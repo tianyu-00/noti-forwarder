@@ -3,15 +3,26 @@ import pg from 'pg';
 import { createApp } from './app.js';
 import { loadBuildInfo } from './config.js';
 import { runMigrations } from './db/migrate.js';
+import { ensureAdminUser } from './auth/users.js';
 
 const port = Number(process.env.PORT) || 3000;
 
-if (!process.env.DATABASE_URL) {
-  console.error('DATABASE_URL is required');
+function requireEnv(name) {
+  if (!process.env[name]) {
+    console.error(`${name} is required`);
+    process.exit(1);
+  }
+  return process.env[name];
+}
+
+const databaseUrl = requireEnv('DATABASE_URL');
+const publicUrl = requireEnv('PUBLIC_URL');
+if (process.env.ADMIN_PASSWORD && process.env.ADMIN_PASSWORD.length < 12) {
+  console.error('ADMIN_PASSWORD must be at least 12 characters');
   process.exit(1);
 }
 
-const db = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+const db = new pg.Pool({ connectionString: databaseUrl });
 const migrationsDir = fileURLToPath(new URL('../migrations', import.meta.url));
 
 // Migrations run automatically on start (see CLAUDE.md); retry while Postgres boots.
@@ -27,7 +38,20 @@ for (let attempt = 1; ; attempt++) {
   }
 }
 
-const app = createApp({ ...loadBuildInfo(process.env), db });
+// First start only: create the single dashboard user from the environment.
+if (process.env.ADMIN_USERNAME && process.env.ADMIN_PASSWORD) {
+  const created = await ensureAdminUser(db, {
+    username: process.env.ADMIN_USERNAME,
+    password: process.env.ADMIN_PASSWORD,
+  });
+  if (created) console.log('created admin user');
+}
+
+// TRUST_PROXY = number of reverse-proxy hops in front of the server (e.g. 1 for
+// Cloudflare tunnel + proxy). Leave unset if clients connect directly.
+const trustProxy = process.env.TRUST_PROXY ? Number(process.env.TRUST_PROXY) : undefined;
+
+const app = createApp({ ...loadBuildInfo(process.env), db, publicUrl, trustProxy });
 
 app.listen(port, () => {
   console.log(`server listening on :${port}`);

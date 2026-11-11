@@ -5,6 +5,10 @@ services:
     env_file: .env
     environment:
       DATABASE_URL: postgres://notiforwarder:${POSTGRES_PASSWORD}@db:5432/notiforwarder
+      PUBLIC_URL: ${PUBLIC_URL}
+      ADMIN_USERNAME: ${ADMIN_USERNAME}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      TRUST_PROXY: ${TRUST_PROXY:-}
     depends_on:
       - db
     ports:
