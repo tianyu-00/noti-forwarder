@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
 import { api } from './api.js';
 import MessageList from './MessageList.jsx';
 import Footer from './Footer.jsx';
+import AddPhoneDialog from './AddPhoneDialog.jsx';
 import Sidebar from './Sidebar.jsx';
 import Filters from './Filters.jsx';
 import { useStream } from './useStream.js';
@@ -17,6 +18,7 @@ export default function Dashboard({ username, onLogout }) {
   const [unread, setUnread] = useState({});
   const [nextBefore, setNextBefore] = useState(null);
   const [loadError, setLoadError] = useState(null);
+  const [addOpen, setAddOpen] = useState(false);
 
   const view = useRef({ selected, filters });
   useEffect(() => {
@@ -113,7 +115,18 @@ export default function Dashboard({ username, onLogout }) {
         </button>
       </header>
       <div className="md:flex">
-        <Sidebar devices={devices} selected={selected} unread={unread} onSelect={select} />
+        <div>
+          <Sidebar devices={devices} selected={selected} unread={unread} onSelect={select} />
+          <div className="px-2 pb-2">
+            <button
+              type="button"
+              onClick={() => setAddOpen(true)}
+              className="w-full rounded bg-sky-600 px-3 py-2 text-sm font-medium hover:bg-sky-500"
+            >
+              Add phone
+            </button>
+          </div>
+        </div>
         <main className="min-w-0 flex-1">
           <h1 className="p-4 text-lg font-semibold">{title}</h1>
           <Filters filters={filters} apps={apps} onChange={setFilters} />
@@ -132,6 +145,7 @@ export default function Dashboard({ username, onLogout }) {
           )}
         </main>
       </div>
+      <AddPhoneDialog open={addOpen} onOpenChange={setAddOpen} devices={devices} />
       <Footer />
     </div>
   );

@@ -316,3 +316,85 @@ describe('footer and sign out', () => {
     expect(called).toBe(true);
   });
 });
+
+describe('add phone', () => {
+  const inMinutes = (m) => new Date(Date.now() + m * 60000).toISOString();
+  const pairingResponse = (overrides = {}) => ({
+    code: 'ABCD-EFGH-IJKL-MNOP-QRST-UVWX-YZ23',
+    expiresAt: inMinutes(10),
+    qrPayload: JSON.stringify({ u: 'https://nf.example.com', c: 'ABCD-EFGH-IJKL-MNOP-QRST-UVWX-YZ23' }),
+    ...overrides,
+  });
+
+  it('shows a QR code and a typeable key for a fresh pairing code', async () => {
+    mockApi({});
+    let posts = 0;
+    server.use(
+      http.post('/api/v1/pairing-codes', () => {
+        posts += 1;
+        return HttpResponse.json(pairingResponse(), { status: 201 });
+      }),
+    );
+    const user = userEvent.setup();
+    render(<Dashboard username="admin" onLogout={() => {}} />);
+
+    await user.click(await screen.findByRole('button', { name: /add phone/i }));
+
+    const dialog = await screen.findByRole('dialog', { name: /add phone/i });
+    expect(await within(dialog).findByText('ABCD-EFGH-IJKL-MNOP-QRST-UVWX-YZ23')).toBeInTheDocument();
+    expect(within(dialog).getByRole('img', { name: /pairing qr code/i })).toBeInTheDocument();
+    expect(within(dialog).getByText('https://nf.example.com')).toBeInTheDocument();
+    expect(within(dialog).getByText(/expires in 9:5\d|expires in 10:00/i)).toBeInTheDocument();
+    expect(posts).toBe(1);
+  });
+
+  it('offers a new code once the old one has expired', async () => {
+    mockApi({});
+    let posts = 0;
+    server.use(
+      http.post('/api/v1/pairing-codes', () => {
+        posts += 1;
+        return HttpResponse.json(posts === 1 ? pairingResponse({ expiresAt: inMinutes(-1) }) : pairingResponse(), {
+          status: 201,
+        });
+      }),
+    );
+    const user = userEvent.setup();
+    render(<Dashboard username="admin" onLogout={() => {}} />);
+    await user.click(await screen.findByRole('button', { name: /add phone/i }));
+
+    const dialog = await screen.findByRole('dialog');
+    expect(await within(dialog).findByText(/this code has expired/i)).toBeInTheDocument();
+    expect(within(dialog).queryByRole('img', { name: /pairing qr code/i })).not.toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole('button', { name: /new code/i }));
+
+    expect(await within(dialog).findByRole('img', { name: /pairing qr code/i })).toBeInTheDocument();
+    expect(posts).toBe(2);
+  });
+
+  it('shows an error when the code cannot be created', async () => {
+    mockApi({});
+    server.use(http.post('/api/v1/pairing-codes', () => HttpResponse.json({ error: 'csrf' }, { status: 403 })));
+    const user = userEvent.setup();
+    render(<Dashboard username="admin" onLogout={() => {}} />);
+    await user.click(await screen.findByRole('button', { name: /add phone/i }));
+
+    expect(await within(await screen.findByRole('dialog')).findByRole('alert')).toHaveTextContent(/could not create/i);
+  });
+
+  it('confirms live when the new phone connects', async () => {
+    mockApi({ devices: [device({ deviceId: 'a', name: 'Kitchen phone' })] });
+    server.use(http.post('/api/v1/pairing-codes', () => HttpResponse.json(pairingResponse(), { status: 201 })));
+    const user = userEvent.setup();
+    render(<Dashboard username="admin" onLogout={() => {}} />);
+    await user.click(await screen.findByRole('button', { name: /add phone/i }));
+    const dialog = await screen.findByRole('dialog');
+    await within(dialog).findByRole('img', { name: /pairing qr code/i });
+
+    act(() => FakeEventSource.current.emit('device', device({ deviceId: 'new', name: 'Fresh phone', lastSeen: null })));
+
+    expect(await within(dialog).findByText(/fresh phone connected/i)).toBeInTheDocument();
+    expect(within(dialog).queryByRole('img', { name: /pairing qr code/i })).not.toBeInTheDocument();
+  });
+});
