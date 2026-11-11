@@ -2,7 +2,7 @@ import express from 'express';
 import helmet from 'helmet';
 import { messagesRouter } from './routes/messages.js';
 
-export function createApp({ version, commit, buildTime, db, messageRateLimit }) {
+export function createApp({ version, commit, buildTime, db, requireViewer, messageRateLimit }) {
   const app = express();
   app.use(helmet());
 
@@ -10,7 +10,7 @@ export function createApp({ version, commit, buildTime, db, messageRateLimit }) 
     res.json({ version, commit, buildTime });
   });
 
-  if (db) app.use('/api/v1', messagesRouter({ db, messageRateLimit }));
+  if (db) app.use('/api/v1', messagesRouter({ db, requireViewer, messageRateLimit }));
 
   app.use((req, res) => {
     res.status(404).json({ error: 'not_found' });

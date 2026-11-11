@@ -5,7 +5,29 @@ import { dedupeHash } from '../dedupe.js';
 import { postMessagesSchema } from '../schemas.js';
 import { rateLimit } from '../rate-limit.js';
 
-export function messagesRouter({ db, messageRateLimit = { limit: 120, windowMs: 60000 } }) {
+// Secure by default: until dashboard sessions exist (milestone 1b), viewers get 401.
+function denyViewers(req, res) {
+  res.status(401).json({ error: 'unauthorized' });
+}
+
+function toApi(row) {
+  return {
+    id: row.id,
+    deviceId: row.device_id,
+    type: row.type,
+    app: row.app,
+    sender: row.sender,
+    body: row.body,
+    receivedAt: row.received_at.toISOString(),
+    createdAt: row.created_at.toISOString(),
+  };
+}
+
+export function messagesRouter({
+  db,
+  requireViewer = denyViewers,
+  messageRateLimit = { limit: 120, windowMs: 60000 },
+}) {
   const router = Router();
   const perDevice = rateLimit({ ...messageRateLimit, key: (req) => req.deviceId });
 
@@ -35,6 +57,25 @@ export function messagesRouter({ db, messageRateLimit = { limit: 120, windowMs: 
         stored += result.rowCount;
       }
       res.status(201).json({ stored, duplicates: incoming.length - stored });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  router.get('/messages', requireViewer, async (req, res, next) => {
+    try {
+      const where = [];
+      const params = [];
+      if (req.query.device) {
+        params.push(req.query.device);
+        where.push(`device_id = $${params.length}`);
+      }
+      const { rows } = await db.query(
+        `SELECT * FROM messages ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+         ORDER BY received_at DESC, id DESC LIMIT 50`,
+        params,
+      );
+      res.json({ messages: rows.map(toApi) });
     } catch (err) {
       next(err);
     }
