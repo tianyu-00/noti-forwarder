@@ -1,22 +1,14 @@
 # Deploy
 
-Images are built by CI and published to GHCR. The Ubuntu server only pulls them.
+CI builds the server image on every push and publishes it to GHCR
+(`ghcr.io/<owner>/notiforwarder-server`). Deploying is manual.
 
-## One-time server setup
-1. Create `~/notiforwarder/` and copy `docker-compose.yml` and `.env.example` (as `.env`) into it.
-2. If the GHCR packages are private: `docker login ghcr.io` with a token that has `read:packages`.
-3. Create a deploy-only SSH key, add the public half to the server user's `authorized_keys`.
+## On the Ubuntu server
+1. Copy `docker-compose.yml` and `.env.example` (as `.env`) into a folder.
+2. Set `VERSION` in `.env` to an explicit tag (a short commit SHA or branch tag; release tags once they exist).
+3. If the GHCR package is private: `docker login ghcr.io` with a token that has `read:packages`.
+4. `docker compose pull && docker compose up -d`
 
-## GitHub repo secrets
-- `DEPLOY_SSH_KEY`, `DEPLOY_HOST`, `DEPLOY_USER` for the deploy workflow.
-- `RELEASE_PLEASE_TOKEN`: a PAT so release tags trigger the CI image build.
+Roll back by changing `VERSION` and running step 4 again.
 
-## Deploying
-Run the **deploy** workflow (Actions tab) with an explicit tag: a release (`1.2.3`),
-a short SHA, or a branch tag. It sets `VERSION` in `.env`, then runs
-`docker compose pull && docker compose up -d`. Roll back by running it with the old tag.
-Pushes never change production by themselves.
-
-## Architecture
-CI builds `linux/amd64` and `linux/arm64`. Narrow to the host's architecture once
-confirmed with `uname -m` on the server.
+CI builds `linux/amd64` and `linux/arm64`; narrow it once you confirm the host with `uname -m`.
