@@ -1,5 +1,7 @@
 import { render, screen, within, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { http, HttpResponse } from 'msw';
+import { server } from './server.js';
 import Dashboard from '../src/Dashboard.jsx';
 import { device, message, mockApi } from './fixtures.js';
 import { FakeEventSource } from './fake-event-source.js';
@@ -247,5 +249,70 @@ describe('live updates', () => {
     act(() => stream.emit('device', device({ deviceId: 'c', name: 'Renamed phone', lastSeen: null })));
     expect(await screen.findByRole('button', { name: /renamed phone/i })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /fresh phone/i })).not.toBeInTheDocument();
+  });
+});
+
+describe('older messages', () => {
+  it('loads the next page when asked, using the server cursor', async () => {
+    const requests = mockApi({
+      devices: [device({ deviceId: 'a' })],
+      messagesResponse: (params) =>
+        params.get('before') === 'cursor-1'
+          ? { messages: [message({ deviceId: 'a', body: 'page two' })], nextBefore: null }
+          : { messages: [message({ deviceId: 'a', body: 'page one' })], nextBefore: 'cursor-1' },
+    });
+    const user = userEvent.setup();
+    render(<Dashboard username="admin" onLogout={() => {}} />);
+    await screen.findByText('page one');
+
+    await user.click(screen.getByRole('button', { name: /load older/i }));
+
+    expect(await screen.findByText('page two')).toBeInTheDocument();
+    expect(screen.getByText('page one')).toBeInTheDocument();
+    expect(requests.messages.at(-1).get('before')).toBe('cursor-1');
+    expect(screen.queryByRole('button', { name: /load older/i })).not.toBeInTheDocument();
+  });
+});
+
+describe('errors', () => {
+  it('tells the user when messages cannot be loaded', async () => {
+    server.use(
+      http.get('/api/v1/devices', () => HttpResponse.json({ devices: [] })),
+      http.get('/api/v1/messages', () => HttpResponse.json({ error: 'internal_error' }, { status: 500 })),
+    );
+    render(<Dashboard username="admin" onLogout={() => {}} />);
+    expect(await screen.findByRole('alert')).toHaveTextContent(/could not load messages/i);
+  });
+});
+
+describe('footer and sign out', () => {
+  it('shows the server version in the footer', async () => {
+    mockApi({});
+    server.use(
+      http.get('/api/v1/health', () => HttpResponse.json({ version: '1.2.3', commit: 'abc1234', buildTime: 'now' })),
+    );
+    render(<Dashboard username="admin" onLogout={() => {}} />);
+    await waitFor(() =>
+      expect(screen.getByRole('contentinfo')).toHaveTextContent(/server 1\.2\.3 \(abc1234\)/i),
+    );
+  });
+
+  it('signs out through the API and tells the app', async () => {
+    mockApi({});
+    let called = false;
+    server.use(
+      http.post('/api/v1/auth/logout', () => {
+        called = true;
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    const onLogout = vi.fn();
+    const user = userEvent.setup();
+    render(<Dashboard username="admin" onLogout={onLogout} />);
+
+    await user.click(await screen.findByRole('button', { name: /sign out/i }));
+
+    await waitFor(() => expect(onLogout).toHaveBeenCalled());
+    expect(called).toBe(true);
   });
 });

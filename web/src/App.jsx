@@ -34,5 +34,13 @@ export default function App() {
 
   if (session.status === 'loading') return null;
   if (session.status === 'out') return <Login onSubmit={login} error={loginError} />;
-  return <Dashboard username={session.username} />;
+  return (
+    <Dashboard
+      username={session.username}
+      onLogout={() => {
+        setCsrfToken(null);
+        setSession({ status: 'out' });
+      }}
+    />
+  );
 }

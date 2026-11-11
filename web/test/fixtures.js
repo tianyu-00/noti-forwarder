@@ -36,6 +36,7 @@ export function message(overrides = {}) {
 export function mockApi({ devices = [], messages = [], messagesResponse } = {}) {
   const requests = { messages: [] };
   server.use(
+    http.get('/api/v1/health', () => HttpResponse.json({ version: 'dev', commit: 'unknown', buildTime: 'unknown' })),
     http.get('/api/v1/devices', () => HttpResponse.json({ devices })),
     http.get('/api/v1/messages', ({ request }) => {
       const url = new URL(request.url);
