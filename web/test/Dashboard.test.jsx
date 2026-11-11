@@ -84,3 +84,80 @@ describe('sidebar', () => {
     await waitFor(() => expect(requests.messages.at(-1).get('device')).toBeNull());
   });
 });
+
+describe('filters', () => {
+  const lastParams = (requests) => requests.messages.at(-1);
+
+  it('filters by type with the All / SMS / Notifications tabs', async () => {
+    const requests = mockApi({ devices: [device({ deviceId: 'a' })], messages: [message({ deviceId: 'a' })] });
+    const user = userEvent.setup();
+    render(<Dashboard username="admin" onLogout={() => {}} />);
+    await screen.findAllByRole('article');
+
+    await user.click(screen.getByRole('tab', { name: /^sms$/i }));
+    await waitFor(() => expect(lastParams(requests).get('type')).toBe('sms'));
+
+    await user.click(screen.getByRole('tab', { name: /notifications/i }));
+    await waitFor(() => expect(lastParams(requests).get('type')).toBe('notification'));
+
+    await user.click(screen.getByRole('tab', { name: /^all$/i }));
+    await waitFor(() => expect(lastParams(requests).get('type')).toBeNull());
+  });
+
+  it('filters by app, offering the apps seen so far', async () => {
+    const requests = mockApi({
+      devices: [device({ deviceId: 'a' })],
+      messages: [
+        message({ deviceId: 'a', app: 'com.bank' }),
+        message({ deviceId: 'a', app: 'com.chat' }),
+        message({ deviceId: 'a', app: 'com.bank' }),
+      ],
+    });
+    const user = userEvent.setup();
+    render(<Dashboard username="admin" onLogout={() => {}} />);
+    await screen.findAllByRole('article');
+
+    const select = screen.getByRole('combobox', { name: /app/i });
+    expect(within(select).getAllByRole('option').map((o) => o.textContent)).toEqual([
+      'All apps',
+      'com.bank',
+      'com.chat',
+    ]);
+
+    await user.selectOptions(select, 'com.chat');
+    await waitFor(() => expect(lastParams(requests).get('app')).toBe('com.chat'));
+    // The choices must not collapse to the filtered result.
+    expect(within(select).getAllByRole('option')).toHaveLength(3);
+  });
+
+  it('searches as the user types', async () => {
+    const requests = mockApi({ devices: [device({ deviceId: 'a' })], messages: [message({ deviceId: 'a' })] });
+    const user = userEvent.setup();
+    render(<Dashboard username="admin" onLogout={() => {}} />);
+    await screen.findAllByRole('article');
+
+    await user.type(screen.getByRole('searchbox', { name: /search/i }), 'parcel');
+
+    await waitFor(() => expect(lastParams(requests).get('q')).toBe('parcel'));
+    // Debounced: typing five letters must not fire five requests.
+    expect(requests.messages.length).toBeLessThan(5);
+  });
+
+  it('keeps the filters when switching phone', async () => {
+    const requests = mockApi({
+      devices: [device({ deviceId: 'a', name: 'Kitchen phone' })],
+      messages: [message({ deviceId: 'a' })],
+    });
+    const user = userEvent.setup();
+    render(<Dashboard username="admin" onLogout={() => {}} />);
+    await screen.findAllByRole('article');
+
+    await user.click(screen.getByRole('tab', { name: /^sms$/i }));
+    await user.click(screen.getByRole('button', { name: /kitchen phone/i }));
+
+    await waitFor(() => {
+      expect(lastParams(requests).get('device')).toBe('a');
+      expect(lastParams(requests).get('type')).toBe('sms');
+    });
+  });
+});
