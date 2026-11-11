@@ -90,3 +90,38 @@ describe('POST /api/v1/messages storing', () => {
     expect(rowCount).toBe(1);
   });
 });
+
+describe('POST /api/v1/messages validation', () => {
+  const cases = {
+    'missing messages array': {},
+    'messages is not an array': { messages: 'nope' },
+    'non-uuid id': { messages: [msg({ id: 'abc' })] },
+    'unknown type': { messages: [msg({ type: 'email' })] },
+    'missing body': { messages: [{ ...msg(), body: undefined }] },
+    'non-string body': { messages: [msg({ body: 42 })] },
+    'invalid receivedAt': { messages: [msg({ receivedAt: 'yesterday' })] },
+    'oversized body': { messages: [msg({ body: 'x'.repeat(20001) })] },
+    'too many messages': { messages: Array.from({ length: 501 }, () => msg()) },
+  };
+
+  for (const [name, payload] of Object.entries(cases)) {
+    it(`returns 400 for ${name} and stores nothing`, async () => {
+      const { token, deviceId } = await ctx.addDevice();
+      const res = await post(token, payload);
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBe('invalid_payload');
+      const { rowCount } = await ctx.pool.query('SELECT 1 FROM messages WHERE device_id=$1', [deviceId]);
+      expect(rowCount).toBe(0);
+    });
+  }
+
+  it('returns 400 for malformed JSON', async () => {
+    const { token } = await ctx.addDevice();
+    const res = await request(ctx.app)
+      .post('/api/v1/messages')
+      .set('Authorization', `Bearer ${token}`)
+      .set('Content-Type', 'application/json')
+      .send('{not json');
+    expect(res.status).toBe(400);
+  });
+});

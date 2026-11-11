@@ -2,13 +2,18 @@ import { Router } from 'express';
 import express from 'express';
 import { authenticateDevice } from '../auth/device-auth.js';
 import { dedupeHash } from '../dedupe.js';
+import { postMessagesSchema } from '../schemas.js';
 
 export function messagesRouter({ db }) {
   const router = Router();
 
   router.post('/messages', authenticateDevice({ db }), express.json(), async (req, res, next) => {
     try {
-      const incoming = req.body.messages;
+      const parsed = postMessagesSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: 'invalid_payload' });
+      }
+      const incoming = parsed.data.messages;
       let stored = 0;
       // ON CONFLICT DO NOTHING covers both a retried id and a repeated dedupe_hash.
       for (const m of incoming) {
