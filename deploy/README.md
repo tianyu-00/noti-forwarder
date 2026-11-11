@@ -1,11 +1,11 @@
 # Deploy
 
-CI builds the server image on every push and publishes it to GHCR
-(`ghcr.io/<owner>/notiforwarder-server`). Deploying is manual.
+CI builds the server image and publishes it to GHCR
+(`ghcr.io/<owner>/notiforwarder-server`), only when you push to the `publish` branch. Deploying is manual.
 
 ## On the Ubuntu server
 1. Copy `docker-compose.yml` and `.env.example` (as `.env`) into a folder.
-2. Set `VERSION` in `.env` to an explicit tag (a short commit SHA or branch tag; release tags once they exist).
+2. Set `VERSION` in `.env` to an explicit tag (a short commit SHA, or `publish` for the newest build).
 3. If the GHCR package is private: `docker login ghcr.io` with a token that has `read:packages`.
 4. `docker compose pull && docker compose up -d`
 
