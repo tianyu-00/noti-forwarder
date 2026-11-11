@@ -15,4 +15,12 @@ describe('loadBuildInfo', () => {
       buildTime: '2026-11-11T10:00:00Z',
     });
   });
+
+  it('falls back to safe defaults when the env vars are unset', () => {
+    expect(loadBuildInfo({})).toEqual({
+      version: 'dev',
+      commit: 'unknown',
+      buildTime: 'unknown',
+    });
+  });
 });
