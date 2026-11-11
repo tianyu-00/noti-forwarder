@@ -1,7 +1,8 @@
-import { render, screen, within, waitFor } from '@testing-library/react';
+import { render, screen, within, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import Dashboard from '../src/Dashboard.jsx';
 import { device, message, mockApi } from './fixtures.js';
+import { FakeEventSource } from './fake-event-source.js';
 
 describe('message list', () => {
   it('shows messages from all phones in the order the server returns them', async () => {
@@ -159,5 +160,92 @@ describe('filters', () => {
       expect(lastParams(requests).get('device')).toBe('a');
       expect(lastParams(requests).get('type')).toBe('sms');
     });
+  });
+});
+
+describe('live updates', () => {
+  const setup = async (extra = {}) => {
+    const devices = [device({ deviceId: 'a', name: 'Kitchen phone' }), device({ deviceId: 'b', name: 'Spare phone' })];
+    mockApi({ devices, messages: [message({ deviceId: 'a', body: 'already here' })], ...extra });
+    const user = userEvent.setup();
+    render(<Dashboard username="admin" onLogout={() => {}} />);
+    await screen.findAllByRole('article');
+    return { user, stream: FakeEventSource.current };
+  };
+
+  it('listens on the stream endpoint and closes it when unmounted', async () => {
+    const { stream } = await setup();
+    expect(stream.url).toContain('/api/v1/stream');
+  });
+
+  it('closes the stream on unmount', async () => {
+    const devices = [device({ deviceId: 'a' })];
+    mockApi({ devices, messages: [] });
+    const { unmount } = render(<Dashboard username="admin" onLogout={() => {}} />);
+    await screen.findByText(/no messages yet/i);
+    const stream = FakeEventSource.current;
+    unmount();
+    expect(stream.closed).toBe(true);
+  });
+
+  it('puts a pushed message at the top of the list', async () => {
+    const { stream } = await setup();
+
+    act(() => stream.emit('message', message({ deviceId: 'b', body: 'brand new' })));
+
+    const items = await screen.findAllByRole('article');
+    expect(within(items[0]).getByText('brand new')).toBeInTheDocument();
+    expect(items).toHaveLength(2);
+  });
+
+  it('ignores a pushed message it already has', async () => {
+    const { stream } = await setup();
+    const m = message({ deviceId: 'b', body: 'only once' });
+
+    act(() => stream.emit('message', m));
+    act(() => stream.emit('message', m));
+
+    expect(await screen.findAllByText('only once')).toHaveLength(1);
+  });
+
+  it('does not show a pushed message that fails the current filters', async () => {
+    const { stream, user } = await setup();
+    await user.click(screen.getByRole('tab', { name: /^sms$/i }));
+    await screen.findByRole('tab', { name: /^sms$/i, selected: true });
+
+    act(() => stream.emit('message', message({ deviceId: 'a', type: 'notification', body: 'wrong type' })));
+    act(() => stream.emit('message', message({ deviceId: 'a', type: 'sms', app: 'sms', body: 'right type' })));
+
+    expect(await screen.findByText('right type')).toBeInTheDocument();
+    expect(screen.queryByText('wrong type')).not.toBeInTheDocument();
+  });
+
+  it('counts unread messages per phone and clears them when the phone is opened', async () => {
+    const { stream, user } = await setup();
+    await user.click(screen.getByRole('button', { name: /kitchen phone/i }));
+    await screen.findByRole('heading', { name: 'Kitchen phone' });
+
+    act(() => stream.emit('message', message({ deviceId: 'b', body: 'one' })));
+    act(() => stream.emit('message', message({ deviceId: 'b', body: 'two' })));
+    act(() => stream.emit('message', message({ deviceId: 'a', body: 'visible, so not unread' })));
+
+    const spare = screen.getByRole('button', { name: /spare phone/i });
+    expect(within(spare).getByLabelText('2 unread')).toBeInTheDocument();
+    expect(within(screen.getByRole('button', { name: /kitchen phone/i })).queryByLabelText(/unread/)).toBeNull();
+    expect(screen.queryByText('one')).not.toBeInTheDocument();
+
+    await user.click(spare);
+    await waitFor(() => expect(within(screen.getByRole('button', { name: /spare phone/i })).queryByLabelText(/unread/)).toBeNull());
+  });
+
+  it('adds a newly paired phone and applies renames from the stream', async () => {
+    const { stream } = await setup();
+
+    act(() => stream.emit('device', device({ deviceId: 'c', name: 'Fresh phone', lastSeen: null })));
+    expect(await screen.findByRole('button', { name: /fresh phone/i })).toBeInTheDocument();
+
+    act(() => stream.emit('device', device({ deviceId: 'c', name: 'Renamed phone', lastSeen: null })));
+    expect(await screen.findByRole('button', { name: /renamed phone/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /fresh phone/i })).not.toBeInTheDocument();
   });
 });

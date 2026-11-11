@@ -37,7 +37,7 @@ Item.propTypes = {
   children: PropTypes.node.isRequired,
 };
 
-export default function Sidebar({ devices, selected, onSelect }) {
+export default function Sidebar({ devices, selected, unread, onSelect }) {
   return (
     <nav aria-label="Phones" className="w-full space-y-1 p-2 md:w-64">
       <Item active={selected === null} onClick={() => onSelect(null)}>
@@ -45,7 +45,14 @@ export default function Sidebar({ devices, selected, onSelect }) {
       </Item>
       {devices.map((d) => (
         <Item key={d.deviceId} active={selected === d.deviceId} onClick={() => onSelect(d.deviceId)}>
-          <span className="font-medium">{d.name}</span>
+          <span className="flex items-center justify-between gap-2 font-medium">
+            {d.name}
+            {unread[d.deviceId] > 0 && (
+              <span aria-label={`${unread[d.deviceId]} unread`} className="rounded-full bg-sky-600 px-2 text-xs text-white">
+                {unread[d.deviceId]}
+              </span>
+            )}
+          </span>
           <span className={clsx('text-xs', isOnline(d.lastSeen) && !d.revokedAt ? 'text-emerald-400' : 'text-slate-400')}>
             {status(d)}
           </span>
@@ -58,5 +65,6 @@ export default function Sidebar({ devices, selected, onSelect }) {
 Sidebar.propTypes = {
   devices: PropTypes.arrayOf(deviceShape).isRequired,
   selected: PropTypes.string,
+  unread: PropTypes.objectOf(PropTypes.number).isRequired,
   onSelect: PropTypes.func.isRequired,
 };
