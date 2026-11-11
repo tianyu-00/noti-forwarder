@@ -19,4 +19,12 @@ describe('GET /api/v1/health', () => {
       buildTime: '2026-11-11T10:00:00Z',
     });
   });
+
+  it('sends security headers and hides the framework', async () => {
+    const res = await request(createApp({})).get('/api/v1/health');
+
+    expect(res.headers['x-powered-by']).toBeUndefined();
+    expect(res.headers['strict-transport-security']).toBeDefined();
+    expect(res.headers['x-content-type-options']).toBe('nosniff');
+  });
 });
