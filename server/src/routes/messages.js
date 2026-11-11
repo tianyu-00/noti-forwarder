@@ -2,7 +2,7 @@ import { Router } from 'express';
 import express from 'express';
 import { authenticateDevice } from '../auth/device-auth.js';
 import { dedupeHash } from '../dedupe.js';
-import { postMessagesSchema } from '../schemas.js';
+import { postMessagesSchema, getMessagesQuerySchema, encodeCursor, decodeCursor } from '../schemas.js';
 import { rateLimit } from '../rate-limit.js';
 
 // Secure by default: until dashboard sessions exist (milestone 1b), viewers get 401.
@@ -21,6 +21,10 @@ function toApi(row) {
     receivedAt: row.received_at.toISOString(),
     createdAt: row.created_at.toISOString(),
   };
+}
+
+function escapeLike(text) {
+  return text.replace(/[\\%_]/g, (c) => `\\${c}`);
 }
 
 export function messagesRouter({
@@ -64,18 +68,43 @@ export function messagesRouter({
 
   router.get('/messages', requireViewer, async (req, res, next) => {
     try {
+      const parsed = getMessagesQuerySchema.safeParse(req.query);
+      if (!parsed.success) {
+        return res.status(400).json({ error: 'invalid_query' });
+      }
+      const { device, type, app, q, limit, before } = parsed.data;
       const where = [];
       const params = [];
-      if (req.query.device) {
-        params.push(req.query.device);
-        where.push(`device_id = $${params.length}`);
+      const bind = (value) => {
+        params.push(value);
+        return `$${params.length}`;
+      };
+
+      if (device) where.push(`device_id = ${bind(device)}`);
+      if (type) where.push(`type = ${bind(type)}`);
+      if (app) where.push(`app = ${bind(app)}`);
+      if (q) {
+        const like = bind(`%${escapeLike(q)}%`);
+        where.push(`(body ILIKE ${like} OR sender ILIKE ${like} OR app ILIKE ${like})`);
       }
+      if (before) {
+        const { ts, id } = decodeCursor(before);
+        where.push(`(received_at, id) < (${bind(ts)}::timestamptz, ${bind(id)}::uuid)`);
+      }
+
       const { rows } = await db.query(
-        `SELECT * FROM messages ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
-         ORDER BY received_at DESC, id DESC LIMIT 50`,
+        `SELECT *, to_char(received_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS received_at_us
+           FROM messages ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+          ORDER BY received_at DESC, id DESC
+          LIMIT ${bind(limit + 1)}`,
         params,
       );
-      res.json({ messages: rows.map(toApi) });
+      const page = rows.slice(0, limit);
+      const last = page[page.length - 1];
+      res.json({
+        messages: page.map(toApi),
+        nextBefore: rows.length > limit ? encodeCursor(last.received_at_us, last.id) : null,
+      });
     } catch (err) {
       next(err);
     }

@@ -13,6 +13,7 @@ ENV APP_VERSION=$APP_VERSION GIT_COMMIT=$GIT_COMMIT BUILD_TIME=$BUILD_TIME
 COPY --from=deps /app/node_modules ./node_modules
 COPY package*.json ./
 COPY src ./src
+COPY migrations ./migrations
 USER node
 EXPOSE 3000
 CMD ["node", "src/index.js"]

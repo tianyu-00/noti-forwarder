@@ -3,5 +3,27 @@ services:
     image: ghcr.io/${GHCR_OWNER}/notiforwarder-server:${VERSION}
     restart: unless-stopped
     env_file: .env
+    environment:
+      DATABASE_URL: postgres://notiforwarder:${POSTGRES_PASSWORD}@db:5432/notiforwarder
+    depends_on:
+      - db
     ports:
       - "127.0.0.1:3000:3000"
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: notiforwarder
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: notiforwarder
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U notiforwarder"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:
