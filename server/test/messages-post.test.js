@@ -125,3 +125,19 @@ describe('POST /api/v1/messages validation', () => {
     expect(res.status).toBe(400);
   });
 });
+
+describe('POST /api/v1/messages size limits', () => {
+  it('accepts a large but legitimate batch', async () => {
+    const { token } = await ctx.addDevice();
+    const messages = Array.from({ length: 100 }, (_, i) => msg({ body: `${i} ${'y'.repeat(5000)}` }));
+    const res = await post(token, { messages });
+    expect(res.status).toBe(201);
+    expect(res.body.stored).toBe(100);
+  });
+
+  it('rejects a body over 2 MB with 413', async () => {
+    const { token } = await ctx.addDevice();
+    const res = await post(token, { messages: [msg({ body: 'z'.repeat(2.5 * 1024 * 1024) })] });
+    expect(res.status).toBe(413);
+  });
+});

@@ -7,7 +7,7 @@ import { postMessagesSchema } from '../schemas.js';
 export function messagesRouter({ db }) {
   const router = Router();
 
-  router.post('/messages', authenticateDevice({ db }), express.json(), async (req, res, next) => {
+  router.post('/messages', authenticateDevice({ db }), express.json({ limit: '2mb' }), async (req, res, next) => {
     try {
       const parsed = postMessagesSchema.safeParse(req.body);
       if (!parsed.success) {
