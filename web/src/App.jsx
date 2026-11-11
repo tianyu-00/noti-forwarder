@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, setCsrfToken } from './api.js';
 import Login from './Login.jsx';
+import Dashboard from './Dashboard.jsx';
 
 const LOGIN_ERRORS = {
   429: 'Too many attempts. Try again in a few minutes.',
@@ -33,5 +34,5 @@ export default function App() {
 
   if (session.status === 'loading') return null;
   if (session.status === 'out') return <Login onSubmit={login} error={loginError} />;
-  return <p>Signed in as {session.username}</p>;
+  return <Dashboard username={session.username} />;
 }
