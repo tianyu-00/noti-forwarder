@@ -1,16 +1,35 @@
 import express from 'express';
 import helmet from 'helmet';
+import cookieParser from 'cookie-parser';
 import { messagesRouter } from './routes/messages.js';
+import { authRouter } from './routes/auth.js';
+import { requireSession } from './auth/sessions.js';
 
-export function createApp({ version, commit, buildTime, db, requireViewer, messageRateLimit }) {
+export function createApp({
+  version,
+  commit,
+  buildTime,
+  db,
+  requireViewer,
+  messageRateLimit,
+  loginRateLimit,
+  cookieSecure,
+  trustProxy,
+}) {
   const app = express();
+  if (trustProxy !== undefined) app.set('trust proxy', trustProxy);
   app.use(helmet());
+  app.use(cookieParser());
 
   app.get('/api/v1/health', (req, res) => {
     res.json({ version, commit, buildTime });
   });
 
-  if (db) app.use('/api/v1', messagesRouter({ db, requireViewer, messageRateLimit }));
+  if (db) {
+    const viewer = requireViewer ?? requireSession({ db });
+    app.use('/api/v1', authRouter({ db, requireViewer: viewer, cookieSecure, loginRateLimit }));
+    app.use('/api/v1', messagesRouter({ db, requireViewer: viewer, messageRateLimit }));
+  }
 
   app.use((req, res) => {
     res.status(404).json({ error: 'not_found' });

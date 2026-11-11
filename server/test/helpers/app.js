@@ -7,11 +7,18 @@ import { hashToken } from '../../src/auth/tokens.js';
 
 const migrationsDir = fileURLToPath(new URL('../../migrations', import.meta.url));
 
-export async function buildTestApp(options = {}) {
+export const ADMIN = { username: 'admin', password: 'correct horse battery staple' };
+
+// By default viewers are let through so message tests stay focused; pass
+// realAuth: true to exercise the real session guard.
+export async function buildTestApp({ realAuth = false, ...options } = {}) {
   const pool = await createTestPool();
   await runMigrations(pool, migrationsDir);
-  // Viewer auth arrives in milestone 1b; tests simply let viewers through.
-  const app = createApp({ db: pool, requireViewer: (req, res, next) => next(), ...options });
+  const app = createApp({
+    db: pool,
+    ...(realAuth ? { cookieSecure: false } : { requireViewer: (req, res, next) => next() }),
+    ...options,
+  });
 
   async function addDevice({ revoked = false } = {}) {
     const token = randomBytes(32).toString('base64url');
