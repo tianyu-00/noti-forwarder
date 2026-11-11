@@ -1,4 +1,14 @@
 services:
+  # Single public entry point: serves the dashboard and proxies /api to the server.
+  # Point the Cloudflare tunnel at http://localhost:3000 (or http://web:80 from another container).
+  web:
+    image: ghcr.io/${GHCR_OWNER}/notiforwarder-web:${VERSION}
+    restart: unless-stopped
+    depends_on:
+      - server
+    ports:
+      - "127.0.0.1:3000:80"
+
   server:
     image: ghcr.io/${GHCR_OWNER}/notiforwarder-server:${VERSION}
     restart: unless-stopped
@@ -11,8 +21,6 @@ services:
       TRUST_PROXY: ${TRUST_PROXY:-}
     depends_on:
       - db
-    ports:
-      - "127.0.0.1:3000:3000"
 
   db:
     image: postgres:16-alpine

@@ -26,11 +26,31 @@ jobs:
       - run: npm run lint
       - run: npm test
 
-  # Publishing only happens after every test job is green.
-  publish-server:
-    needs: [test-server]
+  test-web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+
+  # Publishing only happens after every test job is green, and only from the publish branch.
+  publish:
+    needs: [test-server, test-web]
     if: github.event_name == 'push' && github.ref == 'refs/heads/publish'
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        component: [server, web]
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-qemu-action@v3
@@ -43,21 +63,21 @@ jobs:
       - id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository_owner }}/notiforwarder-server
+          images: ghcr.io/${{ github.repository_owner }}/notiforwarder-${{ matrix.component }}
           flavor: latest=false
           tags: |
             type=sha,format=short
             type=raw,value=publish
       - uses: docker/build-push-action@v6
         with:
-          context: server
+          context: ${{ matrix.component }}
           push: true
           # Host architecture is unconfirmed; build both until it is.
           platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=${{ matrix.component }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.component }}
           build-args: |
             APP_VERSION=${{ steps.meta.outputs.version }}
             GIT_COMMIT=${{ github.sha }}
