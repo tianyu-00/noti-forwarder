@@ -398,3 +398,95 @@ describe('add phone', () => {
     expect(within(dialog).queryByRole('img', { name: /pairing qr code/i })).not.toBeInTheDocument();
   });
 });
+
+describe('manage a phone', () => {
+  const openManage = async (user) => {
+    await user.click(await screen.findByRole('button', { name: /kitchen phone/i }));
+    await user.click(await screen.findByRole('button', { name: /manage phone/i }));
+    return screen.findByRole('dialog', { name: /kitchen phone/i });
+  };
+  const setup = () => {
+    mockApi({ devices: [device({ deviceId: 'a', name: 'Kitchen phone' })] });
+    render(<Dashboard username="admin" onLogout={() => {}} />);
+    return userEvent.setup();
+  };
+
+  it('only offers management when a single phone is selected', async () => {
+    const user = setup();
+    await screen.findByRole('button', { name: /kitchen phone/i });
+    expect(screen.queryByRole('button', { name: /manage phone/i })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /kitchen phone/i }));
+    expect(await screen.findByRole('button', { name: /manage phone/i })).toBeInTheDocument();
+  });
+
+  it('renames the phone', async () => {
+    let sent;
+    server.use(
+      http.patch('/api/v1/devices/a', async ({ request }) => {
+        sent = await request.json();
+        return HttpResponse.json(device({ deviceId: 'a', name: sent.name }));
+      }),
+    );
+    const user = setup();
+    const dialog = await openManage(user);
+
+    const input = within(dialog).getByLabelText(/name/i);
+    await user.clear(input);
+    await user.type(input, 'Hall phone');
+    await user.click(within(dialog).getByRole('button', { name: /save/i }));
+
+    expect(await screen.findByRole('heading', { name: 'Hall phone' })).toBeInTheDocument();
+    expect(sent).toEqual({ name: 'Hall phone' });
+    expect(screen.getByRole('button', { name: /hall phone/i })).toBeInTheDocument();
+  });
+
+  it('shows an error when renaming fails', async () => {
+    server.use(http.patch('/api/v1/devices/a', () => HttpResponse.json({ error: 'x' }, { status: 500 })));
+    const user = setup();
+    const dialog = await openManage(user);
+
+    await user.click(within(dialog).getByRole('button', { name: /save/i }));
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(/could not rename/i);
+  });
+
+  it('asks for confirmation before revoking, then revokes', async () => {
+    let deletes = 0;
+    server.use(
+      http.delete('/api/v1/devices/a', () => {
+        deletes += 1;
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    const user = setup();
+    const dialog = await openManage(user);
+
+    await user.click(within(dialog).getByRole('button', { name: /revoke this phone/i }));
+    expect(deletes).toBe(0);
+    expect(within(dialog).getByText(/must be paired again/i)).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole('button', { name: /yes, revoke/i }));
+
+    await waitFor(() => expect(deletes).toBe(1));
+    expect(await screen.findByText('Revoked')).toBeInTheDocument();
+  });
+
+  it('keeps the phone when the revoke confirmation is cancelled', async () => {
+    let deletes = 0;
+    server.use(
+      http.delete('/api/v1/devices/a', () => {
+        deletes += 1;
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    const user = setup();
+    const dialog = await openManage(user);
+
+    await user.click(within(dialog).getByRole('button', { name: /revoke this phone/i }));
+    await user.click(within(dialog).getByRole('button', { name: /cancel/i }));
+
+    expect(within(dialog).getByRole('button', { name: /revoke this phone/i })).toBeInTheDocument();
+    expect(deletes).toBe(0);
+  });
+});

@@ -4,6 +4,7 @@ import { api } from './api.js';
 import MessageList from './MessageList.jsx';
 import Footer from './Footer.jsx';
 import AddPhoneDialog from './AddPhoneDialog.jsx';
+import ManagePhoneDialog from './ManagePhoneDialog.jsx';
 import Sidebar from './Sidebar.jsx';
 import Filters from './Filters.jsx';
 import { useStream } from './useStream.js';
@@ -19,6 +20,7 @@ export default function Dashboard({ username, onLogout }) {
   const [nextBefore, setNextBefore] = useState(null);
   const [loadError, setLoadError] = useState(null);
   const [addOpen, setAddOpen] = useState(false);
+  const [manageOpen, setManageOpen] = useState(false);
 
   const view = useRef({ selected, filters });
   useEffect(() => {
@@ -104,6 +106,7 @@ export default function Dashboard({ username, onLogout }) {
   }
 
   const deviceNames = useMemo(() => Object.fromEntries(devices.map((d) => [d.deviceId, d.name])), [devices]);
+  const selectedDevice = devices.find((d) => d.deviceId === selected);
   const title = selected ? (deviceNames[selected] ?? 'Phone') : 'All phones';
 
   return (
@@ -128,7 +131,18 @@ export default function Dashboard({ username, onLogout }) {
           </div>
         </div>
         <main className="min-w-0 flex-1">
-          <h1 className="p-4 text-lg font-semibold">{title}</h1>
+          <div className="flex items-center justify-between gap-2 p-4">
+            <h1 className="text-lg font-semibold">{title}</h1>
+            {selectedDevice && (
+              <button
+                type="button"
+                onClick={() => setManageOpen(true)}
+                className="rounded bg-slate-800 px-3 py-1 text-sm hover:bg-slate-700"
+              >
+                Manage phone
+              </button>
+            )}
+          </div>
           <Filters filters={filters} apps={apps} onChange={setFilters} />
           {loadError && (
             <p role="alert" className="px-4 pb-2 text-sm text-red-400">
@@ -145,6 +159,19 @@ export default function Dashboard({ username, onLogout }) {
           )}
         </main>
       </div>
+      {selectedDevice && (
+        <ManagePhoneDialog
+          device={selectedDevice}
+          open={manageOpen}
+          onOpenChange={setManageOpen}
+          onRenamed={(d) => setDevices((list) => list.map((x) => (x.deviceId === d.deviceId ? d : x)))}
+          onRevoked={(id) =>
+            setDevices((list) =>
+              list.map((x) => (x.deviceId === id ? { ...x, revokedAt: new Date().toISOString() } : x)),
+            )
+          }
+        />
+      )}
       <AddPhoneDialog open={addOpen} onOpenChange={setAddOpen} devices={devices} />
       <Footer />
     </div>
