@@ -3,6 +3,7 @@ import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import { messagesRouter } from './routes/messages.js';
 import { authRouter } from './routes/auth.js';
+import { pairingRouter } from './routes/pairing.js';
 import { requireSession } from './auth/sessions.js';
 
 export function createApp({
@@ -15,6 +16,8 @@ export function createApp({
   loginRateLimit,
   cookieSecure,
   trustProxy,
+  publicUrl,
+  pairRateLimit,
 }) {
   const app = express();
   if (trustProxy !== undefined) app.set('trust proxy', trustProxy);
@@ -28,6 +31,7 @@ export function createApp({
   if (db) {
     const viewer = requireViewer ?? requireSession({ db });
     app.use('/api/v1', authRouter({ db, requireViewer: viewer, cookieSecure, loginRateLimit }));
+    app.use('/api/v1', pairingRouter({ db, requireViewer: viewer, publicUrl, pairRateLimit }));
     app.use('/api/v1', messagesRouter({ db, requireViewer: viewer, messageRateLimit }));
   }
 
