@@ -141,3 +141,19 @@ describe('POST /api/v1/messages size limits', () => {
     expect(res.status).toBe(413);
   });
 });
+
+describe('POST /api/v1/messages rate limiting', () => {
+  it('returns 429 once a device exceeds its limit, without affecting other devices', async () => {
+    const limited = await buildTestApp({ messageRateLimit: { limit: 2, windowMs: 60000 } });
+    const d1 = await limited.addDevice();
+    const d2 = await limited.addDevice();
+    const send = (token) =>
+      request(limited.app).post('/api/v1/messages').set('Authorization', `Bearer ${token}`).send({ messages: [] });
+
+    expect((await send(d1.token)).status).toBe(201);
+    expect((await send(d1.token)).status).toBe(201);
+    expect((await send(d1.token)).status).toBe(429);
+    expect((await send(d2.token)).status).toBe(201);
+    await limited.pool.end();
+  });
+});

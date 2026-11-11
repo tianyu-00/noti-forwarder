@@ -3,11 +3,13 @@ import express from 'express';
 import { authenticateDevice } from '../auth/device-auth.js';
 import { dedupeHash } from '../dedupe.js';
 import { postMessagesSchema } from '../schemas.js';
+import { rateLimit } from '../rate-limit.js';
 
-export function messagesRouter({ db }) {
+export function messagesRouter({ db, messageRateLimit = { limit: 120, windowMs: 60000 } }) {
   const router = Router();
+  const perDevice = rateLimit({ ...messageRateLimit, key: (req) => req.deviceId });
 
-  router.post('/messages', authenticateDevice({ db }), express.json({ limit: '2mb' }), async (req, res, next) => {
+  router.post('/messages', authenticateDevice({ db }), perDevice, express.json({ limit: '2mb' }), async (req, res, next) => {
     try {
       const parsed = postMessagesSchema.safeParse(req.body);
       if (!parsed.success) {
