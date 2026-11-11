@@ -1,4 +1,5 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, within, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import Dashboard from '../src/Dashboard.jsx';
 import { device, message, mockApi } from './fixtures.js';
 
@@ -40,5 +41,46 @@ describe('message list', () => {
     mockApi({ devices: [], messages: [] });
     render(<Dashboard username="admin" onLogout={() => {}} />);
     expect(await screen.findByText(/no messages yet/i)).toBeInTheDocument();
+  });
+});
+
+describe('sidebar', () => {
+  const minutesAgo = (m) => new Date(Date.now() - m * 60000).toISOString();
+
+  it('lists phones with their online status', async () => {
+    mockApi({
+      devices: [
+        device({ deviceId: 'a', name: 'Kitchen phone', lastSeen: minutesAgo(0.5) }),
+        device({ deviceId: 'b', name: 'Spare phone', lastSeen: minutesAgo(90) }),
+        device({ deviceId: 'c', name: 'Old phone', revokedAt: minutesAgo(5) }),
+        device({ deviceId: 'd', name: 'New phone', lastSeen: null }),
+      ],
+    });
+    render(<Dashboard username="admin" onLogout={() => {}} />);
+
+    const nav = await screen.findByRole('navigation', { name: /phones/i });
+    expect(within(within(nav).getByRole('button', { name: /kitchen phone/i })).getByText(/online/i)).toBeInTheDocument();
+    expect(within(within(nav).getByRole('button', { name: /spare phone/i })).getByText(/last seen/i)).toBeInTheDocument();
+    expect(within(within(nav).getByRole('button', { name: /old phone/i })).getByText(/revoked/i)).toBeInTheDocument();
+    expect(within(within(nav).getByRole('button', { name: /new phone/i })).getByText(/never connected/i)).toBeInTheDocument();
+  });
+
+  it('shows only the selected phone, and All phones shows everything again', async () => {
+    const requests = mockApi({
+      devices: [device({ deviceId: 'a', name: 'Kitchen phone' }), device({ deviceId: 'b', name: 'Spare phone' })],
+      messages: [message({ deviceId: 'a', body: 'hello from a' })],
+    });
+    const user = userEvent.setup();
+    render(<Dashboard username="admin" onLogout={() => {}} />);
+
+    await user.click(await screen.findByRole('button', { name: /spare phone/i }));
+
+    expect(await screen.findByRole('heading', { name: 'Spare phone' })).toBeInTheDocument();
+    await waitFor(() => expect(requests.messages.at(-1).get('device')).toBe('b'));
+
+    await user.click(screen.getByRole('button', { name: /all phones/i }));
+
+    expect(await screen.findByRole('heading', { name: /all phones/i })).toBeInTheDocument();
+    await waitFor(() => expect(requests.messages.at(-1).get('device')).toBeNull());
   });
 });
