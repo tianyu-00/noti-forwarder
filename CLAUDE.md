@@ -165,45 +165,51 @@ All code is written test-first. No production code without a failing test that d
 
 ## Build, deploy and versioning
 
-- Images are built automatically on deploy. Nothing is built by hand on the server.
-- CI: GitHub Actions builds Docker images for `server` and `web` on every push (any branch, and version tags) and publishes them to GitHub Container Registry (`ghcr.io/<owner>/notiforwarder-server`, `...-web`). Use `docker buildx` with layer caching. Build for the target architecture of the Ubuntu host.
-- Deploy: the Ubuntu server pulls the new images and restarts via `docker compose pull && docker compose up -d`. Triggered by CI over SSH, or by a pull-based updater (e.g. Watchtower) watching the registry. Pick one and document it in `/deploy`.
-- `deploy/docker-compose.yml` references images by explicit version tag (`${VERSION}`), never only `latest`, so any deploy can be rolled back by changing one variable.
-- Versioning: Semantic Versioning (`MAJOR.MINOR.PATCH`) for the whole repo, driven by git tags (`v1.2.3`) and Conventional Commits (`feat:`, `fix:`, `feat!:`). Use release-please or semantic-release to bump the version, update `CHANGELOG.md` and create the tag.
-- Image tags: every push is published with the short commit SHA and the sanitised branch name (e.g. `feat-sms-capture`). Pushes to `main` also get `edge`. Release tags get `1.2.3`, `1.2`, `1` and `latest`. Because every push publishes, `latest` and the semver tags must only ever come from release tags, never from a branch push.
-- Deploy picks an explicit tag (a release version, or a SHA/branch tag for testing a branch on the server); a push publishing an image does not by itself change what is running in production.
-- Every component reports its version: `GET /api/v1/health` returns `{ version, commit, buildTime }`, and the web dashboard shows the version in its footer. Pass these in as Docker build args.
-- Android app: `versionName` follows the repo version. `versionCode` is an integer that increases every release (derive it from the CI run number or from the version). CI builds a signed release APK and attaches it to the GitHub release.
-- API compatibility: the API is versioned in the URL (`/api/v1`). Old phones must keep working after a server update, so never make a breaking change to `v1`. Add `v2` instead and support both until the phones are updated. The server should accept and record the phone app's version in each request (`X-App-Version` header).
-- Database: schema changes go through numbered migrations that run automatically on server start. Migrations must be backward compatible with the previous release so a rollback is safe.
+Current setup (decided during Milestone 0; the earlier plan for release-please, SSH deploy and semver release tags was dropped for now).
+
+- Images are built by CI, never by hand on the server.
+- CI (`.github/workflows/ci.yml`): every push and PR runs lint and tests for `server` and `web` (plus the web build). Images are built and published to GitHub Container Registry (`ghcr.io/<owner>/notiforwarder-server`, `...-web`) **only when pushing to the `publish` branch**, and only after all test jobs pass. To release: `git push origin main:publish`.
+- Image tags: the short commit SHA (`sha-abc1234`) and `publish` (always the newest published build). There is no `latest`, `edge` or semver tag yet.
+- Builds target `linux/amd64` and `linux/arm64` until the Ubuntu host's architecture is confirmed (`uname -m` on the server); narrow it then.
+- Deploy is manual: on the Ubuntu server set `VERSION` in `.env` to an explicit tag (a SHA tag, or `publish` for the newest) and run `docker compose pull && docker compose up -d`. Roll back by changing `VERSION`. See `deploy/README.md`. A push publishing an image does not by itself change what is running.
+- `deploy/docker-compose.yml` references images by `${VERSION}`, never only `latest`. The `web` container (nginx) is the single public entry point on `127.0.0.1:3000`; it serves the dashboard and proxies `/api` to the server, which is not published. Point the Cloudflare tunnel at it. Phones use the same public address.
+- Set `TRUST_PROXY` to the number of reverse-proxy hops in front of the server (2 = cloudflared + the web container) so per-IP rate limits see the real client address.
+- Every component reports its version: `GET /api/v1/health` returns `{ version, commit, buildTime }`, and the web dashboard shows the web and server versions in its footer. They are passed in as Docker build args (`APP_VERSION`, `GIT_COMMIT`, `BUILD_TIME`).
+- Not decided yet: release tags / Semantic Versioning / changelog automation, and Android `versionName`/`versionCode` and APK publishing. Revisit when the Android app exists.
+- API compatibility: the API is versioned in the URL (`/api/v1`). Old phones must keep working after a server update, so never make a breaking change to `v1`. Add `v2` instead and support both until the phones are updated. The server records the phone app's version from each request (`X-App-Version` header).
+- Database: schema changes go through numbered SQL migrations in `server/migrations/` that run automatically on server start. Migrations must be backward compatible with the previous release so a rollback is safe.
 
 ## Milestones
 
-0. Pipeline first: GitHub Actions runs lint and tests, then builds and publishes images, release-please versioning, compose deploy to the Ubuntu server, `/health` showing the version (itself built test-first).
-1. Server: Express + Postgres, `POST /messages`, `GET /messages`, Docker Compose, running on the Ubuntu server.
-   1b. Auth and pairing: web login, pairing code + QR, `/pair` endpoint, device tokens, revoke.
+Status as of the last update: 0, 1, 1b and 5 are done (server and web, test-first). Android work (2-4) and 6-7 are not started.
+
+0. Pipeline first: CI runs lint and tests, then builds and publishes images from the `publish` branch, compose file, `/health` showing the version. (done; release-please and SSH deploy dropped)
+1. Server: Express + Postgres, `POST /messages`, `GET /messages`, Docker Compose. (done)
+   1b. Auth and pairing: web login, pairing code + QR, `/pair` endpoint, device tokens, revoke. (done)
 2. Android: pair with the server (QR/key), then notification listener that POSTs one notification to the server.
 3. Reliability: Room queue, retry with backoff, foreground service, survives reboot.
 4. SMS capture + de-duplication, plus phone settings: SMS/notification toggles and the app blacklist.
-5. React dashboard (Tailwind + Radix UI) with live updates, search, per-device filter.
+5. React dashboard (Tailwind + Radix UI) with live updates, search, per-device filter. (done; unread counts are client-side only and reset on reload)
 6. ntfy push to the main phone; filters and 2FA code highlighting.
 7. SMS reply from the PC (outbox polled by the phone, sent via `SmsManager`).
+Still open from earlier milestones: TOTP 2FA, retention setting, end-to-end test against the Compose stack in CI.
 
 ## Working conventions
 
 - Small commits, one logical change each, written as Conventional Commits (they drive the version bump); run tests/linters before committing.
 - Follow TDD (see Development method). Tests come first, in every component.
 - Ask before adding new dependencies or changing the data model.
+- Do not add `Co-Authored-By` (or any Claude attribution) lines to commits or PR descriptions.
 - Explain Android-specific decisions briefly; I'm more experienced with web/Node than native Android.
 
 ## Commands
 
-(Fill in as the project takes shape.)
-
-- Server dev: `cd server && npm run dev`
-- Server tests: `cd server && npm test` (watch mode: `npm run test:watch`)
-- Web tests: `cd web && npm test`
-- Android unit tests: `cd android && ./gradlew test`
-- Stack up: `docker compose -f deploy/docker-compose.yml up -d`
-- Web dev: `cd web && npm run dev`
-- Android build: `cd android && ./gradlew assembleDebug`
+- Server dev: `cd server && npm run dev` (needs `DATABASE_URL` and `PUBLIC_URL`; see `.env.example`)
+- Server tests: `cd server && npm test` (watch mode: `npm run test:watch`). Needs Docker running: integration tests start a real Postgres with Testcontainers.
+- Server lint: `cd server && npm run lint`
+- Web dev: `cd web && npm run dev` (proxies `/api` to `localhost:3000`)
+- Web tests: `cd web && npm test`; lint: `npm run lint`; build: `npm run build`
+- Stack up (on the server): `cd deploy && docker compose up -d` after copying `.env.example` to `.env` (see `deploy/README.md`)
+- Release images: `git push origin main:publish`
+- Android unit tests: `cd android && ./gradlew test` (not created yet)
+- Android build: `cd android && ./gradlew assembleDebug` (not created yet)
