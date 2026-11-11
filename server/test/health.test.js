@@ -20,6 +20,14 @@ describe('GET /api/v1/health', () => {
     });
   });
 
+  it('returns a JSON 404 for unknown routes', async () => {
+    const res = await request(createApp({})).get('/api/v1/nope');
+
+    expect(res.status).toBe(404);
+    expect(res.headers['content-type']).toMatch(/application\/json/);
+    expect(res.body).toEqual({ error: 'not_found' });
+  });
+
   it('sends security headers and hides the framework', async () => {
     const res = await request(createApp({})).get('/api/v1/health');
 

@@ -9,5 +9,9 @@ export function createApp({ version, commit, buildTime }) {
     res.json({ version, commit, buildTime });
   });
 
+  app.use((req, res) => {
+    res.status(404).json({ error: 'not_found' });
+  });
+
   return app;
 }
