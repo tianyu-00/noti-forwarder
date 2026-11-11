@@ -4,24 +4,14 @@ import { authenticateDevice } from '../auth/device-auth.js';
 import { dedupeHash } from '../dedupe.js';
 import { postMessagesSchema, getMessagesQuerySchema, encodeCursor, decodeCursor } from '../schemas.js';
 import { rateLimit } from '../rate-limit.js';
+import { messageToApi } from '../serializers.js';
 
 // Secure by default: until dashboard sessions exist (milestone 1b), viewers get 401.
 function denyViewers(req, res) {
   res.status(401).json({ error: 'unauthorized' });
 }
 
-function toApi(row) {
-  return {
-    id: row.id,
-    deviceId: row.device_id,
-    type: row.type,
-    app: row.app,
-    sender: row.sender,
-    body: row.body,
-    receivedAt: row.received_at.toISOString(),
-    createdAt: row.created_at.toISOString(),
-  };
-}
+const toApi = messageToApi;
 
 function escapeLike(text) {
   return text.replace(/[\\%_]/g, (c) => `\\${c}`);
@@ -30,6 +20,7 @@ function escapeLike(text) {
 export function messagesRouter({
   db,
   requireViewer = denyViewers,
+  events,
   messageRateLimit = { limit: 120, windowMs: 60000 },
 }) {
   const router = Router();
@@ -55,10 +46,13 @@ export function messagesRouter({
         const result = await db.query(
           `INSERT INTO messages (id, device_id, type, app, sender, body, received_at, dedupe_hash)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-           ON CONFLICT DO NOTHING`,
+           ON CONFLICT DO NOTHING
+           RETURNING *`,
           [m.id, req.deviceId, m.type, m.app, m.sender, m.body, m.receivedAt, hash],
         );
         stored += result.rowCount;
+        // Only newly stored messages are pushed; duplicates stay silent.
+        if (result.rowCount === 1) events.publish('message', toApi(result.rows[0]));
       }
       res.status(201).json({ stored, duplicates: incoming.length - stored });
     } catch (err) {

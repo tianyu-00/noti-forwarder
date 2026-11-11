@@ -3,25 +3,14 @@ import express from 'express';
 import { z } from 'zod';
 import { audit } from '../audit.js';
 import { requireCsrf } from '../auth/sessions.js';
+import { deviceToApi, DEVICE_COLUMNS } from '../serializers.js';
 
 const renameSchema = z.object({ name: z.string().min(1).max(100) });
 
-function toApi(row) {
-  return {
-    deviceId: row.device_id,
-    name: row.name,
-    model: row.model,
-    appVersion: row.app_version,
-    pairedAt: row.paired_at.toISOString(),
-    lastSeen: row.last_seen ? row.last_seen.toISOString() : null,
-    revokedAt: row.revoked_at ? row.revoked_at.toISOString() : null,
-  };
-}
+const toApi = deviceToApi;
+const COLUMNS = DEVICE_COLUMNS;
 
-// token_hash is never selected, so it cannot leak through this router.
-const COLUMNS = 'device_id, name, model, app_version, paired_at, last_seen, revoked_at';
-
-export function devicesRouter({ db, requireViewer }) {
+export function devicesRouter({ db, requireViewer, events }) {
   const router = Router();
 
   router.get('/devices', requireViewer, async (req, res, next) => {
@@ -42,6 +31,7 @@ export function devicesRouter({ db, requireViewer }) {
         [req.params.id, parsed.data.name],
       );
       if (rows.length === 0) return res.status(404).json({ error: 'not_found' });
+      events.publish('device', toApi(rows[0]));
       res.json(toApi(rows[0]));
     } catch (err) {
       next(err);
@@ -52,10 +42,13 @@ export function devicesRouter({ db, requireViewer }) {
   router.delete('/devices/:id', requireViewer, requireCsrf, async (req, res, next) => {
     try {
       const revoked = await db.query(
-        'UPDATE devices SET revoked_at = now() WHERE device_id = $1 AND revoked_at IS NULL',
+        `UPDATE devices SET revoked_at = now()
+          WHERE device_id = $1 AND revoked_at IS NULL
+        RETURNING ${COLUMNS}`,
         [req.params.id],
       );
       if (revoked.rowCount === 1) {
+        events.publish('device', toApi(revoked.rows[0]));
         await audit(db, { event: 'revoke', actor: req.session.username, deviceId: req.params.id, ip: req.ip });
       } else {
         const exists = await db.query('SELECT 1 FROM devices WHERE device_id = $1', [req.params.id]);

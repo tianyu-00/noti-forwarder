@@ -7,6 +7,7 @@ import { generatePairingCode, hashCode, PAIRING_TTL_MS } from '../auth/pairing.j
 import { requireCsrf } from '../auth/sessions.js';
 import { hashToken } from '../auth/tokens.js';
 import { rateLimit } from '../rate-limit.js';
+import { deviceToApi, DEVICE_COLUMNS } from '../serializers.js';
 
 const pairSchema = z.object({
   code: z.string().min(8).max(100),
@@ -18,6 +19,7 @@ const pairSchema = z.object({
 export function pairingRouter({
   db,
   requireViewer,
+  events,
   publicUrl = '',
   pairRateLimit = { limit: 10, windowMs: 15 * 60 * 1000 },
 }) {
@@ -77,6 +79,8 @@ export function pairingRouter({
       await client.query('COMMIT');
 
       await audit(db, { event: 'pair', deviceId, ip: req.ip });
+      const created = await db.query(`SELECT ${DEVICE_COLUMNS} FROM devices WHERE device_id = $1`, [deviceId]);
+      events.publish('device', deviceToApi(created.rows[0]));
       res.status(201).json({ deviceId, token });
     } catch (err) {
       await client.query('ROLLBACK').catch(() => {});

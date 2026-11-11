@@ -5,6 +5,8 @@ import { messagesRouter } from './routes/messages.js';
 import { authRouter } from './routes/auth.js';
 import { pairingRouter } from './routes/pairing.js';
 import { devicesRouter } from './routes/devices.js';
+import { streamRouter } from './routes/stream.js';
+import { createEventHub } from './events.js';
 import { requireSession } from './auth/sessions.js';
 
 export function createApp({
@@ -31,10 +33,12 @@ export function createApp({
 
   if (db) {
     const viewer = requireViewer ?? requireSession({ db });
+    const events = createEventHub();
     app.use('/api/v1', authRouter({ db, requireViewer: viewer, cookieSecure, loginRateLimit }));
-    app.use('/api/v1', pairingRouter({ db, requireViewer: viewer, publicUrl, pairRateLimit }));
-    app.use('/api/v1', devicesRouter({ db, requireViewer: viewer }));
-    app.use('/api/v1', messagesRouter({ db, requireViewer: viewer, messageRateLimit }));
+    app.use('/api/v1', pairingRouter({ db, requireViewer: viewer, events, publicUrl, pairRateLimit }));
+    app.use('/api/v1', devicesRouter({ db, requireViewer: viewer, events }));
+    app.use('/api/v1', messagesRouter({ db, requireViewer: viewer, events, messageRateLimit }));
+    app.use('/api/v1', streamRouter({ requireViewer: viewer, events }));
   }
 
   app.use((req, res) => {
