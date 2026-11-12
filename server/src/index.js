@@ -1,6 +1,7 @@
 import { fileURLToPath } from 'node:url';
 import pg from 'pg';
 import { createApp } from './app.js';
+import { cookieSecureFor } from './cookie-secure.js';
 import { loadBuildInfo } from './config.js';
 import { runMigrations } from './db/migrate.js';
 import { ensureAdminUser } from './auth/users.js';
@@ -64,7 +65,9 @@ try {
 }
 console.log(notifier ? 'ntfy push enabled' : 'ntfy push off (set NTFY_TOPIC to turn it on)');
 
-const app = createApp({ ...loadBuildInfo(process.env), db, publicUrl, trustProxy, notifier });
+const cookieSecure = cookieSecureFor(publicUrl);
+if (!cookieSecure) console.log('PUBLIC_URL is http://: sessions work without HTTPS, but traffic is not encrypted');
+const app = createApp({ ...loadBuildInfo(process.env), db, publicUrl, trustProxy, notifier, cookieSecure });
 
 startRetentionJob(db);
 

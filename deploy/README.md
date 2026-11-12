@@ -70,3 +70,7 @@ Cloudflare presents the HTTPS certificate, so nothing needs opening on your rout
 Phones and the dashboard then both use `PUBLIC_URL`. The phone API paths (`/api/v1/pair`, `/api/v1/messages`) must stay reachable without a Cloudflare Access login, because the phone app can't complete one.
 
 If Nginx Proxy Manager also sits in the path, there is one more proxy: set `TRUST_PROXY=3`, and in NPM add `proxy_buffering off;` and `proxy_read_timeout 1h;` for `/api/v1/stream` so live updates are not buffered.
+
+## Without a domain (plain http)
+
+Set `PUBLIC_URL` to the address you open the dashboard on, for example `http://192.168.1.20:3000`. With `http://` the server stops marking the session cookie Secure, so signing in sticks. Nothing is encrypted in that mode: use it only on a network you trust. The Android app still refuses plain http, so phones need an https address.

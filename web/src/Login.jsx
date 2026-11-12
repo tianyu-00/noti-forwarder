@@ -26,8 +26,8 @@ export default function Login({ onSubmit, error, needsCode = false }) {
         </div>
         {!window.isSecureContext && (
           <p role="status" className="rounded-md border border-line bg-surface p-3 text-sm text-muted">
-            This page is not using HTTPS, so your browser will not keep you signed in and you will have to sign
-            in again after every refresh. Open the dashboard through its https:// address.
+            This page is not using HTTPS, so your password and messages are not encrypted. Use it only on a
+            network you trust, and prefer the https:// address when you have one.
           </p>
         )}
         {error && (
