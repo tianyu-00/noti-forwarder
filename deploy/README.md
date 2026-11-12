@@ -17,55 +17,37 @@ Roll back by changing `VERSION` and running step 4 again.
 
 CI builds `linux/amd64` and `linux/arm64`; narrow it once you confirm the host with `uname -m`.
 
-## First deploy on a production VM (fresh start, public images)
+## First deploy on a production VM (fresh start)
 
-Starts empty: new database, new admin login, phones pair again. Nothing is copied from another machine.
+If the VM has its own PostgreSQL and cloudflared, use the next section instead. Otherwise:
 
-**Once, on GitHub: make the images public** so the VM needs no login. Your profile, **Packages**, then for each of `notiforwarder-server` and `notiforwarder-web`: **Package settings**, **Danger Zone**, **Change visibility**, **Public**. The images hold the app code only, never `.env` or any secret.
+1. Once, on GitHub: make the `notiforwarder-server` and `notiforwarder-web` packages public (Packages, then Package settings, then Change visibility), so the VM needs no login. They contain code only, never `.env`.
+2. Copy `docker-compose.yml` and `.env.example` (renamed `.env`) to the VM, never your other machine's `.env`. Fill in the passwords, `PUBLIC_URL`, `VERSION` and `TUNNEL_TOKEN`.
+3. `docker compose up -d`, then sign in at `PUBLIC_URL` and pair the phone again.
 
-**On the VM** (Docker with the compose plugin; `docker --version && docker compose version` to check, and `uname -m` should say `x86_64` or `aarch64`, both are built):
-
-1. Get the two files over, from the machine that has the project. Do not copy its `.env`: it holds that machine's passwords and tunnel token.
-   ```bash
-   ssh <vm> mkdir -p ~/notiforwarder
-   scp deploy/docker-compose.yml deploy/.env.example <vm>:~/notiforwarder/
-   ```
-2. On the VM:
-   ```bash
-   cd ~/notiforwarder
-   cp .env.example .env && chmod 600 .env
-   nano .env
-   ```
-   Set `GHCR_OWNER`, `VERSION` (a `sha-xxxxxxx` tag from the Packages page, so production only changes when you choose; `publish` always follows the newest build), a new `POSTGRES_PASSWORD` (`openssl rand -base64 24`), `PUBLIC_URL`, `TRUST_PROXY=2`, `ADMIN_USERNAME`, `ADMIN_PASSWORD` (12+ characters), and `TUNNEL_TOKEN` with `COMPOSE_PROFILES=tunnel`. Leave `COMPOSE_PROJECT_NAME` alone once the first start has happened.
-3. Make a tunnel for this VM (see below), then `docker compose up -d`.
-4. Check: `docker compose ps` (four running), `curl localhost:3000/api/v1/health`, and `docker compose logs server` shows `applied migrations` and `created admin user`.
-5. Sign in at `PUBLIC_URL`, choose **Add phone**, and scan the code with the app. If the app still shows the old pairing, tap **Unpair this phone** first. Then turn two-step login on again in Settings.
-6. Nothing needs opening on the firewall: the tunnel only makes outgoing connections, and port 3000 is bound to `127.0.0.1`.
-
-If you reuse the hostname the old machine served (so the phones keep the same address), stop the old machine's stack first (`docker compose down`, without `-v`) and repoint the hostname to the new tunnel. Two machines connected to one tunnel would split the traffic between two different databases.
-
-Update later with `docker compose pull && docker compose up -d` after changing `VERSION`, and back up with the `pg_dump` command in the main README.
+If you reuse a hostname another machine served, stop that machine's stack first and repoint the hostname to the new tunnel.
 
 ## Using your own PostgreSQL and cloudflared
 
-For a machine that already runs both. `docker-compose.byo.yml` starts only the dashboard (`web`) and the `server`; it has no database and no tunnel of its own. Use it instead of `docker-compose.yml`.
+Four steps. This runs only the dashboard and the server; the database and the tunnel are yours.
 
-**1. The database** (PostgreSQL 13 or newer, no extensions). Create a user that owns its own database, so the server can create its tables:
-```sql
-CREATE ROLE notiforwarder LOGIN PASSWORD 'a-long-random-password';
-CREATE DATABASE notiforwarder OWNER notiforwarder;
-```
-The server creates and updates its tables itself on start. If PostgreSQL runs on the same machine as Docker, it must accept connections from Docker's network: listen on more than `localhost` (`listen_addresses`), and allow the Docker address range in `pg_hba.conf`, e.g. `host notiforwarder notiforwarder 172.16.0.0/12 scram-sha-256`, then reload. If it runs elsewhere, use its address. Back it up with your own tooling, e.g. `pg_dump -U notiforwarder notiforwarder > backup.sql`.
+1. **Database.** In your PostgreSQL (13 or newer):
+   ```sql
+   CREATE ROLE notiforwarder LOGIN PASSWORD 'a-long-random-password';
+   CREATE DATABASE notiforwarder OWNER notiforwarder;
+   ```
+2. **Files.** Put `docker-compose.byo.yml` and `.env.byo.example` (renamed `.env`) in a folder on the machine. Fill in the five lines marked `<--`.
+3. **Start.** `docker compose up -d`
+4. **Tunnel.** In Cloudflare, point your hostname at **HTTP** `localhost:3000`. Then open your address, sign in, and choose **Add phone**.
 
-**2. Files.** Copy `docker-compose.byo.yml` and `.env.byo.example` (as `.env`) to the machine, plus `docker-compose.byo-network.yml` if you need step 3b. Set `DATABASE_URL`, `PUBLIC_URL`, the admin login and `VERSION`. `COMPOSE_FILE` in that `.env` makes plain `docker compose up -d`, `pull` and `logs` use this file. Passwords with special characters must be URL-encoded in `DATABASE_URL`. A database that requires TLS needs `?sslmode=require` on the URL; this has not been tried against one.
+Check it worked: `docker compose logs server` shows `created admin user`.
 
-**3. Pointing your cloudflared at it.** The dashboard container listens on `127.0.0.1:3000` of the machine. In the Cloudflare public hostname, use service type **HTTP** and:
-- a. cloudflared runs on the machine itself: `localhost:3000`.
-- b. cloudflared runs as a container on its own Docker network: set `COMPOSE_FILE=docker-compose.byo.yml:docker-compose.byo-network.yml` and `CLOUDFLARED_NETWORK=<that network's name>` in `.env` (`docker network ls`). The dashboard container is then reachable from the tunnel as `notiforwarder-web:80`.
-
-Keep `TRUST_PROXY=2` (your cloudflared, then the dashboard container). If another proxy sits in front, count it too.
-
-**4. Start and check:** `docker compose up -d`, then `docker compose ps`, `curl localhost:3000/api/v1/health`, and `docker compose logs server` should show `applied migrations` and `created admin user`. Sign in at `PUBLIC_URL`, choose **Add phone**, and pair. Updating later is `docker compose pull && docker compose up -d`.
+### If something doesn't work
+- **"connection refused" or a timeout to the database, with PostgreSQL on the same machine:** it must accept connections from Docker. Set `listen_addresses` to include the Docker bridge (or `*`), and add `host notiforwarder notiforwarder 172.16.0.0/12 scram-sha-256` to `pg_hba.conf`, then reload PostgreSQL. A database on another machine just needs its address in `DATABASE_URL`.
+- **A password with special characters:** URL-encode it inside `DATABASE_URL`.
+- **cloudflared is a container, not on the machine itself:** set `COMPOSE_FILE=docker-compose.byo.yml:docker-compose.byo-network.yml` and `CLOUDFLARED_NETWORK=<its network, from docker network ls>` in `.env` (copy `docker-compose.byo-network.yml` too), and use **HTTP** `notiforwarder-web:80` in Cloudflare instead.
+- **A database that needs TLS:** add `?sslmode=require` to `DATABASE_URL`. Not tried against a real one.
+- Back up with your own tools, e.g. `pg_dump -U notiforwarder notiforwarder > backup.sql`. Update with `docker compose pull && docker compose up -d`.
 
 ## Public access with a Cloudflare tunnel
 Cloudflare presents the HTTPS certificate, so nothing needs opening on your router and there is no certificate to renew. The domain must use Cloudflare DNS.
