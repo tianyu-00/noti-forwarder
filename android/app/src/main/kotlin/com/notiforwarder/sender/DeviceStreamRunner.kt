@@ -63,7 +63,7 @@ class DeviceStreamRunner(
                 }
                 lastAttemptAt = now()
                 _state.value = ConnectionState.Connecting
-                when (val end = connect { _state.value = ConnectionState.Connected }) {
+                when (val end = connectSafely()) {
                     StreamEnd.NotPaired -> return
                     StreamEnd.Revoked -> {
                         store.clear()
@@ -85,6 +85,16 @@ class DeviceStreamRunner(
         } finally {
             _state.value = ConnectionState.Stopped
         }
+    }
+
+    // Whatever goes wrong inside one attempt, the loop must live on: a dead thread would leave the
+    // phone silently disconnected until the app restarted. An interrupt still means "stop".
+    private fun connectSafely(): StreamEnd = try {
+        connect { _state.value = ConnectionState.Connected }
+    } catch (e: InterruptedException) {
+        throw e
+    } catch (e: Exception) {
+        StreamEnd.Dropped(wasConnected = false)
     }
 
     /** The network may be back: end the current wait and try again now. Does nothing if not waiting. */

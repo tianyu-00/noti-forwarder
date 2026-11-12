@@ -200,4 +200,34 @@ class DeviceStreamRunnerTest {
         stopped.run()
         assertEquals(ConnectionState.Stopped, stopped.state.value)
     }
+
+    @Test
+    fun `an unexpected error is treated as a dropped connection, so the loop keeps going`() {
+        var runs = 0
+        val runner = DeviceStreamRunner(
+            connect = { _ ->
+                when (runs++) {
+                    0 -> throw IllegalStateException("something nobody planned for")
+                    1 -> throw NullPointerException()
+                    else -> StreamEnd.Revoked
+                }
+            },
+            store = store,
+            onRevoked = { revoked++ },
+            backoff = Backoff(baseMillis = 2_000, maxMillis = 60_000, jitter = 0.0),
+            wait = { ms ->
+                sleeps += ms
+                clock += ms
+                false
+            },
+            now = { clock },
+        )
+
+        runner.run() // must not throw
+
+        assertEquals(3, runs)
+        assertEquals(listOf(2_000L, 4_000L), sleeps) // waits grow like for any failed attempt
+        assertEquals(1, revoked)
+        assertEquals(ConnectionState.Stopped, runner.state.value)
+    }
 }
