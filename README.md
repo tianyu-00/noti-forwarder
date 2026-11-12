@@ -15,11 +15,11 @@ Design notes and project rules are in [CLAUDE.md](CLAUDE.md).
 
 ## Running it (day to day)
 
-The running copy lives in its own folder, **`~/notiforwarder-run`** (it holds `docker-compose.yml`
-and a private `.env` with the passwords and tunnel token). Run every command below from there:
+It runs from the project's **`deploy/`** folder, using the private **`deploy/.env`** (passwords and
+tunnel token; git ignores it). Run every command below from there:
 
 ```bash
-cd ~/notiforwarder-run
+cd ~/github/noti-forwarder/deploy
 ```
 
 | I want to... | Command |
@@ -32,10 +32,12 @@ cd ~/notiforwarder-run
 | Watch the server's log (Ctrl+C stops watching) | `docker compose logs -f server` |
 | Check the tunnel | `docker compose logs --tail 30 cloudflared` |
 
-The `.env` file contains `COMPOSE_PROFILES=tunnel`, which is what makes these plain commands
-include the Cloudflare tunnel. If that line is ever missing, add `--profile tunnel` after
-`docker compose` (for example `docker compose --profile tunnel up -d`), otherwise the site stays
-unreachable.
+Two lines in `.env` matter for these plain commands:
+- `COMPOSE_PROFILES=tunnel` makes them include the Cloudflare tunnel. If it is ever missing, add
+  `--profile tunnel` after `docker compose` (for example `docker compose --profile tunnel up -d`),
+  otherwise the site stays unreachable.
+- `COMPOSE_PROJECT_NAME=notiforwarder-run` keeps the database volume from before the stack moved
+  into `deploy/`. Do not change it, or Docker will start a new, empty database.
 
 ### Check that it works
 Open `<your PUBLIC_URL>/api/v1/health` in a browser. It should show a version and a commit.
@@ -78,5 +80,9 @@ docker compose exec -T db psql -U notiforwarder notiforwarder < backup-2026-11-1
   really want to erase every message.
 - Never commit `.env` or paste the tunnel token or passwords anywhere. They belong only in that
   file.
+- `git clean -fdx` deletes ignored files, including `deploy/.env`. Do not run it in this project
+  without copying `.env` somewhere safe first.
+- `deploy/docker-compose.yml` is tracked by git. After a `git pull`, run `docker compose up -d`
+  to apply any change to it.
 
 More about the server install and the Cloudflare tunnel: [deploy/README.md](deploy/README.md).

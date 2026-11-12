@@ -2,6 +2,8 @@
 
 Day-to-day commands (start, stop, restart, logs, update, backup) are in the [main README](../README.md#running-it-day-to-day).
 
+On a machine that has the project (like a development PC), copy `.env.example` to `.env` right here in `deploy/` and run the commands from this folder. On a server without the project, put `docker-compose.yml` and `.env` in any folder and run them there.
+
 CI builds the server image and publishes it to GHCR
 (`ghcr.io/<owner>/notiforwarder-server`), only when you push to the `publish` branch. Deploying is manual.
 
