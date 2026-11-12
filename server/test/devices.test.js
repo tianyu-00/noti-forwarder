@@ -187,3 +187,31 @@ describe('DELETE /api/v1/devices/:id/messages (clear messages, phone stays)', ()
     expect(rows).toEqual([{ actor: 'admin' }]);
   });
 });
+
+describe('DELETE /api/v1/messages (clear every phone\'s messages)', () => {
+  const clearAll = (token = csrf) => agent.delete('/api/v1/messages').set('X-CSRF-Token', token);
+
+  it('needs a session and a CSRF token', async () => {
+    expect((await request(ctx.app).delete('/api/v1/messages')).status).toBe(401);
+    expect((await agent.delete('/api/v1/messages')).status).toBe(403);
+  });
+
+  it('deletes all messages of all phones, keeps the phones paired and writes an audit entry', async () => {
+    const a = await ctx.addDevice();
+    const b = await ctx.addDevice();
+    await send(a.token, [msg({ body: 'one' }), msg({ body: 'two' })]);
+    await send(b.token, [msg({ body: 'three' })]);
+    const before = (await ctx.pool.query('SELECT count(*)::int AS n FROM messages')).rows[0].n;
+
+    const res = await clearAll();
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ deleted: before });
+    expect((await ctx.pool.query('SELECT count(*)::int AS n FROM messages')).rows[0].n).toBe(0);
+    const list = await agent.get('/api/v1/devices');
+    expect(list.body.devices.find((x) => x.deviceId === a.deviceId).revokedAt).toBeNull();
+    expect((await send(b.token, [msg()])).status).toBe(201);
+    const { rows } = await ctx.pool.query("SELECT actor, device_id FROM audit_log WHERE event = 'clear_all_messages'");
+    expect(rows).toEqual([{ actor: ADMIN.username, device_id: null }]);
+  });
+});

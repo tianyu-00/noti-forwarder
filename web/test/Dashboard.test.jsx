@@ -1125,3 +1125,63 @@ describe('add phone: scan feedback', () => {
     expect(within(dialog).queryByText(/connected/i)).not.toBeInTheDocument();
   });
 });
+
+describe('settings: clear all messages', () => {
+  const setup = async () => {
+    server.use(
+      http.get('/api/v1/settings', () => HttpResponse.json({ retentionDays: null })),
+      http.get('/api/v1/auth/me', () => HttpResponse.json({ username: 'admin', csrfToken: 'c', totpEnabled: false })),
+    );
+    mockApi({ devices: [device({ deviceId: 'a' })], messages: [message({ deviceId: 'a', body: 'keep me maybe' })] });
+    const user = userEvent.setup();
+    render(<Dashboard username="admin" onLogout={() => {}} />);
+    await screen.findByText('keep me maybe');
+    await user.click(await screen.findByRole('button', { name: /settings/i }));
+    return { user, dialog: await screen.findByRole('dialog', { name: /settings/i }) };
+  };
+
+  it('asks before clearing, and cancelling sends nothing', async () => {
+    let called = false;
+    server.use(http.delete('/api/v1/messages', () => { called = true; return HttpResponse.json({ deleted: 1 }); }));
+    const { user, dialog } = await setup();
+
+    await user.click(await within(dialog).findByRole('button', { name: /clear all messages/i }));
+    expect(within(dialog).getByText(/delete the messages of every phone/i)).toBeInTheDocument();
+    await user.click(within(dialog).getByRole('button', { name: /cancel/i }));
+
+    expect(called).toBe(false);
+    expect(screen.getByText('keep me maybe')).toBeInTheDocument();
+  });
+
+  it('deletes everything once confirmed, empties the list and says how many were deleted', async () => {
+    server.use(http.delete('/api/v1/messages', () => HttpResponse.json({ deleted: 7 })));
+    const { user, dialog } = await setup();
+
+    await user.click(await within(dialog).findByRole('button', { name: /clear all messages/i }));
+    await user.click(within(dialog).getByRole('button', { name: /yes, clear/i }));
+
+    expect(await within(dialog).findByText(/deleted 7 messages/i)).toBeInTheDocument();
+    expect(screen.queryByText('keep me maybe')).not.toBeInTheDocument();
+  });
+
+  it('shows an error and keeps the list when the server refuses', async () => {
+    server.use(http.delete('/api/v1/messages', () => HttpResponse.json({ error: 'x' }, { status: 500 })));
+    const { user, dialog } = await setup();
+
+    await user.click(await within(dialog).findByRole('button', { name: /clear all messages/i }));
+    await user.click(within(dialog).getByRole('button', { name: /yes, clear/i }));
+
+    expect(await within(dialog).findByText(/could not clear the messages/i)).toBeInTheDocument();
+    expect(screen.getByText('keep me maybe')).toBeInTheDocument();
+  });
+
+  it('empties the list when another dashboard clears everything', async () => {
+    mockApi({ devices: [device({ deviceId: 'a' })], messages: [message({ deviceId: 'a', body: 'gone soon' })] });
+    render(<Dashboard username="admin" onLogout={() => {}} />);
+    await screen.findByText('gone soon');
+
+    act(() => FakeEventSource.current.emit('messages_cleared_all', {}));
+
+    await waitFor(() => expect(screen.queryByText('gone soon')).not.toBeInTheDocument());
+  });
+});

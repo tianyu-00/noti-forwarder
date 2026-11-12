@@ -49,6 +49,11 @@ export default function Dashboard({ username, onLogout, pairingTiming }) {
     setUnread((u) => ({ ...u, [deviceId]: 0 }));
   }, []);
 
+  const clearAllMessages = useCallback(() => {
+    setMessages([]);
+    setUnread({});
+  }, []);
+
   // A phone was erased (here or on another dashboard): drop it and its messages from view.
   const removeDevice = useCallback((deviceId) => {
     setDevices((list) => list.filter((x) => x.deviceId !== deviceId));
@@ -72,6 +77,7 @@ export default function Dashboard({ username, onLogout, pairingTiming }) {
     },
     device_deleted: (d) => removeDevice(d.deviceId),
     messages_cleared: (d) => clearMessagesOf(d.deviceId),
+    messages_cleared_all: clearAllMessages,
     device: (d) =>
       setDevices((list) =>
         list.some((x) => x.deviceId === d.deviceId)
@@ -244,6 +250,7 @@ export default function Dashboard({ username, onLogout, pairingTiming }) {
         open={settingsOpen}
         onOpenChange={setSettingsOpen}
         onPurged={() => setReloadKey((k) => k + 1)}
+        onClearedAll={clearAllMessages}
       />
       <AddPhoneDialog
         open={addOpen}

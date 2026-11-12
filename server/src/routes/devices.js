@@ -75,6 +75,19 @@ export function devicesRouter({ db, requireViewer, events }) {
     }
   });
 
+  // Clears every phone's messages at once. Phones stay paired. Irreversible, so the dashboard
+  // asks first. The audit log records who did it, never any text.
+  router.delete('/messages', requireViewer, requireCsrf, async (req, res, next) => {
+    try {
+      const result = await db.query('DELETE FROM messages');
+      await audit(db, { event: 'clear_all_messages', actor: req.session.username, ip: req.ip });
+      events.publish('messages_cleared_all', {});
+      res.json({ deleted: result.rowCount });
+    } catch (err) {
+      next(err);
+    }
+  });
+
   // Erasing removes a revoked phone and every message it sent. Irreversible, so the phone
   // must be revoked first (it can no longer be sending). The audit log keeps the record.
   router.delete('/devices/:id/permanent', requireViewer, requireCsrf, async (req, res, next) => {
