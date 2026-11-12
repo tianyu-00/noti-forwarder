@@ -142,6 +142,11 @@ Table `audit_log`: `id`, `event` (login, pair, revoke, ...), `actor`, `device_id
 
 ## Android gotchas
 
+- Android tests: Robolectric needs `--add-exports=java.base/jdk.internal.access=ALL-UNNAMED` on JDK 21 (set in `app/build.gradle.kts`), and `robolectric.properties` uses a plain `Application` so WorkManager is not started in unit tests.
+- OkHttp 5 needs `compileSdk` 37; `targetSdk` is 37 as well.
+- The phone can only find out it was revoked when it next tries to send (a 401), not before.
+- Quick tunnels (`trycloudflare.com`) do not pass Server-Sent Events, so the dashboard's live stream does not work through one. Use a named tunnel.
+
 - Notification access is a manual user grant in system settings.
 - OnePlus/Oppo kill background apps aggressively: use a foreground service, request battery-optimisation exemption, and document the auto-start settings per device.
 - Sideloaded APK, so Play Store SMS-permission policy does not apply.
@@ -181,13 +186,13 @@ Current setup (decided during Milestone 0; the earlier plan for release-please, 
 
 ## Milestones
 
-Status as of the last update: 0, 1, 1b and 5 are done (server and web, test-first). Android work (2-4) and 6-7 are not started.
+Status as of the last update: 0, 1, 1b, 2, 3 and 5 are done. 3's reboot survival and the OnePlus battery/auto-start settings still need a manual check on the phone. 4, 6 and 7 are not started.
 
 0. Pipeline first: CI runs lint and tests, then builds and publishes images from the `publish` branch, compose file, `/health` showing the version. (done; release-please and SSH deploy dropped)
 1. Server: Express + Postgres, `POST /messages`, `GET /messages`, Docker Compose. (done)
    1b. Auth and pairing: web login, pairing code + QR, `/pair` endpoint, device tokens, revoke. (done)
-2. Android: pair with the server (QR/key), then notification listener that POSTs one notification to the server.
-3. Reliability: Room queue, retry with backoff, foreground service, survives reboot.
+2. Android: pair with the server (QR/key), then notification listener that POSTs one notification to the server. (done; re-pairing the same phone reuses its entry via `hardware_id`)
+3. Reliability: Room queue, retry with backoff, foreground service, survives reboot. (done: queue, backoff, WorkManager, foreground keep-alive service and boot receiver; verified offline then online on a real phone, reboot not yet verified)
 4. SMS capture + de-duplication, plus phone settings: SMS/notification toggles and the app blacklist.
 5. React dashboard (Tailwind + Radix UI) with live updates, search, per-device filter. (done; unread counts are client-side only and reset on reload)
 6. ntfy push to the main phone; filters and 2FA code highlighting.
@@ -211,5 +216,6 @@ Still open from earlier milestones: TOTP 2FA, retention setting, end-to-end test
 - Web tests: `cd web && npm test`; lint: `npm run lint`; build: `npm run build`
 - Stack up (on the server): `cd deploy && docker compose up -d` after copying `.env.example` to `.env` (see `deploy/README.md`)
 - Release images: `git push origin main:publish`
-- Android unit tests: `cd android && ./gradlew test` (not created yet)
-- Android build: `cd android && ./gradlew assembleDebug` (not created yet)
+- Android unit tests: `cd android && ./gradlew testDebugUnitTest` (needs `JAVA_HOME`/`ANDROID_HOME`; JDK 21 and the SDK are under `~/android-dev`)
+- Android lint + build: `cd android && ./gradlew lintDebug assembleDebug` (APK at `app/build/outputs/apk/debug/`; CI also uploads it as an artifact)
+- Install on a phone: `adb install -r app/build/outputs/apk/debug/app-debug.apk` (wireless debugging: `adb pair` once, then `adb connect <ip:port>`)
