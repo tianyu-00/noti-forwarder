@@ -11,14 +11,14 @@ function parse(raw) {
 }
 
 // Opens /api/v1/stream on a real listening server and collects parsed SSE frames.
-export async function openStream(app, { cookie } = {}) {
+export async function openStream(app, { cookie, path = '/api/v1/stream', headers = {} } = {}) {
   const server = app.listen(0);
   await new Promise((resolve) => server.once('listening', resolve));
   const { port } = server.address();
 
   return new Promise((resolve, reject) => {
     const req = http.get(
-      { port, path: '/api/v1/stream', headers: cookie ? { cookie } : {} },
+      { port, path, headers: cookie ? { cookie, ...headers } : headers },
       (res) => {
         const events = [];
         let buffer = '';

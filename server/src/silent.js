@@ -16,6 +16,8 @@ export function createSilentMonitor({
   db,
   notifier = null,
   afterMinutes,
+  // A phone holding its connection is alive by definition, however long since its last message.
+  isConnected = () => false,
   now = Date.now,
   logger = console,
 }) {
@@ -39,6 +41,7 @@ export function createSilentMonitor({
     const limit = afterMinutes * 60000;
     const quietNow = new Map();
     for (const row of rows) {
+      if (isConnected(row.device_id)) continue;
       const lastContact = new Date(row.last_seen ?? row.paired_at).getTime();
       if (now() - lastContact >= limit) quietNow.set(row.device_id, { row, ms: now() - lastContact });
     }

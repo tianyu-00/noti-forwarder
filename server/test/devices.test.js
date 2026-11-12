@@ -38,6 +38,7 @@ describe('GET /api/v1/devices', () => {
       pairedAt: expect.any(String),
       lastSeen: expect.any(String),
       revokedAt: null,
+      connected: false,
     });
     expect(JSON.stringify(res.body)).not.toMatch(/token/i);
   });

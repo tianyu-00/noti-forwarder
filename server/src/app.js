@@ -3,6 +3,8 @@ import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import { messagesRouter } from './routes/messages.js';
 import { heartbeatRouter } from './routes/heartbeat.js';
+import { deviceStreamRouter } from './routes/device-stream.js';
+import { createPresence } from './presence.js';
 import { authRouter } from './routes/auth.js';
 import { pairingRouter } from './routes/pairing.js';
 import { devicesRouter } from './routes/devices.js';
@@ -41,12 +43,25 @@ export function createApp({
   if (db) {
     const viewer = requireViewer ?? requireSession({ db });
     const events = createEventHub();
+    // Who holds a connection right now. Going on or offline refreshes "last seen" and tells open
+    // dashboards, so the green dot is exact.
+    const presence = createPresence({
+      onChange: (deviceId, connected) => {
+        db.query('UPDATE devices SET last_seen = now() WHERE device_id = $1 RETURNING last_seen', [deviceId])
+          .then(({ rows }) => {
+            if (rows[0]) events.publish('device_presence', { deviceId, connected, lastSeen: rows[0].last_seen.toISOString() });
+          })
+          .catch(() => {}); // never let a bookkeeping failure break a connection
+      },
+    });
+    app.locals.presence = presence; // the silent-phone monitor reads it
     app.use('/api/v1', authRouter({ db, requireViewer: viewer, cookieSecure, loginRateLimit, now, secretBox }));
     app.use('/api/v1', pairingRouter({ db, requireViewer: viewer, events, publicUrl, pairRateLimit }));
-    app.use('/api/v1', devicesRouter({ db, requireViewer: viewer, events, silentAfterMinutes }));
+    app.use('/api/v1', devicesRouter({ db, requireViewer: viewer, events, presence, silentAfterMinutes }));
     app.use('/api/v1', settingsRouter({ db, requireViewer: viewer }));
     app.use('/api/v1', messagesRouter({ db, requireViewer: viewer, events, notifier, messageRateLimit, preAuthRateLimit }));
     app.use('/api/v1', heartbeatRouter({ db, events, preAuthRateLimit }));
+    app.use('/api/v1', deviceStreamRouter({ db, events, presence, preAuthRateLimit }));
     app.use('/api/v1', streamRouter({ requireViewer: viewer, events }));
   }
 

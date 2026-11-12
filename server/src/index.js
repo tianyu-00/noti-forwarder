@@ -102,7 +102,7 @@ const app = createApp({ ...loadBuildInfo(process.env), db, publicUrl, trustProxy
 
 startRetentionJob(db);
 if (silentAfterMinutes > 0) {
-  createSilentMonitor({ db, notifier, afterMinutes: silentAfterMinutes }).start();
+  createSilentMonitor({ db, notifier, afterMinutes: silentAfterMinutes, isConnected: (id) => app.locals.presence?.isConnected(id) ?? false }).start();
   console.log(`silent phone alerts after ${silentAfterMinutes} minutes without contact`);
 } else {
   console.log('silent phone alerts off (SILENT_AFTER_MINUTES=0)');

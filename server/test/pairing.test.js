@@ -124,3 +124,17 @@ describe('POST /api/v1/pair', () => {
     await local.pool.end();
   });
 });
+
+describe('POST /api/v1/pair marks the phone as seen', () => {
+  it('sets last seen at pairing, so a new phone is not shown as "never connected"', async () => {
+    const { body: code } = await createCode();
+
+    const res = await pair({ code: code.code, ...phone });
+
+    const { rows } = await ctx.pool.query(
+      "SELECT last_seen > now() - interval '1 minute' AS fresh FROM devices WHERE device_id = $1",
+      [res.body.deviceId],
+    );
+    expect(rows[0].fresh).toBe(true);
+  });
+});

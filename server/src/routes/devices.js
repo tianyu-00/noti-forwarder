@@ -10,14 +10,17 @@ const renameSchema = z.object({ name: z.string().min(1).max(100) });
 const toApi = deviceToApi;
 const COLUMNS = DEVICE_COLUMNS;
 
-export function devicesRouter({ db, requireViewer, events, silentAfterMinutes = 0 }) {
+export function devicesRouter({ db, requireViewer, events, presence, silentAfterMinutes = 0 }) {
   const router = Router();
 
   router.get('/devices', requireViewer, async (req, res, next) => {
     try {
       const { rows } = await db.query(`SELECT ${COLUMNS} FROM devices ORDER BY paired_at DESC`);
       // silentAfterMinutes lets the dashboard label a phone that has not checked in (0 = off).
-      res.json({ devices: rows.map(toApi), silentAfterMinutes });
+      res.json({
+        devices: rows.map((r) => ({ ...toApi(r), connected: presence.isConnected(r.device_id) })),
+        silentAfterMinutes,
+      });
     } catch (err) {
       next(err);
     }
@@ -50,6 +53,7 @@ export function devicesRouter({ db, requireViewer, events, silentAfterMinutes = 
       );
       if (revoked.rowCount === 1) {
         events.publish('device', toApi(revoked.rows[0]));
+        presence.revoke(req.params.id); // a connected phone hears it at once
         await audit(db, { event: 'revoke', actor: req.session.username, deviceId: req.params.id, ip: req.ip });
       } else {
         const exists = await db.query('SELECT 1 FROM devices WHERE device_id = $1', [req.params.id]);

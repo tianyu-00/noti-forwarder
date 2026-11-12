@@ -117,4 +117,13 @@ describe('silent phone monitor', () => {
 
     expect((await m.check()).wentQuiet).toEqual([d.deviceId]);
   });
+
+  it('never flags a phone that holds a connection, however old its last message is', async () => {
+    const d = await ctx.addDevice();
+    await seenAgo(d.deviceId, 9 * HOUR);
+    const m = monitor({ isConnected: (id) => id === d.deviceId });
+
+    expect(await m.check()).toEqual({ wentQuiet: [], recovered: [] });
+    expect(alerts).toEqual([]);
+  });
 });

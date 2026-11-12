@@ -76,14 +76,15 @@ export function pairingRouter({
       // pairings of one phone cannot create two rows. A returning phone keeps its id,
       // name and messages, gets a new token (the old one stops working) and is un-revoked.
       const upserted = await client.query(
-        `INSERT INTO devices (device_id, name, model, app_version, token_hash, hardware_id)
-         VALUES ($1, $2, $3, $4, $5, $6)
+        `INSERT INTO devices (device_id, name, model, app_version, token_hash, hardware_id, last_seen)
+         VALUES ($1, $2, $3, $4, $5, $6, now())
          ON CONFLICT (hardware_id) WHERE hardware_id IS NOT NULL
          DO UPDATE SET token_hash = EXCLUDED.token_hash,
                        model = COALESCE(EXCLUDED.model, devices.model),
                        app_version = COALESCE(EXCLUDED.app_version, devices.app_version),
                        revoked_at = NULL,
-                       paired_at = now()
+                       paired_at = now(),
+                       last_seen = now()
          RETURNING device_id, (xmax = 0) AS inserted`,
         [randomUUID(), name, model ?? null, appVersion ?? null, hashToken(token), hardwareId ?? null],
       );
