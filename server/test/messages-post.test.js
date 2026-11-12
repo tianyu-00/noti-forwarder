@@ -170,3 +170,16 @@ describe('POST /api/v1/messages rate limiting', () => {
     await limited.pool.end();
   });
 });
+
+describe('POST /api/v1/messages before authentication', () => {
+  it('limits bad-token attempts per IP so guessing cannot flood the database', async () => {
+    const local = await buildTestApp({ preAuthRateLimit: { limit: 3, windowMs: 60000 } });
+    const attempt = () =>
+      request(local.app).post('/api/v1/messages').set('Authorization', 'Bearer nope').send({ messages: [] });
+    for (let i = 0; i < 3; i++) expect((await attempt()).status).toBe(401);
+    const blocked = await attempt();
+    expect(blocked.status).toBe(429);
+    expect(blocked.headers['retry-after']).toBeDefined();
+    await local.pool.end();
+  });
+});

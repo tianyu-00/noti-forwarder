@@ -109,6 +109,17 @@ describe('login protection and audit', () => {
     await local.pool.end();
   });
 
+  it('starts counting from zero once a lock has expired, so one typo does not lock again', async () => {
+    const local = await buildTestApp({ realAuth: true });
+    await ensureAdminUser(local.pool, ADMIN);
+    await local.pool.query("UPDATE users SET failed_logins = 5, locked_until = now() - interval '1 minute'");
+    const bad = { username: 'admin', password: 'bad bad bad bad' };
+    expect((await login(request(local.app), bad)).status).toBe(401);
+    // Not locked: the right password still works.
+    expect((await login(request(local.app))).status).toBe(200);
+    await local.pool.end();
+  });
+
   it('rate limits login attempts per IP', async () => {
     const local = await buildTestApp({ realAuth: true, loginRateLimit: { limit: 3, windowMs: 60000 } });
     for (let i = 0; i < 3; i++) await login(request(local.app), { username: 'x', password: 'bad bad bad bad' });

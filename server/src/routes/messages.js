@@ -23,11 +23,15 @@ export function messagesRouter({
   events,
   notifier,
   messageRateLimit = { limit: 120, windowMs: 60000 },
+  // Before the token check, per IP: bad-token guessing must not cost a database write each time.
+  // Generous, because several phones can share one home IP.
+  preAuthRateLimit = { limit: 600, windowMs: 60000 },
 }) {
   const router = Router();
+  const perIp = rateLimit({ ...preAuthRateLimit, key: (req) => req.ip });
   const perDevice = rateLimit({ ...messageRateLimit, key: (req) => req.deviceId });
 
-  router.post('/messages', authenticateDevice({ db }), perDevice, express.json({ limit: '2mb' }), async (req, res, next) => {
+  router.post('/messages', perIp, authenticateDevice({ db }), perDevice, express.json({ limit: '2mb' }), async (req, res, next) => {
     try {
       const parsed = postMessagesSchema.safeParse(req.body);
       if (!parsed.success) {

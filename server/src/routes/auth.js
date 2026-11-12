@@ -48,8 +48,10 @@ export function authRouter({
         if (user) {
           await db.query(
             `UPDATE users
-                SET failed_logins = failed_logins + 1,
-                    locked_until = CASE WHEN failed_logins + 1 >= $2
+                SET failed_logins = CASE WHEN locked_until IS NOT NULL AND locked_until <= now()
+                                         THEN 1 ELSE failed_logins + 1 END,
+                    locked_until = CASE WHEN (CASE WHEN locked_until IS NOT NULL AND locked_until <= now()
+                                                   THEN 1 ELSE failed_logins + 1 END) >= $2
                                         THEN now() + ($3 || ' minutes')::interval END
               WHERE id = $1`,
             [user.id, MAX_FAILURES, String(LOCK_MINUTES)],
