@@ -48,23 +48,23 @@ private val LightColors = lightColorScheme(
 
 private val DarkColors = darkColorScheme(
     primary = Color(0xFFFAFAFA),
-    onPrimary = Color(0xFF09090B),
+    onPrimary = Color(0xFF18181B),
     secondary = Color(0xFFFAFAFA),
-    onSecondary = Color(0xFF09090B),
+    onSecondary = Color(0xFF18181B),
     tertiary = Color(0xFF4ADE80),
-    onTertiary = Color(0xFF09090B),
+    onTertiary = Color(0xFF18181B),
     error = Color(0xFFEF4444),
     onError = Color.White,
-    background = Color(0xFF09090B),
+    background = Color(0xFF18181B),
     onBackground = Color(0xFFFAFAFA),
-    surface = Color(0xFF09090B),
+    surface = Color(0xFF18181B),
     onSurface = Color(0xFFFAFAFA),
-    surfaceVariant = Color(0xFF18181B),
+    surfaceVariant = Color(0xFF27272A),
     onSurfaceVariant = Color(0xFFA1A1AA),
-    surfaceContainer = Color(0xFF0F0F12),
-    surfaceContainerHigh = Color(0xFF18181B),
-    outline = Color(0xFF52525B),
-    outlineVariant = Color(0xFF27272A),
+    surfaceContainer = Color(0xFF1F1F23),
+    surfaceContainerHigh = Color(0xFF27272A),
+    outline = Color(0xFF71717A),
+    outlineVariant = Color(0xFF3F3F46),
 )
 
 private val NotiShapes = Shapes(

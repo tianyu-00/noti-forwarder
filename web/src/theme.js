@@ -22,7 +22,7 @@ export function currentTheme() {
 export function applyTheme(theme) {
   document.documentElement.dataset.theme = theme;
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute('content', theme === 'dark' ? '#09090b' : '#ffffff');
+  if (meta) meta.setAttribute('content', theme === 'dark' ? '#18181b' : '#ffffff');
 }
 
 /** Call once before the first render so there is no flash of the wrong theme. */
