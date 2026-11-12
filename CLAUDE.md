@@ -187,7 +187,7 @@ Current setup (decided during Milestone 0; the earlier plan for release-please, 
 
 ## Milestones
 
-Status as of the last update: 0, 1, 1b, 2, 3, 4 and 5 are done. 3's reboot survival is verified on a real phone; the OnePlus battery/auto-start settings still depend on the user toggling them. 6 and 7 are not started.
+Status as of the last update: 0, 1, 1b, 2, 3, 4 and 5 are done, and 6 is built and tested (its ntfy push still needs enabling and a check on the real phone). 3's reboot survival is verified on a real phone; the OnePlus battery/auto-start settings still depend on the user toggling them. 7 is not started.
 
 0. Pipeline first: CI runs lint and tests, then builds and publishes images from the `publish` branch, compose file, `/health` showing the version. (done; release-please and SSH deploy dropped)
 1. Server: Express + Postgres, `POST /messages`, `GET /messages`, Docker Compose. (done)
@@ -196,7 +196,7 @@ Status as of the last update: 0, 1, 1b, 2, 3, 4 and 5 are done. 3's reboot survi
 3. Reliability: Room queue, retry with backoff, foreground service, survives reboot. (done and verified on a real phone: offline then online, and a reboot — the listener rebinds and the boot receiver starts the keep-alive service by itself)
 4. SMS capture + de-duplication, plus phone settings: SMS/notification toggles and the app blacklist. (done and verified on a real phone: texts arrive once, the toggles and blocked apps work. A notification from the SMS app is stored at once with a 3s "not before" time and removed when its SMS arrives, so nothing is held only in memory)
 5. React dashboard (Tailwind + Radix UI) with live updates, search, per-device filter. (done; unread counts are client-side only and reset on reload)
-6. ntfy push to the main phone; filters and 2FA code highlighting.
+6. ntfy push to the main phone; filters and 2FA code highlighting. (built and tested: the server detects the 2FA code and adds a `code` field to messages, the dashboard highlights it with a copy button, and ntfy push is configured by `NTFY_*` environment variables with mode/type/app filters, JSON publishing, a burst cap and no message text in logs. Filters are env-only; a dashboard settings screen would need a stored setting. The public ntfy.sh needs a long random topic; the server refuses a short one.)
 7. SMS reply from the PC (outbox polled by the phone, sent via `SmsManager`).
 Still open from earlier milestones: TOTP 2FA, retention setting, end-to-end test against the Compose stack in CI.
 
