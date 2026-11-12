@@ -83,6 +83,18 @@ describe('2FA codes', () => {
     expect(await screen.findByText(/could not copy/i)).toBeInTheDocument();
   });
 
+  it('explains next to the button that copying only works over HTTPS, and disables it', async () => {
+    Object.defineProperty(window, 'isSecureContext', { value: false, configurable: true });
+    try {
+      await setup(message({ deviceId: 'a', body: 'Your code is 482913', code: '482913' }));
+
+      expect(screen.getByRole('button', { name: /copy code/i })).toBeDisabled();
+      expect(screen.getByText(/only works over https/i)).toBeInTheDocument();
+    } finally {
+      delete window.isSecureContext;
+    }
+  });
+
   it('shows no copy button when a message has no code', async () => {
     await setup(message({ deviceId: 'a', body: 'Your parcel has shipped', code: null }));
 

@@ -17,6 +17,8 @@ export const messageShape = PropTypes.shape({
 
 function CopyCodeButton({ code }) {
   const [state, setState] = useState('idle'); // idle | copied | failed
+  // Browsers only allow clipboard access on HTTPS pages (and localhost).
+  const insecure = window.isSecureContext === false;
 
   // Go back to "Copy code" after a moment.
   useEffect(() => {
@@ -36,9 +38,10 @@ function CopyCodeButton({ code }) {
 
   return (
     <span className="inline-flex items-center gap-2">
-      <Button onClick={copy} className="px-3 py-1.5 text-xs">
+      <Button onClick={copy} disabled={insecure} className="px-3 py-1.5 text-xs">
         {state === 'copied' ? 'Copied' : 'Copy code'}
       </Button>
+      {insecure && <span className="text-xs text-muted">Copying only works over HTTPS. Select the code instead.</span>}
       {state === 'failed' && <span className="text-xs text-danger">Could not copy. Select the code instead.</span>}
     </span>
   );
