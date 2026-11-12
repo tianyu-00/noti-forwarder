@@ -34,10 +34,10 @@ class MessageSender(
     private val http: OkHttpClient = defaultHttpClient(),
     /** Called after the credentials are cleared because the server revoked this phone. */
     private val onRevoked: () -> Unit = {},
-) {
+) : BatchSender {
     private val json = Json { ignoreUnknownKeys = true }
 
-    fun send(messages: List<Message>): SendOutcome {
+    override fun send(messages: List<Message>): SendOutcome {
         val credentials = store.load() ?: return SendOutcome.NotPaired
         val request = Request.Builder()
             .url("${credentials.serverUrl}/api/v1/messages")
