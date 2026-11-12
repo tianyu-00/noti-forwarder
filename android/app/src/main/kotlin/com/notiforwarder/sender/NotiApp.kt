@@ -1,6 +1,7 @@
 package com.notiforwarder.sender
 
 import android.app.Application
+import android.content.Intent
 import android.os.Build
 import android.provider.Settings
 import android.provider.Telephony
@@ -56,6 +57,8 @@ class NotiApp : Application() {
             ),
             // Messages queued while unpaired (or revoked) go out as soon as pairing works.
             onPaired = { scheduler.flushSoon() },
+            // No point keeping a "running" notice on screen for a phone that is not paired.
+            onUnpaired = { stopService(Intent(this, KeepAliveService::class.java)) },
         )
     }
 

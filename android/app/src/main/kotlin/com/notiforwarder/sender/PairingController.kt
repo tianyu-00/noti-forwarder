@@ -20,6 +20,8 @@ class PairingController(
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     /** Called after a successful pairing, e.g. to send messages queued while unpaired. */
     private val onPaired: () -> Unit = {},
+    /** Called when the phone becomes unpaired, e.g. to remove the "running" notice. */
+    private val onUnpaired: () -> Unit = {},
 ) {
     private val _state = MutableStateFlow<UiState>(stateFromStore())
     val state: StateFlow<UiState> = _state
@@ -31,6 +33,7 @@ class PairingController(
     fun unpair() {
         store.clear()
         _state.value = UiState.Unpaired()
+        onUnpaired()
     }
 
     /** Re-reads storage, e.g. after the sender cleared it because the server revoked this phone. */
@@ -38,8 +41,10 @@ class PairingController(
         val credentials = store.load()
         when {
             credentials != null -> _state.value = UiState.Paired(credentials.serverUrl, credentials.deviceId)
-            _state.value is UiState.Paired ->
+            _state.value is UiState.Paired -> {
                 _state.value = UiState.Unpaired("This phone was removed from the server. Pair it again.")
+                onUnpaired()
+            }
         }
     }
 

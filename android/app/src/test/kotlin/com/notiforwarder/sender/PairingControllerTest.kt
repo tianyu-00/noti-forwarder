@@ -88,6 +88,44 @@ class PairingControllerTest {
     }
 
     @Test
+    fun `announces when the phone becomes unpaired, by the user or by a revocation`() {
+        var unpaired = 0
+
+        // by the user
+        val store1 = InMemoryTokenStore(saved)
+        val flow1 = PairingFlow(store1) { _, _ -> error("unused") }
+        PairingController(store1, flow1, device, Dispatchers.Unconfined, onUnpaired = { unpaired++ }).unpair()
+        assertEquals(1, unpaired)
+
+        // by the server revoking it (the sender cleared the credentials)
+        val store2 = InMemoryTokenStore(saved)
+        val flow2 = PairingFlow(store2) { _, _ -> error("unused") }
+        val controller = PairingController(store2, flow2, device, Dispatchers.Unconfined, onUnpaired = { unpaired++ })
+        store2.clear()
+        controller.refresh()
+        assertEquals(2, unpaired)
+    }
+
+    @Test
+    fun `does not announce an unpairing while the phone is still paired or never was`() {
+        var unpaired = 0
+        val paired = PairingController(
+            InMemoryTokenStore(saved),
+            PairingFlow(InMemoryTokenStore(saved)) { _, _ -> error("unused") },
+            device,
+            Dispatchers.Unconfined,
+            onUnpaired = { unpaired++ },
+        )
+        paired.refresh()
+
+        val neverPaired = Harness(InMemoryTokenStore()) { PairOutcome.InvalidCode }
+        runBlocking { neverPaired.controller.pairManual("nf.example.com", code) }
+        neverPaired.controller.refresh()
+
+        assertEquals(0, unpaired)
+    }
+
+    @Test
     fun `pairs from a scanned QR code`() {
         val h = Harness(InMemoryTokenStore()) { PairOutcome.Paired("dev-2", "tok-2") }
 
