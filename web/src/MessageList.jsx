@@ -13,6 +13,8 @@ export const messageShape = PropTypes.shape({
   receivedAt: PropTypes.string.isRequired,
   // The one-time (2FA) code found in the text, digits only, or null.
   code: PropTypes.string,
+  // Set by the dashboard when an encrypted message cannot be shown: 'no-key' or 'wrong-key'.
+  locked: PropTypes.string,
 });
 
 // Browsers only offer the clipboard API on HTTPS pages (and localhost). On plain http the old
@@ -92,6 +94,13 @@ export default function MessageList({ messages, deviceNames }) {
               <span>{m.type === 'sms' ? 'SMS' : m.app}</span>
             </p>
             {/* Plain text only: message content is untrusted. The code is a slice of that text. */}
+            {m.locked ? (
+              <p className="text-sm italic text-muted">
+                {m.locked === 'no-key'
+                  ? 'Encrypted message. Add the encryption key in Settings to read it.'
+                  : 'Could not decrypt this message. It was probably encrypted with a different key.'}
+              </p>
+            ) : (
             <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-fg">
               {splitAroundCode(m.body, m.code).map((part, i) =>
                 part.isCode ? (
@@ -103,6 +112,7 @@ export default function MessageList({ messages, deviceNames }) {
                 ),
               )}
             </p>
+            )}
             {m.code && <CopyCodeButton code={m.code} />}
           </article>
         </li>

@@ -12,6 +12,8 @@ import ThemeToggle from './ThemeToggle.jsx';
 import { Button } from './ui.jsx';
 import { useStream } from './useStream.js';
 import { matchesView } from './matches.js';
+import { useE2eKey } from './keyStore.js';
+import { readMessage } from './readable.js';
 
 export default function Dashboard({ username, onLogout, pairingTiming }) {
   const [devices, setDevices] = useState([]);
@@ -20,6 +22,7 @@ export default function Dashboard({ username, onLogout, pairingTiming }) {
   const [filters, setFilters] = useState({ type: '', app: '', q: '' });
   const [apps, setApps] = useState([]);
   const [unread, setUnread] = useState({});
+  const e2eKey = useE2eKey();
   const [nextBefore, setNextBefore] = useState(null);
   const [loadError, setLoadError] = useState(null);
   const [addOpen, setAddOpen] = useState(false);
@@ -32,9 +35,13 @@ export default function Dashboard({ username, onLogout, pairingTiming }) {
   const endRef = useRef(null); // sits below the last message; scrolling near it loads more
   const loadingRef = useRef(false);
   const loadOlderRef = useRef(() => {});
-  const view = useRef({ selected, filters });
+  // With an encryption key the server cannot search encrypted text, so search runs here instead
+  // and the server is never sent the search words.
+  const searchHere = e2eKey !== null;
+  const serverFilters = useMemo(() => (searchHere ? { ...filters, q: '' } : filters), [filters, searchHere]);
+  const view = useRef({ selected, filters: serverFilters });
   useEffect(() => {
-    view.current = { selected, filters };
+    view.current = { selected, filters: serverFilters };
   });
 
   const select = useCallback((deviceId) => {
@@ -96,7 +103,7 @@ export default function Dashboard({ username, onLogout, pairingTiming }) {
     let stale = false;
     const params = new URLSearchParams();
     if (selected) params.set('device', selected);
-    for (const [key, value] of Object.entries(filters)) if (value) params.set(key, value);
+    for (const [key, value] of Object.entries(serverFilters)) if (value) params.set(key, value);
     api(`/messages?${params}`)
       .then((m) => {
         if (stale) return;
@@ -113,12 +120,12 @@ export default function Dashboard({ username, onLogout, pairingTiming }) {
     return () => {
       stale = true;
     };
-  }, [selected, filters, reloadKey]);
+  }, [selected, serverFilters, reloadKey]);
 
   function queryParams() {
     const params = new URLSearchParams();
     if (selected) params.set('device', selected);
-    for (const [key, value] of Object.entries(filters)) if (value) params.set(key, value);
+    for (const [key, value] of Object.entries(serverFilters)) if (value) params.set(key, value);
     return params;
   }
 
@@ -173,6 +180,14 @@ export default function Dashboard({ username, onLogout, pairingTiming }) {
     }
   }
 
+  // Decrypted for display; the raw (possibly encrypted) messages stay in state.
+  const shown = useMemo(() => {
+    const readable = messages.map((m) => readMessage(m, e2eKey));
+    if (!searchHere || !filters.q) return readable;
+    const search = { selected: null, filters: { type: '', app: '', q: filters.q } };
+    return readable.filter((m) => matchesView(m, search));
+  }, [messages, e2eKey, searchHere, filters.q]);
+
   const deviceNames = useMemo(() => Object.fromEntries(devices.map((d) => [d.deviceId, d.name])), [devices]);
   const selectedDevice = devices.find((d) => d.deviceId === selected);
   const title = selected ? (deviceNames[selected] ?? 'Phone') : 'All phones';
@@ -216,7 +231,7 @@ export default function Dashboard({ username, onLogout, pairingTiming }) {
               {loadError}
             </p>
           )}
-          <MessageList messages={messages} deviceNames={deviceNames} />
+          <MessageList messages={shown} deviceNames={deviceNames} />
           {nextBefore && (
             <div className="p-4 text-center">
               <div ref={endRef} className="h-px" />
