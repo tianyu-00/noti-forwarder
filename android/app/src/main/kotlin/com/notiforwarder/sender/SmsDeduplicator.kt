@@ -8,7 +8,7 @@ package com.notiforwarder.sender
  */
 class SmsDeduplicator(
     private val clock: () -> Long = System::currentTimeMillis,
-    private val windowMillis: Long = 2 * 60_000,
+    val windowMillis: Long = 2 * 60_000,
     private val maxEntries: Int = 100,
 ) {
     private data class Seen(val text: String, val at: Long)
@@ -28,6 +28,12 @@ class SmsDeduplicator(
         if (candidate.isEmpty()) return false
         // The window is deliberately short: the same code texted again later is a new message.
         return recent.any { now - it.at <= windowMillis && matches(candidate, it.text) }
+    }
+
+    /** True if [notificationText] looks like the messaging app's copy of the text [smsText]. */
+    fun looksLikeCopy(notificationText: String, smsText: String): Boolean {
+        val notification = normalize(notificationText)
+        return notification.isNotEmpty() && matches(notification, normalize(smsText))
     }
 
     private fun matches(notification: String, sms: String): Boolean {

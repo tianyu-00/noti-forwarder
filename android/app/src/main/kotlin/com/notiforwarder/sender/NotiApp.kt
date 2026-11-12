@@ -5,8 +5,6 @@ import android.content.Intent
 import android.os.Build
 import android.provider.Settings
 import android.provider.Telephony
-import java.util.concurrent.Executors
-import java.util.concurrent.TimeUnit
 
 /** Wires the pure classes together once per process. */
 class NotiApp : Application() {
@@ -26,7 +24,6 @@ class NotiApp : Application() {
     val statusReader by lazy { StatusReader(queue, sendStatus) }
 
     private val smsDedupe = SmsDeduplicator()
-    private val holdExecutor by lazy { Executors.newSingleThreadScheduledExecutor() }
 
     val capture by lazy {
         NotificationCapture(
@@ -37,11 +34,13 @@ class NotiApp : Application() {
             dedupe = smsDedupe,
             // The default SMS app can change, so ask each time.
             smsPackages = { Telephony.Sms.getDefaultSmsPackage(this)?.let(::setOf).orEmpty() },
-            delayer = { delayMillis, block -> holdExecutor.schedule(block, delayMillis, TimeUnit.MILLISECONDS) },
         )
     }
     val smsCapture by lazy {
-        SmsCapture(SmsParser(), queue, scheduler, settings = settingsStore::load, dedupe = smsDedupe)
+        SmsCapture(
+            SmsParser(), queue, scheduler, settings = settingsStore::load, dedupe = smsDedupe,
+            smsPackages = { Telephony.Sms.getDefaultSmsPackage(this)?.let(::setOf).orEmpty() },
+        )
     }
 
     val controller by lazy {

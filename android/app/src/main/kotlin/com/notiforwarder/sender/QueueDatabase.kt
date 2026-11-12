@@ -44,6 +44,9 @@ interface QueueDao {
     )
     fun due(now: Long, limit: Int): List<QueuedMessage>
 
+    @Query("SELECT * FROM queued_messages WHERE type = 'notification' AND app IN (:apps) AND enqueuedAt >= :since")
+    fun notificationsFrom(apps: List<String>, since: Long): List<QueuedMessage>
+
     @Query("DELETE FROM queued_messages WHERE id IN (:ids)")
     fun delete(ids: List<String>)
 

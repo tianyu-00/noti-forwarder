@@ -12,8 +12,11 @@ class MessageQueue(
     private val dao: QueueDao,
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
-    /** False if a message with this id was already queued (the original is kept). */
-    fun enqueue(message: Message): Boolean = dao.insert(
+    /**
+     * False if a message with this id was already queued (the original is kept).
+     * [notBefore] stores it now but keeps it from being sent until that time.
+     */
+    fun enqueue(message: Message, notBefore: Long = 0L): Boolean = dao.insert(
         QueuedMessage(
             id = message.id,
             type = message.type,
@@ -22,12 +25,24 @@ class MessageQueue(
             body = message.body,
             receivedAt = message.receivedAt,
             enqueuedAt = clock(),
+            nextAttemptAt = notBefore,
         ),
     ) != -1L
 
     /** The oldest messages that are due now, oldest first. */
     fun nextBatch(limit: Int): List<Queued> = dao.due(clock(), limit).map {
         Queued(Message(it.id, it.type, it.app, it.sender, it.body, it.receivedAt), it.attempts)
+    }
+
+    /**
+     * Deletes queued notifications from [apps], queued since [since], whose text [isCopy] says
+     * repeats a text message. Returns how many were removed.
+     */
+    fun removeNotificationCopies(apps: Set<String>, since: Long, isCopy: (String) -> Boolean): Int {
+        if (apps.isEmpty()) return 0
+        val ids = dao.notificationsFrom(apps.toList(), since).filter { isCopy(it.body) }.map { it.id }
+        if (ids.isNotEmpty()) dao.delete(ids)
+        return ids.size
     }
 
     fun confirmed(ids: List<String>) = dao.delete(ids)

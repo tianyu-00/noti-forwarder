@@ -32,7 +32,7 @@ class SmsCaptureTest {
     @Before
     fun open() {
         db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).allowMainThreadQueries().build()
-        queue = MessageQueue(db.queueDao())
+        queue = MessageQueue(db.queueDao()) { now }
     }
 
     @After
@@ -40,7 +40,12 @@ class SmsCaptureTest {
         db.close()
     }
 
-    private fun capture() = SmsCapture(SmsParser(), queue, scheduler, { settings }, dedupe)
+    private var now = 9_000_000L
+    private val smsApp = "com.android.mms"
+
+    private fun capture() = SmsCapture(
+        SmsParser(), queue, scheduler, { settings }, dedupe, smsPackages = { setOf(smsApp) }, clock = { now },
+    )
 
     private fun part(address: String, body: String) = RawSmsPart(address, body, 1_762_855_205_000L)
 
@@ -88,5 +93,31 @@ class SmsCaptureTest {
 
         assertEquals(2, count)
         assertEquals(2, queue.count())
+    }
+
+    private fun heldNotification(app: String, body: String, id: String) = queue.enqueue(
+        Message(id, "notification", app, "Mum", body, "2025-11-11T10:00:05Z"),
+        notBefore = now + 3_000,
+    )
+
+    @Test
+    fun `an sms that arrives while its notification copy is held removes the copy`() {
+        heldNotification(smsApp, "Your code is 123456", "copy")
+
+        capture().onSms(listOf(part("BANK", "Your code is 123456")))
+
+        now += 3_000 // even once the hold has passed, only the sms is left to send
+        assertEquals(listOf("sms"), queue.nextBatch(10).map { it.message.type })
+    }
+
+    @Test
+    fun `an sms leaves notifications from other apps and different text alone`() {
+        heldNotification("com.whatsapp", "Your code is 123456", "other-app")
+        heldNotification(smsApp, "Different text", "other-text")
+
+        capture().onSms(listOf(part("BANK", "Your code is 123456")))
+
+        now += 3_000
+        assertEquals(3, queue.nextBatch(10).size) // both notifications and the sms
     }
 }

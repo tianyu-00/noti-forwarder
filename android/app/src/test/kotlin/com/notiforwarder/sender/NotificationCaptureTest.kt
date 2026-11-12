@@ -17,6 +17,7 @@ class NotificationCaptureTest {
     private val context: Context = ApplicationProvider.getApplicationContext()
     private lateinit var db: AppDatabase
     private lateinit var queue: MessageQueue
+    private var now = 5_000_000L
     private val flushRequests = mutableListOf<String>()
     private val scheduler = object : FlushScheduler {
         override fun flushSoon() {
@@ -30,7 +31,7 @@ class NotificationCaptureTest {
     @Before
     fun open() {
         db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).allowMainThreadQueries().build()
-        queue = MessageQueue(db.queueDao())
+        queue = MessageQueue(db.queueDao()) { now }
     }
 
     @After
@@ -51,10 +52,9 @@ class NotificationCaptureTest {
 
     private fun capture() = NotificationCapture(NotificationParser("com.notiforwarder.sender"), queue, scheduler)
 
-    // Settings, the SMS de-duplication and the 3 second hold are all wired in for these tests.
+    // Settings and SMS de-duplication are wired in for these tests.
     private var settings = CaptureSettings()
     private val smsDedupe = SmsDeduplicator()
-    private val held = mutableListOf<() -> Unit>()
     private val smsApp = "com.android.mms"
 
     private fun fullCapture() = NotificationCapture(
@@ -64,14 +64,8 @@ class NotificationCaptureTest {
         settings = { settings },
         dedupe = smsDedupe,
         smsPackages = { setOf(smsApp) },
-        delayer = { _, block -> held += block },
+        clock = { now },
     )
-
-    private fun releaseHeld() {
-        val toRun = held.toList()
-        held.clear()
-        toRun.forEach { it() }
-    }
 
     private fun rawWithText(pkg: String, text: String) = raw(pkg).copy(text = text)
 
@@ -127,29 +121,19 @@ class NotificationCaptureTest {
         smsDedupe.recordSms("Your code is 123456")
 
         fullCapture().onNotification(rawWithText(smsApp, "Your code is 123456"))
-        releaseHeld()
 
         assertEquals(0, queue.count())
     }
 
     @Test
-    fun `a notification from the sms app that is not a repeat is sent after a short hold`() {
-        fullCapture().onNotification(rawWithText(smsApp, "Hello from a friend"))
-        assertEquals(0, queue.count()) // held, so the sms broadcast has time to arrive
+    fun `a notification from the sms app is stored at once but held back for a few seconds`() {
+        assertTrue(fullCapture().onNotification(rawWithText(smsApp, "Hello from a friend")))
 
-        releaseHeld()
-
-        assertEquals("Hello from a friend", queue.nextBatch(10).single().message.body)
-    }
-
-    @Test
-    fun `if the notification arrives first, the sms that follows during the hold still wins`() {
-        fullCapture().onNotification(rawWithText(smsApp, "Your code is 123456"))
-        smsDedupe.recordSms("Your code is 123456") // the sms broadcast arrives while it is held
-
-        releaseHeld()
-
-        assertEquals(0, queue.count())
+        assertEquals(1, queue.count()) // on disk immediately, so a crash cannot lose it
+        assertEquals(emptyList<String>(), queue.nextBatch(10).map { it.message.body }) // but not due yet
+        assertEquals(listOf("after 3000"), flushRequests)
+        now += 3_000
+        assertEquals(listOf("Hello from a friend"), queue.nextBatch(10).map { it.message.body })
     }
 
     @Test
@@ -157,7 +141,6 @@ class NotificationCaptureTest {
         smsDedupe.recordSms("Your code is 123456")
 
         fullCapture().onNotification(rawWithText("com.whatsapp", "Your code is 123456"))
-        releaseHeld()
 
         assertEquals(listOf("com.whatsapp"), queue.nextBatch(10).map { it.message.app })
     }
@@ -168,7 +151,7 @@ class NotificationCaptureTest {
 
         fullCapture().onNotification(rawWithText(smsApp, "Your code is 123456"))
         fullCapture().onNotification(rawWithText("com.bank", "A payment was made"))
-        releaseHeld()
+        now += 3_000
 
         assertEquals(listOf("com.bank"), queue.nextBatch(10).map { it.message.app })
     }

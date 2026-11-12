@@ -142,4 +142,42 @@ class MessageQueueTest {
 
         assertEquals("written before the crash", restored.single().message.body)
     }
+
+    @Test
+    fun `a message can be queued now but not become due for a while`() {
+        queue.enqueue(msg("held"), notBefore = now + 3_000)
+        queue.enqueue(msg("now"))
+
+        assertEquals(2, queue.count()) // safely stored right away
+        assertEquals(listOf("now"), ids())
+        now += 3_000
+        assertEquals(listOf("held", "now").sorted(), ids().sorted())
+    }
+
+    private fun notification(id: String, app: String, body: String) =
+        Message(id, "notification", app, "Sender", body, "2025-11-11T10:00:05Z")
+
+    @Test
+    fun `removes queued notification copies of an sms, but only from the given apps and with matching text`() {
+        queue.enqueue(notification("copy", "com.android.mms", "Your code is 123456"))
+        queue.enqueue(notification("other-text", "com.android.mms", "Something else"))
+        queue.enqueue(notification("other-app", "com.whatsapp", "Your code is 123456"))
+        queue.enqueue(msg("sms").copy(type = "sms", app = "sms", body = "Your code is 123456"))
+
+        val removed = queue.removeNotificationCopies(setOf("com.android.mms"), since = 0) { it == "Your code is 123456" }
+
+        assertEquals(1, removed)
+        assertEquals(listOf("other-text", "other-app", "sms"), ids())
+    }
+
+    @Test
+    fun `only recent notifications can be copies of a new sms`() {
+        queue.enqueue(notification("old", "com.android.mms", "Your code is 123456"))
+        now += 10 * 60_000
+        queue.enqueue(notification("recent", "com.android.mms", "Your code is 123456"))
+
+        queue.removeNotificationCopies(setOf("com.android.mms"), since = now - 2 * 60_000) { true }
+
+        assertEquals(listOf("old"), ids())
+    }
 }
