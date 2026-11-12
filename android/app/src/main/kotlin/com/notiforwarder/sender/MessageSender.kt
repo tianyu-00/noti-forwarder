@@ -32,6 +32,8 @@ class MessageSender(
     private val store: TokenStore,
     private val appVersion: String,
     private val http: OkHttpClient = defaultHttpClient(),
+    /** Called after the credentials are cleared because the server revoked this phone. */
+    private val onRevoked: () -> Unit = {},
 ) {
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -53,6 +55,7 @@ class MessageSender(
                     }
                     401 -> {
                         store.clear()
+                        onRevoked()
                         SendOutcome.Unauthorized
                     }
                     400, 413 -> SendOutcome.Rejected

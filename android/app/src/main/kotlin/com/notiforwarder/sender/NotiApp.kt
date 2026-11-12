@@ -7,7 +7,10 @@ import android.os.Build
 class NotiApp : Application() {
     val store: TokenStore by lazy { EncryptedTokenStore(this) }
     val parser by lazy { NotificationParser(ownPackage = packageName) }
-    val sender by lazy { MessageSender(store, appVersion = BuildConfig.VERSION_NAME) }
+    // The service runs without a screen, so a revocation must reach the UI state from here.
+    val sender by lazy {
+        MessageSender(store, appVersion = BuildConfig.VERSION_NAME, onRevoked = { controller.refresh() })
+    }
     val controller by lazy {
         PairingController(
             store = store,

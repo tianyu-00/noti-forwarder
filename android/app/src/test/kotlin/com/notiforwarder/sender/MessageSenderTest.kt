@@ -87,6 +87,35 @@ class MessageSenderTest {
     }
 
     @Test
+    fun `tells the app when the server revoked this phone, after the credentials are cleared`() {
+        var storedWhenNotified: Credentials? = store.load()
+        var notifications = 0
+        sender = MessageSender(store, appVersion = "0.1.0", onRevoked = {
+            notifications++
+            storedWhenNotified = store.load()
+        })
+        reply(401, """{"error":"unauthorized"}""")
+
+        sender.send(listOf(message))
+
+        assertEquals(1, notifications)
+        assertNull(storedWhenNotified)
+    }
+
+    @Test
+    fun `does not announce a revocation for ordinary failures`() {
+        var notifications = 0
+        sender = MessageSender(store, appVersion = "0.1.0", onRevoked = { notifications++ })
+        reply(500)
+        reply(429)
+
+        sender.send(listOf(message))
+        sender.send(listOf(message))
+
+        assertEquals(0, notifications)
+    }
+
+    @Test
     fun `a 400 means the server will never accept this payload`() {
         reply(400, """{"error":"invalid_payload"}""")
 
