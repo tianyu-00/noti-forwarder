@@ -4,10 +4,11 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { api } from './api.js';
 import { deviceShape } from './Sidebar.jsx';
 
-function Panel({ device, onRenamed, onRevoked, onDone }) {
+function Panel({ device, onRenamed, onRevoked, onErased, onDone }) {
   const [name, setName] = useState(device.name);
   const [error, setError] = useState(null);
   const [confirming, setConfirming] = useState(false);
+  const [confirmingErase, setConfirmingErase] = useState(false);
 
   async function rename(e) {
     e.preventDefault();
@@ -28,6 +29,17 @@ function Panel({ device, onRenamed, onRevoked, onDone }) {
       onDone();
     } catch {
       setError('Could not revoke the phone.');
+    }
+  }
+
+  async function erase() {
+    setError(null);
+    try {
+      await api(`/devices/${device.deviceId}/permanent`, { method: 'DELETE' });
+      onErased(device.deviceId);
+      onDone();
+    } catch {
+      setError('Could not erase the phone.');
     }
   }
 
@@ -55,7 +67,28 @@ function Panel({ device, onRenamed, onRevoked, onDone }) {
       )}
 
       {device.revokedAt ? (
-        <p className="text-sm text-slate-400">This phone has been revoked.</p>
+        <div className="space-y-2 text-sm">
+          <p className="text-slate-400">This phone has been revoked.</p>
+          {confirmingErase ? (
+            <div className="space-y-2 rounded border border-red-500/40 p-3">
+              <p>
+                Erase {device.name} and every message it sent? This cannot be undone.
+              </p>
+              <div className="flex gap-2">
+                <button type="button" onClick={erase} className="rounded bg-red-600 px-3 py-1">
+                  Yes, erase
+                </button>
+                <button type="button" onClick={() => setConfirmingErase(false)} className="rounded bg-slate-700 px-3 py-1">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button type="button" onClick={() => setConfirmingErase(true)} className="rounded bg-red-600/80 px-3 py-1">
+              Erase this phone and its messages
+            </button>
+          )}
+        </div>
       ) : confirming ? (
         <div className="space-y-2 rounded border border-red-500/40 p-3 text-sm">
           <p>
@@ -83,10 +116,11 @@ Panel.propTypes = {
   device: deviceShape.isRequired,
   onRenamed: PropTypes.func.isRequired,
   onRevoked: PropTypes.func.isRequired,
+  onErased: PropTypes.func.isRequired,
   onDone: PropTypes.func.isRequired,
 };
 
-export default function ManagePhoneDialog({ device, open, onOpenChange, onRenamed, onRevoked }) {
+export default function ManagePhoneDialog({ device, open, onOpenChange, onRenamed, onRevoked, onErased }) {
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
@@ -97,7 +131,7 @@ export default function ManagePhoneDialog({ device, open, onOpenChange, onRename
             {[device.model, device.appVersion && `app ${device.appVersion}`].filter(Boolean).join(' · ') ||
               'Rename or revoke this phone.'}
           </Dialog.Description>
-          <Panel device={device} onRenamed={onRenamed} onRevoked={onRevoked} onDone={() => onOpenChange(false)} />
+          <Panel device={device} onRenamed={onRenamed} onRevoked={onRevoked} onErased={onErased} onDone={() => onOpenChange(false)} />
           <Dialog.Close className="rounded bg-slate-700 px-3 py-1 text-sm">Close</Dialog.Close>
         </Dialog.Content>
       </Dialog.Portal>
@@ -111,4 +145,5 @@ ManagePhoneDialog.propTypes = {
   onOpenChange: PropTypes.func.isRequired,
   onRenamed: PropTypes.func.isRequired,
   onRevoked: PropTypes.func.isRequired,
+  onErased: PropTypes.func.isRequired,
 };

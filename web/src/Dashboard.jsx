@@ -33,6 +33,18 @@ export default function Dashboard({ username, onLogout, pairingTiming }) {
     setUnread((u) => (deviceId ? { ...u, [deviceId]: 0 } : {}));
   }, []);
 
+  // A phone was erased (here or on another dashboard): drop it and its messages from view.
+  const removeDevice = useCallback((deviceId) => {
+    setDevices((list) => list.filter((x) => x.deviceId !== deviceId));
+    setMessages((list) => list.filter((m) => m.deviceId !== deviceId));
+    setUnread((u) => {
+      const rest = { ...u };
+      delete rest[deviceId];
+      return rest;
+    });
+    setSelected((current) => (current === deviceId ? null : current));
+  }, []);
+
   useStream({
     message: (m) => {
       if (matchesView(m, view.current)) {
@@ -42,6 +54,7 @@ export default function Dashboard({ username, onLogout, pairingTiming }) {
         setUnread((u) => ({ ...u, [m.deviceId]: (u[m.deviceId] ?? 0) + 1 }));
       }
     },
+    device_deleted: (d) => removeDevice(d.deviceId),
     device: (d) =>
       setDevices((list) =>
         list.some((x) => x.deviceId === d.deviceId)
@@ -165,6 +178,7 @@ export default function Dashboard({ username, onLogout, pairingTiming }) {
           open={manageOpen}
           onOpenChange={setManageOpen}
           onRenamed={(d) => setDevices((list) => list.map((x) => (x.deviceId === d.deviceId ? d : x)))}
+          onErased={removeDevice}
           onRevoked={(id) =>
             setDevices((list) =>
               list.map((x) => (x.deviceId === id ? { ...x, revokedAt: new Date().toISOString() } : x)),

@@ -556,6 +556,64 @@ describe('manage a phone', () => {
   });
 });
 
+describe('erasing a revoked phone', () => {
+  const revokedAt = new Date(Date.now() - 60000).toISOString();
+  const open = async (user) => {
+    await user.click(await screen.findByRole('button', { name: /old phone/i }));
+    await user.click(await screen.findByRole('button', { name: /manage phone/i }));
+    return screen.findByRole('dialog', { name: /old phone/i });
+  };
+
+  it('does not offer erasing for a phone that is still active', async () => {
+    mockApi({ devices: [device({ deviceId: 'a', name: 'Old phone' })] });
+    const user = userEvent.setup();
+    render(<Dashboard username="admin" onLogout={() => {}} />);
+    const dialog = await open(user);
+    expect(within(dialog).queryByRole('button', { name: /erase/i })).not.toBeInTheDocument();
+  });
+
+  it('asks for confirmation, then removes the phone and its messages and goes back to all phones', async () => {
+    let erased = 0;
+    server.use(
+      http.delete('/api/v1/devices/a/permanent', () => {
+        erased += 1;
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    mockApi({
+      devices: [device({ deviceId: 'a', name: 'Old phone', revokedAt }), device({ deviceId: 'b', name: 'Spare phone' })],
+      // Like the real server: once erased, its messages are gone from every later load.
+      messagesResponse: () => ({
+        messages: erased ? [] : [message({ deviceId: 'a', body: 'from the old phone' })],
+        nextBefore: null,
+      }),
+    });
+    const user = userEvent.setup();
+    render(<Dashboard username="admin" onLogout={() => {}} />);
+    const dialog = await open(user);
+
+    await user.click(within(dialog).getByRole('button', { name: /erase this phone/i }));
+    expect(erased).toBe(0);
+    expect(within(dialog).getByText(/cannot be undone/i)).toBeInTheDocument();
+    await user.click(within(dialog).getByRole('button', { name: /yes, erase/i }));
+
+    await waitFor(() => expect(erased).toBe(1));
+    await waitFor(() => expect(screen.queryByRole('button', { name: /old phone/i })).not.toBeInTheDocument());
+    expect(screen.getByRole('heading', { name: /all phones/i })).toBeInTheDocument();
+    expect(screen.queryByText('from the old phone')).not.toBeInTheDocument();
+  });
+
+  it('removes a phone another dashboard erased', async () => {
+    mockApi({ devices: [device({ deviceId: 'a', name: 'Old phone' })] });
+    render(<Dashboard username="admin" onLogout={() => {}} />);
+    await screen.findByRole('button', { name: /old phone/i });
+
+    act(() => FakeEventSource.current.emit('device_deleted', { deviceId: 'a' }));
+
+    await waitFor(() => expect(screen.queryByRole('button', { name: /old phone/i })).not.toBeInTheDocument());
+  });
+});
+
 describe('add phone: scan feedback', () => {
   const inMinutes = (m) => new Date(Date.now() + m * 60000).toISOString();
   const timing = { pollMs: 40, closeMs: 120 };
