@@ -22,9 +22,14 @@ export default function Dashboard({ username, onLogout, pairingTiming }) {
   const [loadError, setLoadError] = useState(null);
   const [addOpen, setAddOpen] = useState(false);
   const [manageOpen, setManageOpen] = useState(false);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const [olderFailed, setOlderFailed] = useState(false); // stop auto-loading until the user retries
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [reloadKey, setReloadKey] = useState(0); // bump to load the message list again
 
+  const endRef = useRef(null); // sits below the last message; scrolling near it loads more
+  const loadingRef = useRef(false);
+  const loadOlderRef = useRef(() => {});
   const view = useRef({ selected, filters });
   useEffect(() => {
     view.current = { selected, filters };
@@ -81,6 +86,7 @@ export default function Dashboard({ username, onLogout, pairingTiming }) {
       .then((m) => {
         if (stale) return;
         setLoadError(null);
+        setOlderFailed(false);
         setMessages(m.messages);
         setNextBefore(m.nextBefore);
         // Accumulate so the app choices do not shrink to the filtered result.
@@ -102,16 +108,47 @@ export default function Dashboard({ username, onLogout, pairingTiming }) {
   }
 
   async function loadOlder() {
+    if (loadingRef.current || !nextBefore) return; // one page at a time
+    loadingRef.current = true;
+    setLoadingOlder(true);
+    const viewAtStart = JSON.stringify(view.current);
     const params = queryParams();
     params.set('before', nextBefore);
     try {
       const page = await api(`/messages?${params}`);
+      // The user changed phone or filters meanwhile: this page belongs to the old list.
+      if (JSON.stringify(view.current) !== viewAtStart) return;
+      setLoadError(null);
+      setOlderFailed(false);
       setMessages((list) => [...list, ...page.messages.filter((m) => !list.some((x) => x.id === m.id))]);
       setNextBefore(page.nextBefore);
     } catch {
       setLoadError('Could not load messages.');
+      setOlderFailed(true);
+    } finally {
+      loadingRef.current = false;
+      setLoadingOlder(false);
     }
   }
+
+  useEffect(() => {
+    loadOlderRef.current = loadOlder;
+  });
+
+  // Load the next page when the end of the list scrolls near the screen. Re-created after each
+  // page, so a tall window that still shows the end keeps loading. Stops after a failure.
+  const canWatchScroll = typeof IntersectionObserver !== 'undefined';
+  useEffect(() => {
+    if (!nextBefore || olderFailed || !canWatchScroll || !endRef.current) return undefined;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) loadOlderRef.current();
+      },
+      { rootMargin: '400px' },
+    );
+    observer.observe(endRef.current);
+    return () => observer.disconnect();
+  }, [nextBefore, olderFailed, canWatchScroll]);
 
   async function signOut() {
     try {
@@ -172,10 +209,15 @@ export default function Dashboard({ username, onLogout, pairingTiming }) {
           )}
           <MessageList messages={messages} deviceNames={deviceNames} />
           {nextBefore && (
-            <div className="p-4">
-              <button type="button" onClick={loadOlder} className="rounded bg-slate-800 px-4 py-2 text-sm hover:bg-slate-700">
-                Load older
-              </button>
+            <div className="p-4 text-center">
+              <div ref={endRef} className="h-px" />
+              {olderFailed || !canWatchScroll ? (
+                <button type="button" onClick={loadOlder} className="rounded bg-slate-800 px-4 py-2 text-sm hover:bg-slate-700">
+                  {olderFailed ? 'Try again' : 'Load older'}
+                </button>
+              ) : (
+                loadingOlder && <p className="text-sm text-slate-500">Loading older messages…</p>
+              )}
             </div>
           )}
         </main>

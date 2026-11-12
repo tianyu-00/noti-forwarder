@@ -5,6 +5,7 @@ import { server } from './server.js';
 import Dashboard from '../src/Dashboard.jsx';
 import { device, message, mockApi } from './fixtures.js';
 import { FakeEventSource } from './fake-event-source.js';
+import { FakeIntersectionObserver } from './fake-intersection-observer.js';
 
 describe('message list', () => {
   it('shows messages from all phones in the order the server returns them', async () => {
@@ -317,25 +318,153 @@ describe('live updates', () => {
   });
 });
 
-describe('older messages', () => {
-  it('loads the next page when asked, using the server cursor', async () => {
-    const requests = mockApi({
-      devices: [device({ deviceId: 'a' })],
-      messagesResponse: (params) =>
-        params.get('before') === 'cursor-1'
-          ? { messages: [message({ deviceId: 'a', body: 'page two' })], nextBefore: null }
-          : { messages: [message({ deviceId: 'a', body: 'page one' })], nextBefore: 'cursor-1' },
+describe('older messages load as you scroll', () => {
+  const pages = {
+    first: { messages: [message({ deviceId: 'a', body: 'page one' })], nextBefore: 'cursor-1' },
+    second: { messages: [message({ deviceId: 'a', body: 'page two' })], nextBefore: 'cursor-2' },
+    third: { messages: [message({ deviceId: 'a', body: 'page three' })], nextBefore: null },
+  };
+  const byCursor = (params) =>
+    ({ 'cursor-1': pages.second, 'cursor-2': pages.third })[params.get('before')] ?? pages.first;
+
+  const open = async () => {
+    const requests = mockApi({ devices: [device({ deviceId: 'a' })], messagesResponse: byCursor });
+    render(<Dashboard username="admin" onLogout={() => {}} />);
+    await screen.findByText('page one');
+    return requests;
+  };
+  const reachEnd = () => act(() => FakeIntersectionObserver.current.trigger(true));
+  const olderRequests = (requests) => requests.messages.filter((p) => p.get('before'));
+
+  it('loads the next page, using the server cursor, when the end of the list comes into view', async () => {
+    const requests = await open();
+    expect(olderRequests(requests)).toHaveLength(0); // nothing extra until the user scrolls
+
+    reachEnd();
+
+    expect(await screen.findByText('page two')).toBeInTheDocument();
+    expect(screen.getByText('page one')).toBeInTheDocument();
+    expect(olderRequests(requests).map((p) => p.get('before'))).toEqual(['cursor-1']);
+  });
+
+  it('asks for one page at a time while a page is still loading', async () => {
+    let release;
+    const gate = new Promise((resolve) => {
+      release = resolve;
     });
+    let olderCalls = 0;
+    server.use(
+      http.get('/api/v1/messages', async ({ request }) => {
+        const before = new URL(request.url).searchParams.get('before');
+        if (!before) return HttpResponse.json(pages.first);
+        olderCalls += 1;
+        await gate;
+        return HttpResponse.json(pages.second);
+      }),
+      http.get('/api/v1/devices', () => HttpResponse.json({ devices: [device({ deviceId: 'a' })] })),
+    );
+    render(<Dashboard username="admin" onLogout={() => {}} />);
+    await screen.findByText('page one');
+
+    reachEnd();
+    reachEnd();
+    reachEnd();
+    release();
+
+    expect(await screen.findByText('page two')).toBeInTheDocument();
+    expect(olderCalls).toBe(1);
+  });
+
+  it('keeps loading while the end of the list is still on screen, until there are no more', async () => {
+    FakeIntersectionObserver.startVisible = true; // a tall window: the end never leaves the screen
+    await open();
+
+    expect(await screen.findByText('page three')).toBeInTheDocument();
+    expect(screen.getByText('page one')).toBeInTheDocument();
+    expect(screen.getByText('page two')).toBeInTheDocument();
+  });
+
+  it('stops watching the end of the list once there is nothing older', async () => {
+    FakeIntersectionObserver.startVisible = true;
+    const requests = await open();
+    await screen.findByText('page three');
+    const before = requests.messages.length;
+
+    await waitFor(() => expect(FakeIntersectionObserver.active).toHaveLength(0));
+    expect(requests.messages).toHaveLength(before);
+  });
+
+  it('shows an error with a Try again button when a page fails, and does not retry by itself', async () => {
+    let failing = true;
+    let olderCalls = 0;
+    server.use(
+      http.get('/api/v1/messages', ({ request }) => {
+        if (!new URL(request.url).searchParams.get('before')) return HttpResponse.json(pages.first);
+        olderCalls += 1;
+        return failing ? HttpResponse.json({ error: 'x' }, { status: 500 }) : HttpResponse.json(pages.third);
+      }),
+      http.get('/api/v1/devices', () => HttpResponse.json({ devices: [device({ deviceId: 'a' })] })),
+    );
     const user = userEvent.setup();
+    render(<Dashboard username="admin" onLogout={() => {}} />);
+    await screen.findByText('page one');
+
+    reachEnd();
+    expect(await screen.findByRole('alert')).toHaveTextContent(/could not load/i);
+    expect(olderCalls).toBe(1);
+
+    failing = false;
+    await user.click(screen.getByRole('button', { name: /try again/i }));
+
+    expect(await screen.findByText('page three')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('drops an older page that arrives after the user switched filters', async () => {
+    let release;
+    const gate = new Promise((resolve) => {
+      release = resolve;
+    });
+    server.use(
+      http.get('/api/v1/messages', async ({ request }) => {
+        const params = new URL(request.url).searchParams;
+        if (params.get('before')) {
+          await gate;
+          return HttpResponse.json({ messages: [message({ deviceId: 'a', body: 'stale page' })], nextBefore: null });
+        }
+        return HttpResponse.json(
+          params.get('type') === 'sms'
+            ? { messages: [message({ deviceId: 'a', type: 'sms', body: 'only texts' })], nextBefore: null }
+            : pages.first,
+        );
+      }),
+      http.get('/api/v1/devices', () => HttpResponse.json({ devices: [device({ deviceId: 'a' })] })),
+    );
+    const user = userEvent.setup();
+    render(<Dashboard username="admin" onLogout={() => {}} />);
+    await screen.findByText('page one');
+
+    reachEnd(); // an older page starts loading...
+    await user.click(screen.getByRole('tab', { name: 'SMS' })); // ...then the user changes the view
+    expect(await screen.findByText('only texts')).toBeInTheDocument();
+    release();
+    await new Promise((r) => setTimeout(r, 50));
+
+    expect(screen.queryByText('stale page')).not.toBeInTheDocument();
+    expect(screen.getByText('only texts')).toBeInTheDocument();
+  });
+
+  it('falls back to a Load older button when the browser cannot watch scrolling', async () => {
+    delete globalThis.IntersectionObserver;
+    const user = userEvent.setup();
+    mockApi({ devices: [device({ deviceId: 'a' })], messagesResponse: byCursor });
     render(<Dashboard username="admin" onLogout={() => {}} />);
     await screen.findByText('page one');
 
     await user.click(screen.getByRole('button', { name: /load older/i }));
 
     expect(await screen.findByText('page two')).toBeInTheDocument();
-    expect(screen.getByText('page one')).toBeInTheDocument();
-    expect(requests.messages.at(-1).get('before')).toBe('cursor-1');
-    expect(screen.queryByRole('button', { name: /load older/i })).not.toBeInTheDocument();
+    globalThis.IntersectionObserver = FakeIntersectionObserver;
   });
 });
 
