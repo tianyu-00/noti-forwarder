@@ -1185,3 +1185,67 @@ describe('settings: clear all messages', () => {
     await waitFor(() => expect(screen.queryByText('gone soon')).not.toBeInTheDocument());
   });
 });
+
+describe('settings: change password', () => {
+  const setup = async () => {
+    server.use(
+      http.get('/api/v1/settings', () => HttpResponse.json({ retentionDays: null })),
+      http.get('/api/v1/auth/me', () => HttpResponse.json({ username: 'admin', csrfToken: 'c', totpEnabled: false })),
+    );
+    mockApi({ devices: [device({ deviceId: 'a' })] });
+    const user = userEvent.setup();
+    render(<Dashboard username="admin" onLogout={() => {}} />);
+    await user.click(await screen.findByRole('button', { name: /settings/i }));
+    const dialog = await screen.findByRole('dialog', { name: /settings/i });
+    const fill = async (current, next, again = next) => {
+      await user.type(await within(dialog).findByLabelText(/current password/i), current);
+      await user.type(within(dialog).getByLabelText(/^new password/i), next);
+      await user.type(within(dialog).getByLabelText(/repeat new password/i), again);
+    };
+    const submit = () => user.click(within(dialog).getByRole('button', { name: /change password/i }));
+    return { user, dialog, fill, submit };
+  };
+
+  it('refuses a short password or a mismatch without sending anything', async () => {
+    let called = false;
+    server.use(http.post('/api/v1/auth/password', () => { called = true; return new HttpResponse(null, { status: 204 }); }));
+    const { dialog, fill, submit } = await setup();
+
+    await fill('old password 123', 'short');
+    await submit();
+    expect(within(dialog).getByText(/at least 12 characters/i)).toBeInTheDocument();
+
+    await userEvent.setup().type(within(dialog).getByLabelText(/^new password/i), ' and more text');
+    await submit();
+    expect(within(dialog).getByText(/do not match/i)).toBeInTheDocument();
+    expect(called).toBe(false);
+  });
+
+  it('sends both passwords, says it worked and clears the fields', async () => {
+    let sent;
+    server.use(
+      http.post('/api/v1/auth/password', async ({ request }) => {
+        sent = await request.json();
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    const { dialog, fill, submit } = await setup();
+
+    await fill('old password 123', 'a long enough new one');
+    await submit();
+
+    expect(await within(dialog).findByText(/password changed/i)).toBeInTheDocument();
+    expect(sent).toEqual({ currentPassword: 'old password 123', newPassword: 'a long enough new one' });
+    expect(within(dialog).getByLabelText(/current password/i)).toHaveValue('');
+  });
+
+  it('says when the current password is wrong', async () => {
+    server.use(http.post('/api/v1/auth/password', () => HttpResponse.json({ error: 'wrong_password' }, { status: 400 })));
+    const { dialog, fill, submit } = await setup();
+
+    await fill('not mine at all', 'a long enough new one');
+    await submit();
+
+    expect(await within(dialog).findByText(/current password is not correct/i)).toBeInTheDocument();
+  });
+});

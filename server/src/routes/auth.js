@@ -3,6 +3,7 @@ import express from 'express';
 import { z } from 'zod';
 import { audit } from '../audit.js';
 import { hashPassword, verifyPassword } from '../auth/password.js';
+import { hashToken } from '../auth/tokens.js';
 import { createSession, deleteSession, requireCsrf, SESSION_COOKIE, SESSION_TTL_MS } from '../auth/sessions.js';
 import { rateLimit } from '../rate-limit.js';
 import { verifySecondFactor } from '../auth/second-factor.js';
@@ -15,6 +16,11 @@ const loginSchema = z.object({
   username: z.string().min(1).max(100),
   password: z.string().min(1).max(500),
   code: z.string().max(30).optional(),
+});
+
+const passwordSchema = z.object({
+  currentPassword: z.string().min(1).max(500),
+  newPassword: z.string().min(12).max(500),
 });
 
 // Verified against when the user does not exist, so timing does not reveal it.
@@ -95,6 +101,28 @@ export function authRouter({
         csrfToken: req.session.csrfToken,
         totpEnabled: Boolean(rows[0]?.totp_enabled_at),
       });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  // Changing the password ends every other session, so a stolen session or an old browser
+  // cannot stay signed in. This session stays.
+  router.post('/auth/password', perIp, requireViewer, requireCsrf, express.json({ limit: '10kb' }), async (req, res, next) => {
+    try {
+      const parsed = passwordSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ error: 'invalid_payload' });
+      const { rows } = await db.query('SELECT id, password_hash FROM users WHERE username = $1', [req.session.username]);
+      const user = rows[0];
+      if (!user || !(await verifyPassword(user.password_hash, parsed.data.currentPassword))) {
+        await audit(db, { event: 'password_change_failed', actor: req.session.username, ip: req.ip });
+        return res.status(400).json({ error: 'wrong_password' });
+      }
+      const hash = await hashPassword(parsed.data.newPassword);
+      await db.query('UPDATE users SET password_hash = $2, failed_logins = 0, locked_until = NULL WHERE id = $1', [user.id, hash]);
+      await db.query('DELETE FROM sessions WHERE user_id = $1 AND token_hash <> $2', [user.id, hashToken(req.session.token)]);
+      await audit(db, { event: 'password_change', actor: req.session.username, ip: req.ip });
+      res.status(204).end();
     } catch (err) {
       next(err);
     }
