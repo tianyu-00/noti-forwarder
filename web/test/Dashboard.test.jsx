@@ -614,6 +614,83 @@ describe('erasing a revoked phone', () => {
   });
 });
 
+describe('settings: message retention', () => {
+  const setup = async (retentionDays = null) => {
+    server.use(http.get('/api/v1/settings', () => HttpResponse.json({ retentionDays })));
+    mockApi({ devices: [device({ deviceId: 'a' })] });
+    const user = userEvent.setup();
+    render(<Dashboard username="admin" onLogout={() => {}} />);
+    await user.click(await screen.findByRole('button', { name: /settings/i }));
+    return { user, dialog: await screen.findByRole('dialog', { name: /settings/i }) };
+  };
+
+  it('shows that messages are kept forever by default', async () => {
+    const { dialog } = await setup(null);
+    expect(await within(dialog).findByRole('radio', { name: /keep messages forever/i })).toBeChecked();
+  });
+
+  it('shows the saved limit', async () => {
+    const { dialog } = await setup(45);
+    expect(await within(dialog).findByRole('radio', { name: /delete messages older than/i })).toBeChecked();
+    expect(within(dialog).getByRole('spinbutton', { name: /days/i })).toHaveValue(45);
+  });
+
+  it('confirms before saving a limit, then saves it and says how many were deleted', async () => {
+    let sent;
+    server.use(
+      http.put('/api/v1/settings', async ({ request }) => {
+        sent = await request.json();
+        return HttpResponse.json({ retentionDays: 30, purged: 12 });
+      }),
+    );
+    const { user, dialog } = await setup(null);
+    await user.click(await within(dialog).findByRole('radio', { name: /delete messages older than/i }));
+    const days = within(dialog).getByRole('spinbutton', { name: /days/i });
+    await user.clear(days);
+    await user.type(days, '30');
+
+    await user.click(within(dialog).getByRole('button', { name: /^save/i }));
+    expect(sent).toBeUndefined();
+    expect(within(dialog).getByText(/cannot be undone/i)).toBeInTheDocument();
+    await user.click(within(dialog).getByRole('button', { name: /yes, save/i }));
+
+    await waitFor(() => expect(sent).toEqual({ retentionDays: 30 }));
+    expect(await within(dialog).findByText(/deleted 12 old messages/i)).toBeInTheDocument();
+  });
+
+  it('saves keep-forever without a warning', async () => {
+    let sent;
+    server.use(
+      http.put('/api/v1/settings', async ({ request }) => {
+        sent = await request.json();
+        return HttpResponse.json({ retentionDays: null, purged: 0 });
+      }),
+    );
+    const { user, dialog } = await setup(30);
+    await user.click(await within(dialog).findByRole('radio', { name: /keep messages forever/i }));
+    await user.click(within(dialog).getByRole('button', { name: /^save/i }));
+    await waitFor(() => expect(sent).toEqual({ retentionDays: null }));
+  });
+
+  it('does not allow a limit that is not a whole number of days from 1 to 3650', async () => {
+    const { user, dialog } = await setup(null);
+    await user.click(await within(dialog).findByRole('radio', { name: /delete messages older than/i }));
+    const days = within(dialog).getByRole('spinbutton', { name: /days/i });
+    await user.clear(days);
+    await user.type(days, '0');
+    await user.click(within(dialog).getByRole('button', { name: /^save/i }));
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(/1 and 3650/i);
+  });
+
+  it('shows an error when saving fails', async () => {
+    server.use(http.put('/api/v1/settings', () => HttpResponse.json({ error: 'x' }, { status: 500 })));
+    const { user, dialog } = await setup(30);
+    await user.click(await within(dialog).findByRole('radio', { name: /keep messages forever/i }));
+    await user.click(within(dialog).getByRole('button', { name: /^save/i }));
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(/could not save/i);
+  });
+});
+
 describe('add phone: scan feedback', () => {
   const inMinutes = (m) => new Date(Date.now() + m * 60000).toISOString();
   const timing = { pollMs: 40, closeMs: 120 };

@@ -5,6 +5,7 @@ import MessageList from './MessageList.jsx';
 import Footer from './Footer.jsx';
 import AddPhoneDialog from './AddPhoneDialog.jsx';
 import ManagePhoneDialog from './ManagePhoneDialog.jsx';
+import SettingsDialog from './SettingsDialog.jsx';
 import Sidebar from './Sidebar.jsx';
 import Filters from './Filters.jsx';
 import { useStream } from './useStream.js';
@@ -21,6 +22,8 @@ export default function Dashboard({ username, onLogout, pairingTiming }) {
   const [loadError, setLoadError] = useState(null);
   const [addOpen, setAddOpen] = useState(false);
   const [manageOpen, setManageOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0); // bump to load the message list again
 
   const view = useRef({ selected, filters });
   useEffect(() => {
@@ -89,7 +92,7 @@ export default function Dashboard({ username, onLogout, pairingTiming }) {
     return () => {
       stale = true;
     };
-  }, [selected, filters]);
+  }, [selected, filters, reloadKey]);
 
   function queryParams() {
     const params = new URLSearchParams();
@@ -126,9 +129,14 @@ export default function Dashboard({ username, onLogout, pairingTiming }) {
     <div className="min-h-screen bg-slate-900 text-slate-100">
       <header className="flex items-center justify-between border-b border-slate-800 p-4 text-sm text-slate-400">
         <span>Signed in as {username}</span>
-        <button type="button" onClick={signOut} className="rounded px-3 py-1 hover:bg-slate-800">
-          Sign out
-        </button>
+        <div className="flex gap-2">
+          <button type="button" onClick={() => setSettingsOpen(true)} className="rounded px-3 py-1 hover:bg-slate-800">
+            Settings
+          </button>
+          <button type="button" onClick={signOut} className="rounded px-3 py-1 hover:bg-slate-800">
+            Sign out
+          </button>
+        </div>
       </header>
       <div className="md:flex">
         <div>
@@ -186,6 +194,11 @@ export default function Dashboard({ username, onLogout, pairingTiming }) {
           }
         />
       )}
+      <SettingsDialog
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+        onPurged={() => setReloadKey((k) => k + 1)}
+      />
       <AddPhoneDialog
         open={addOpen}
         onOpenChange={setAddOpen}
