@@ -2,6 +2,7 @@ import { fileURLToPath } from 'node:url';
 import pg from 'pg';
 import { createApp } from './app.js';
 import { cookieSecureFor } from './cookie-secure.js';
+import { createSilentMonitor } from './silent.js';
 import { createSecretBox, plainSecretBox } from './auth/secret-box.js';
 import { assertSecretsReadable, sealExistingSecrets } from './auth/secrets-at-rest.js';
 import { loadBuildInfo } from './config.js';
@@ -88,11 +89,24 @@ try {
 }
 console.log(notifier ? 'ntfy push enabled' : 'ntfy push off (set NTFY_TOPIC to turn it on)');
 
+// A phone unseen for this many minutes counts as quiet (0 turns the check off). Phones check in
+// every ~15 minutes, so the default leaves room for a couple of missed ones.
+const silentAfterMinutes = process.env.SILENT_AFTER_MINUTES === undefined || process.env.SILENT_AFTER_MINUTES === '' ? 120 : Number(process.env.SILENT_AFTER_MINUTES);
+if (!Number.isInteger(silentAfterMinutes) || silentAfterMinutes < 0 || (silentAfterMinutes > 0 && silentAfterMinutes < 30)) {
+  console.error('SILENT_AFTER_MINUTES must be 0 (off) or a whole number of at least 30');
+  process.exit(1);
+}
 const cookieSecure = cookieSecureFor(publicUrl);
 if (!cookieSecure) console.log('PUBLIC_URL is http://: sessions work without HTTPS, but traffic is not encrypted');
-const app = createApp({ ...loadBuildInfo(process.env), db, publicUrl, trustProxy, notifier, cookieSecure, secretBox });
+const app = createApp({ ...loadBuildInfo(process.env), db, publicUrl, trustProxy, notifier, cookieSecure, secretBox, silentAfterMinutes });
 
 startRetentionJob(db);
+if (silentAfterMinutes > 0) {
+  createSilentMonitor({ db, notifier, afterMinutes: silentAfterMinutes }).start();
+  console.log(`silent phone alerts after ${silentAfterMinutes} minutes without contact`);
+} else {
+  console.log('silent phone alerts off (SILENT_AFTER_MINUTES=0)');
+}
 
 app.listen(port, () => {
   console.log(`server listening on :${port}`);

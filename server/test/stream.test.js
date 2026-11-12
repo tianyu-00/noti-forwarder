@@ -52,6 +52,19 @@ describe('GET /api/v1/stream', () => {
     stream.close();
   });
 
+  it('tells viewers when a phone checks in, so a quiet label can clear', async () => {
+    const d = await ctx.addDevice();
+    const stream = await openStream(ctx.app, { cookie });
+    await stream.next();
+
+    await request(ctx.app).post('/api/v1/heartbeat').set('Authorization', `Bearer ${d.token}`);
+
+    const event = await stream.next();
+    expect(event.event).toBe('device_seen');
+    expect(event.data).toEqual({ deviceId: d.deviceId, lastSeen: expect.any(String) });
+    stream.close();
+  });
+
   it('pushes device events when a phone pairs, is renamed and is revoked', async () => {
     const stream = await openStream(ctx.app, { cookie });
     await stream.next();

@@ -10,13 +10,14 @@ const renameSchema = z.object({ name: z.string().min(1).max(100) });
 const toApi = deviceToApi;
 const COLUMNS = DEVICE_COLUMNS;
 
-export function devicesRouter({ db, requireViewer, events }) {
+export function devicesRouter({ db, requireViewer, events, silentAfterMinutes = 0 }) {
   const router = Router();
 
   router.get('/devices', requireViewer, async (req, res, next) => {
     try {
       const { rows } = await db.query(`SELECT ${COLUMNS} FROM devices ORDER BY paired_at DESC`);
-      res.json({ devices: rows.map(toApi) });
+      // silentAfterMinutes lets the dashboard label a phone that has not checked in (0 = off).
+      res.json({ devices: rows.map(toApi), silentAfterMinutes });
     } catch (err) {
       next(err);
     }

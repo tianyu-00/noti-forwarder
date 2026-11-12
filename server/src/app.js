@@ -2,6 +2,7 @@ import express from 'express';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import { messagesRouter } from './routes/messages.js';
+import { heartbeatRouter } from './routes/heartbeat.js';
 import { authRouter } from './routes/auth.js';
 import { pairingRouter } from './routes/pairing.js';
 import { devicesRouter } from './routes/devices.js';
@@ -26,6 +27,7 @@ export function createApp({
   publicUrl,
   pairRateLimit,
   secretBox,
+  silentAfterMinutes = 0,
 }) {
   const app = express();
   if (trustProxy !== undefined) app.set('trust proxy', trustProxy);
@@ -41,9 +43,10 @@ export function createApp({
     const events = createEventHub();
     app.use('/api/v1', authRouter({ db, requireViewer: viewer, cookieSecure, loginRateLimit, now, secretBox }));
     app.use('/api/v1', pairingRouter({ db, requireViewer: viewer, events, publicUrl, pairRateLimit }));
-    app.use('/api/v1', devicesRouter({ db, requireViewer: viewer, events }));
+    app.use('/api/v1', devicesRouter({ db, requireViewer: viewer, events, silentAfterMinutes }));
     app.use('/api/v1', settingsRouter({ db, requireViewer: viewer }));
     app.use('/api/v1', messagesRouter({ db, requireViewer: viewer, events, notifier, messageRateLimit, preAuthRateLimit }));
+    app.use('/api/v1', heartbeatRouter({ db, events, preAuthRateLimit }));
     app.use('/api/v1', streamRouter({ requireViewer: viewer, events }));
   }
 

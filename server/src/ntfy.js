@@ -59,6 +59,11 @@ export function createNtfyNotifier({
   }
 
   return {
+    /** A plain alert that is not about a message (e.g. a phone went quiet). Never throws. */
+    alert({ title, message, priority = 3, tags = [] }) {
+      return publish({ title, message, priority, tags });
+    },
+
     /** messages use the API shape (with `code`). Never throws. Returns how many pushes went out. */
     async notify(messages, deviceName) {
       const wanted = messages.filter(

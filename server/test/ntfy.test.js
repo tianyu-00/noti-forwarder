@@ -47,6 +47,32 @@ describe('push for end-to-end encrypted messages', () => {
   });
 });
 
+describe('ntfy alerts (not about a message)', () => {
+  it('publishes a title and text with the topic', async () => {
+    const { notifier, calls } = setup();
+
+    const ok = await notifier.alert({ title: 'Kitchen phone has gone quiet', message: 'No contact for 3 hours.', priority: 4, tags: ['warning'] });
+
+    expect(ok).toBe(true);
+    expect(calls[0].json).toEqual({
+      topic: TOPIC,
+      title: 'Kitchen phone has gone quiet',
+      message: 'No contact for 3 hours.',
+      priority: 4,
+      tags: ['warning'],
+    });
+  });
+
+  it('does not throw when ntfy is down, and logs no text', async () => {
+    const { notifier, logs } = setup({}, { throws: new Error('connection refused to ntfy.example.com') });
+
+    const ok = await notifier.alert({ title: 'Secret title', message: 'Secret text' });
+
+    expect(ok).toBe(false);
+    expect(logs.join(' ')).not.toMatch(/Secret|ntfy\.example/);
+  });
+});
+
 describe('createNtfyNotifier', () => {
   it('publishes JSON to the base URL and keeps Chinese text and emoji intact', async () => {
     const { notifier, calls } = setup();
