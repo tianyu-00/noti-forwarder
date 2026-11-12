@@ -1,6 +1,6 @@
 # Optional add-on, only when your cloudflared runs as a container on its own Docker network:
 # it joins the dashboard container to that network, so the tunnel can reach http://notiforwarder-web:80.
-# Enable by adding it to COMPOSE_FILE in .env and setting CLOUDFLARED_NETWORK (see .env.byo.example).
+# Enable by adding it to COMPOSE_FILE in .env and setting CLOUDFLARED_NETWORK (see the deploy README).
 services:
   web:
     networks:

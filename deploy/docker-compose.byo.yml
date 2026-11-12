@@ -1,30 +1,42 @@
-# The dashboard (web) and the server only, for a machine that already runs its own PostgreSQL
-# and its own cloudflared. Use it instead of docker-compose.yml (see .env.byo.example, which
-# sets COMPOSE_FILE so plain `docker compose up -d` picks this file).
+# Notiforwarder with your own PostgreSQL and your own cloudflared.
+# Only three values are required. Set them as environment variables (in your manager's env
+# panel or a .env file next to this file):
+#   DATABASE_URL    postgres://notiforwarder:PASSWORD@HOST:5432/notiforwarder
+#   PUBLIC_URL      https://notifications.example.com   (your tunnel address, no trailing slash)
+#   ADMIN_PASSWORD  at least 12 characters
+# Everything else has a default. Optional: ADMIN_USERNAME (admin), VERSION (publish),
+# WEB_BIND (3000), TRUST_PROXY (2), GHCR_OWNER (tianyu-00).
+#
+# Point your tunnel's service (type HTTP) at  http://<this machine's address>:3000
 services:
-  # Single entry point: serves the dashboard and proxies /api to the server. Point cloudflared at it:
-  #   cloudflared on the host:               http://localhost:3000
-  #   cloudflared in another container:      http://notiforwarder-web:80  (join the network, see below)
   web:
-    image: ghcr.io/${GHCR_OWNER}/notiforwarder-web:${VERSION}
+    image: ghcr.io/${GHCR_OWNER:-tianyu-00}/notiforwarder-web:${VERSION:-publish}
     container_name: notiforwarder-web
     restart: unless-stopped
     depends_on:
       - server
     ports:
-      # Loopback only, so the only way in is through your tunnel. Change WEB_BIND with care.
-      - "${WEB_BIND:-127.0.0.1:3000}:80"
+      # Port 3000 on this machine, reachable from your network so a cloudflared container or
+      # another machine can connect. To allow only this machine itself: WEB_BIND=127.0.0.1:3000
+      - "${WEB_BIND:-3000}:80"
 
   server:
-    image: ghcr.io/${GHCR_OWNER}/notiforwarder-server:${VERSION}
+    image: ghcr.io/${GHCR_OWNER:-tianyu-00}/notiforwarder-server:${VERSION:-publish}
     restart: unless-stopped
-    env_file: .env
     environment:
-      DATABASE_URL: ${DATABASE_URL}
-      PUBLIC_URL: ${PUBLIC_URL}
-      ADMIN_USERNAME: ${ADMIN_USERNAME}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
-      TRUST_PROXY: ${TRUST_PROXY:-}
-    # Lets DATABASE_URL use host.docker.internal when PostgreSQL runs on the Docker host itself.
+      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL, e.g. postgres://notiforwarder:PASSWORD@192.168.1.10:5432/notiforwarder}
+      PUBLIC_URL: ${PUBLIC_URL:?set PUBLIC_URL, e.g. https://notifications.example.com}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?set ADMIN_PASSWORD (at least 12 characters)}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      TRUST_PROXY: ${TRUST_PROXY:-2}
+      # Optional push alerts through ntfy; leave unset to keep them off.
+      NTFY_TOPIC: ${NTFY_TOPIC:-}
+      NTFY_URL: ${NTFY_URL:-}
+      NTFY_TOKEN: ${NTFY_TOKEN:-}
+      NTFY_MODE: ${NTFY_MODE:-}
+      NTFY_TYPES: ${NTFY_TYPES:-}
+      NTFY_APPS_BLOCK: ${NTFY_APPS_BLOCK:-}
+      NTFY_INCLUDE_BODY: ${NTFY_INCLUDE_BODY:-}
+    # Lets DATABASE_URL use host.docker.internal when PostgreSQL runs on this same machine.
     extra_hosts:
       - "host.docker.internal:host-gateway"
