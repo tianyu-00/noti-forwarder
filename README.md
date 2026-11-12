@@ -44,6 +44,23 @@ Open `<your PUBLIC_URL>/api/v1/health` in a browser. It should show a version an
 If the site does not load: run `docker compose ps` (all four should say `running`), then
 `docker compose logs --tail 30 cloudflared` (look for "Registered tunnel connection").
 
+### Reaching a stack in WSL from your phone (local testing)
+With WSL in mirrored networking mode, Windows blocks other devices from reaching a port a
+container publishes, so a phone on the same Wi-Fi times out. Open the port once, in PowerShell
+as Administrator (port 3100 is the local test stack):
+
+```powershell
+New-NetFirewallHyperVRule -Name "NotiforwarderLocal" -DisplayName "Notiforwarder local test" -Direction Inbound -VMCreatorId '{40E0AC32-46A5-438A-A0B2-2B479E8F2E90}' -Protocol TCP -LocalPorts 3100
+```
+
+Undo it when you are done testing:
+
+```powershell
+Remove-NetFirewallHyperVRule -Name "NotiforwarderLocal"
+```
+
+Only needed on Windows with WSL. A Raspberry Pi or other Linux server needs no such rule.
+
 ### After the PC or WSL restarts
 The containers are set to restart by themselves (`restart: unless-stopped`), but only once Docker
 is running again. Start Docker (and WSL) first. If nothing is running afterwards, run
