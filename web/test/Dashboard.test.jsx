@@ -616,7 +616,10 @@ describe('erasing a revoked phone', () => {
 
 describe('settings: message retention', () => {
   const setup = async (retentionDays = null) => {
-    server.use(http.get('/api/v1/settings', () => HttpResponse.json({ retentionDays })));
+    server.use(
+      http.get('/api/v1/settings', () => HttpResponse.json({ retentionDays })),
+      http.get('/api/v1/auth/me', () => HttpResponse.json({ username: 'admin', csrfToken: 'c', totpEnabled: false })),
+    );
     mockApi({ devices: [device({ deviceId: 'a' })] });
     const user = userEvent.setup();
     render(<Dashboard username="admin" onLogout={() => {}} />);
@@ -688,6 +691,101 @@ describe('settings: message retention', () => {
     await user.click(await within(dialog).findByRole('radio', { name: /keep messages forever/i }));
     await user.click(within(dialog).getByRole('button', { name: /^save/i }));
     expect(await within(dialog).findByRole('alert')).toHaveTextContent(/could not save/i);
+  });
+});
+
+describe('settings: two-step login', () => {
+  const setup = async ({ totpEnabled }) => {
+    server.use(
+      http.get('/api/v1/settings', () => HttpResponse.json({ retentionDays: null })),
+      http.get('/api/v1/auth/me', () => HttpResponse.json({ username: 'admin', csrfToken: 'c', totpEnabled })),
+    );
+    mockApi({ devices: [device({ deviceId: 'a' })] });
+    const user = userEvent.setup();
+    render(<Dashboard username="admin" onLogout={() => {}} />);
+    await user.click(await screen.findByRole('button', { name: /settings/i }));
+    return { user, dialog: await screen.findByRole('dialog', { name: /settings/i }) };
+  };
+
+  it('says whether two-step login is on or off', async () => {
+    const off = await setup({ totpEnabled: false });
+    expect(await within(off.dialog).findByText(/two-step login is off/i)).toBeInTheDocument();
+    expect(within(off.dialog).getByRole('button', { name: /turn on/i })).toBeInTheDocument();
+  });
+
+  it('turns on: shows a QR code and the key, checks a code, then shows the backup codes', async () => {
+    let enabledWith;
+    const codes = Array.from({ length: 10 }, (_, i) => `code${i}-abcde`);
+    server.use(
+      http.post('/api/v1/auth/totp/setup', () =>
+        HttpResponse.json({ secret: 'JBSWY3DPEHPK3PXP', otpauthUri: 'otpauth://totp/N:admin?secret=JBSWY3DPEHPK3PXP' }),
+      ),
+      http.post('/api/v1/auth/totp/enable', async ({ request }) => {
+        enabledWith = await request.json();
+        return HttpResponse.json({ backupCodes: codes });
+      }),
+    );
+    const { user, dialog } = await setup({ totpEnabled: false });
+
+    await user.click(await within(dialog).findByRole('button', { name: /turn on/i }));
+    expect(await within(dialog).findByRole('img', { name: /authenticator qr code/i })).toBeInTheDocument();
+    expect(within(dialog).getByText('JBSWY3DPEHPK3PXP')).toBeInTheDocument();
+
+    await user.type(within(dialog).getByLabelText(/6-digit code/i), '123456');
+    await user.click(within(dialog).getByRole('button', { name: /confirm/i }));
+
+    await waitFor(() => expect(enabledWith).toEqual({ code: '123456' }));
+    expect(await within(dialog).findByText(/save these backup codes/i)).toBeInTheDocument();
+    for (const c of codes) expect(within(dialog).getByText(c)).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole('button', { name: /i have saved them/i }));
+    expect(await within(dialog).findByText(/two-step login is on/i)).toBeInTheDocument();
+  });
+
+  it('says when the code was wrong and lets the user try again', async () => {
+    server.use(
+      http.post('/api/v1/auth/totp/setup', () => HttpResponse.json({ secret: 'ABCDEFGH', otpauthUri: 'otpauth://totp/x' })),
+      http.post('/api/v1/auth/totp/enable', () => HttpResponse.json({ error: 'invalid_code' }, { status: 400 })),
+    );
+    const { user, dialog } = await setup({ totpEnabled: false });
+    await user.click(await within(dialog).findByRole('button', { name: /turn on/i }));
+    await user.type(await within(dialog).findByLabelText(/6-digit code/i), '000000');
+    await user.click(within(dialog).getByRole('button', { name: /confirm/i }));
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(/code was not correct/i);
+    expect(within(dialog).getByLabelText(/6-digit code/i)).toBeInTheDocument();
+  });
+
+  it('turns off with the password and a code', async () => {
+    let sent;
+    server.use(
+      http.post('/api/v1/auth/totp/disable', async ({ request }) => {
+        sent = await request.json();
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    const { user, dialog } = await setup({ totpEnabled: true });
+    expect(await within(dialog).findByText(/two-step login is on/i)).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole('button', { name: /turn off/i }));
+    await user.type(within(dialog).getByLabelText(/^password/i), 'my password');
+    await user.type(within(dialog).getByLabelText(/code/i), '654321');
+    await user.click(within(dialog).getByRole('button', { name: /confirm turn off/i }));
+
+    await waitFor(() => expect(sent).toEqual({ password: 'my password', code: '654321' }));
+    expect(await within(dialog).findByText(/two-step login is off/i)).toBeInTheDocument();
+  });
+
+  it('shows an error and stays on when turning off is refused', async () => {
+    server.use(http.post('/api/v1/auth/totp/disable', () => HttpResponse.json({ error: 'invalid_credentials' }, { status: 403 })));
+    const { user, dialog } = await setup({ totpEnabled: true });
+    await user.click(await within(dialog).findByRole('button', { name: /turn off/i }));
+    await user.type(within(dialog).getByLabelText(/^password/i), 'nope');
+    await user.type(within(dialog).getByLabelText(/code/i), '000000');
+    await user.click(within(dialog).getByRole('button', { name: /confirm turn off/i }));
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(/password or code was not correct/i);
+    expect(within(dialog).queryByText(/two-step login is off/i)).not.toBeInTheDocument();
   });
 });
 

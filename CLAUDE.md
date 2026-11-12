@@ -104,7 +104,7 @@ Table `devices`: `device_id`, `name`, `model`, `app_version`, `token_hash`, `pai
 
 Table `pairing_codes`: `code_hash`, `created_at`, `expires_at`, `used_at`, `device_id` (set when used).
 
-Table `users`: `id`, `email`/`username`, `password_hash`, `totp_secret` (later). Sessions stored server-side or as signed cookies.
+Table `users`: `id`, `username`, `password_hash`, `totp_secret` (set while 2FA setup is pending and once on), `totp_enabled_at`, `totp_last_step` (replay guard), `failed_logins`, `locked_until`. Table `totp_backup_codes`: `code_hash`, `user_id`, `used_at` (10 one-use recovery codes, hashed). Sessions stored server-side or as signed cookies.
 
 Table `settings`: `key`, `value` (jsonb), `updated_at`. Holds dashboard settings; today only `retention_days` (absent = keep messages forever).
 
@@ -112,7 +112,8 @@ Table `audit_log`: `id`, `event` (login, pair, revoke, ...), `actor`, `device_id
 
 ## API (v1)
 
-- `POST /api/v1/auth/login`, `POST /api/v1/auth/logout`, `GET /api/v1/auth/me` : dashboard login (session cookie).
+- `POST /api/v1/auth/login` (optional `code` field: 6-digit TOTP or a backup code; with 2FA on and no code the answer is 401 `totp_required`), `POST /api/v1/auth/logout`, `GET /api/v1/auth/me` (includes `totpEnabled`) : dashboard login (session cookie).
+- `POST /api/v1/auth/totp/setup`, `/enable`, `/disable` (dashboard session): optional two-step login with an authenticator app. Disabling needs the password and a code. Lost phone and backup codes: `docker compose exec server node src/reset-totp.js <username>`.
 - `POST /api/v1/pairing-codes` (dashboard session) : create a pairing code + QR payload.
 - `POST /api/v1/pair` (no auth, code required) : phone exchanges a pairing code for a device token.
 - `DELETE /api/v1/devices/:id` / `PATCH /api/v1/devices/:id` (dashboard session) : revoke / rename a phone.
@@ -203,7 +204,7 @@ Status as of the last update: 0, 1, 1b, 2, 3, 4 and 5 are done, and 6 is built a
 6. ntfy push to the main phone; filters and 2FA code highlighting. (built and tested: the server detects the 2FA code and adds a `code` field to messages, the dashboard highlights it with a copy button, and ntfy push is configured by `NTFY_*` environment variables with mode/type/app filters, JSON publishing, a burst cap and no message text in logs. Filters are env-only; a dashboard settings screen would need a stored setting. The public ntfy.sh needs a long random topic; the server refuses a short one.)
 7. SMS reply from the PC (outbox polled by the phone, sent via `SmsManager`).
 Hardening (done): the phone API is rate limited per IP before the token check; a login lock that has expired starts counting from zero; a revoked phone can be erased with its messages; message retention is a dashboard setting with an hourly purge; an end-to-end test (`e2e/`) runs against the real stack in CI (API level, no browser).
-Still open: TOTP 2FA (needs a `users.totp_secret` column and an OTP library; ask first), a browser-level end-to-end test (would need Playwright).
+TOTP two-step login is built (optional; turned on in the dashboard Settings; `otpauth` library; the secret is stored unencrypted in the database like the session data, so protect database backups). Still open: a browser-level end-to-end test (would need Playwright).
 
 ## Working conventions
 

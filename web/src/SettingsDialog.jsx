@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
 import * as Dialog from '@radix-ui/react-dialog';
 import { api } from './api.js';
+import SecuritySection from './SecuritySection.jsx';
 
 const MAX_DAYS = 3650;
 
@@ -127,12 +128,13 @@ export default function SettingsDialog({ open, onOpenChange, onPurged }) {
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/60" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 w-[90vw] max-w-md -translate-x-1/2 -translate-y-1/2 space-y-4 rounded-lg bg-slate-800 p-6 text-slate-100">
+        <Dialog.Content className="fixed left-1/2 top-1/2 w-[90vw] max-h-[90vh] max-w-md -translate-x-1/2 -translate-y-1/2 space-y-4 overflow-y-auto rounded-lg bg-slate-800 p-6 text-slate-100">
           <Dialog.Title className="text-lg font-semibold">Settings</Dialog.Title>
           <Dialog.Description className="text-sm text-slate-400">
-            Applies to messages from every phone.
+            Message retention applies to every phone.
           </Dialog.Description>
           <RetentionForm onPurged={onPurged} />
+          <SecuritySection />
           <Dialog.Close className="rounded bg-slate-700 px-3 py-1 text-sm">Close</Dialog.Close>
         </Dialog.Content>
       </Dialog.Portal>

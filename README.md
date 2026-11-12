@@ -85,6 +85,17 @@ docker compose exec -T db psql -U notiforwarder notiforwarder < backup-2026-11-1
 - `deploy/docker-compose.yml` is tracked by git. After a `git pull`, run `docker compose up -d`
   to apply any change to it.
 
+## Two-step login
+
+Optional but recommended, because messages hold 2FA codes for your other accounts. In the dashboard open **Settings**, then **Two-step login**, and choose *Turn on*. Scan the QR code with an authenticator app (Google Authenticator, Authy, 1Password…), type the code it shows, and **save the 10 backup codes** (each works once, and they are shown only once). From then on the sign-in form asks for a code after your password.
+
+Lost your phone and the backup codes? Turn it off from the server:
+
+```bash
+cd ~/github/noti-forwarder/deploy
+docker compose exec server node src/reset-totp.js admin
+```
+
 ## Keeping and deleting messages
 
 - **Settings** (top right of the dashboard) sets how long messages are kept: forever (the default) or delete everything older than N days. Saving a limit deletes the older messages at once and the server repeats it every hour. This cannot be undone, so the dashboard asks first.
