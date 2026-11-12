@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
 import { QRCodeSVG } from 'qrcode.react';
+import { useE2eKey } from './keyStore.js';
+import { withKey } from './pairingPayload.js';
 import { api } from './api.js';
 import { deviceShape } from './Sidebar.jsx';
 import { Button, Modal } from './ui.jsx';
@@ -13,6 +15,7 @@ function formatRemaining(ms) {
 function PairingPanel({ devices, onDevicesLoaded, onClose, timing }) {
   // Phones known when the dialog opened: any other phone appearing means pairing worked.
   const [knownIds] = useState(() => new Set(devices.map((d) => d.deviceId)));
+  const e2eKey = useE2eKey();
   const [attempt, setAttempt] = useState(0);
   const [pairing, setPairing] = useState(null);
   const [error, setError] = useState(null);
@@ -114,14 +117,26 @@ function PairingPanel({ devices, onDevicesLoaded, onClose, timing }) {
   return (
     <div className="space-y-3">
       <div className="inline-block rounded-lg border border-line bg-white p-3">
-        <QRCodeSVG value={pairing.qrPayload} size={192} role="img" aria-label="Pairing QR code" />
+        <QRCodeSVG value={withKey(pairing.qrPayload, e2eKey)} size={192} role="img" aria-label="Pairing QR code" />
       </div>
       <dl className="space-y-1 text-sm">
         <dt className="text-muted">Server address</dt>
         <dd className="break-all font-mono">{serverUrl}</dd>
         <dt className="pt-2 text-muted">Security key</dt>
         <dd className="break-all font-mono text-lg tracking-wide">{pairing.code}</dd>
+        {e2eKey && (
+          <>
+            <dt className="pt-2 text-muted">Encryption key (for typing by hand)</dt>
+            <dd className="break-all font-mono">{e2eKey}</dd>
+          </>
+        )}
       </dl>
+      {!e2eKey && (
+        <p className="text-xs text-muted">
+          This phone&apos;s messages will not be encrypted. To encrypt them, turn on end-to-end encryption in Settings, then
+          make a new code.
+        </p>
+      )}
       <p role="status" className="text-sm text-muted">
         Waiting for the phone to scan…
       </p>

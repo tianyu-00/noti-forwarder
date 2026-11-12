@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
 import { api } from './api.js';
+import EncryptionSection from './EncryptionSection.jsx';
 import PasswordSection from './PasswordSection.jsx';
 import SecuritySection from './SecuritySection.jsx';
 import { Button, Modal } from './ui.jsx';
@@ -177,6 +178,7 @@ export default function SettingsDialog({ open, onOpenChange, onPurged, onCleared
   return (
     <Modal open={open} onOpenChange={onOpenChange} title="Settings" description="Message retention applies to every phone.">
       <RetentionForm onPurged={onPurged} />
+      <EncryptionSection />
       <PasswordSection />
       <SecuritySection />
       <ClearAllSection onClearedAll={onClearedAll} />
