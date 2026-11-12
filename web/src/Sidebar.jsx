@@ -7,6 +7,8 @@ export const deviceShape = PropTypes.shape({
   name: PropTypes.string.isRequired,
   pairedAt: PropTypes.string,
   lastSeen: PropTypes.string,
+  // True while the phone holds its connection to the server.
+  connected: PropTypes.bool,
   revokedAt: PropTypes.string,
 });
 
@@ -18,13 +20,37 @@ function quietFor(device, silentAfterMinutes, now) {
   return Number.isNaN(since) || now - since < silentAfterMinutes * 60000 ? null : now - since;
 }
 
-function status(device, silentAfterMinutes, now) {
-  if (device.revokedAt) return 'Revoked';
-  const quiet = quietFor(device, silentAfterMinutes, now);
-  if (quiet !== null) return `Quiet for ${formatQuiet(quiet)}`;
-  if (!device.lastSeen) return 'Never connected';
-  return isOnline(device.lastSeen, now) ? 'Online' : `Last seen ${timeAgo(device.lastSeen, now)}`;
+// live: holds its connection right now. recent: seen within the online window. quiet: silent for
+// too long. idle: seen a while ago. A phone that holds its connection is never quiet, however old
+// its last message is.
+function stateOf(device, silentAfterMinutes, now) {
+  if (device.revokedAt) return 'revoked';
+  if (device.connected) return 'live';
+  if (quietFor(device, silentAfterMinutes, now) !== null) return 'quiet';
+  return isOnline(device.lastSeen, now) ? 'recent' : 'idle';
 }
+
+function status(device, state, silentAfterMinutes, now) {
+  if (state === 'revoked') return 'Revoked';
+  if (state === 'live' || state === 'recent') return 'Online';
+  if (state === 'quiet') return `Quiet for ${formatQuiet(quietFor(device, silentAfterMinutes, now))}`;
+  return device.lastSeen ? `Last seen ${timeAgo(device.lastSeen, now)}` : 'Never connected';
+}
+
+const DOT_CLASS = {
+  live: 'status-dot-live bg-ok',
+  recent: 'bg-ok',
+  idle: 'bg-faint',
+  quiet: 'bg-danger',
+};
+
+// Decorative: the words next to it carry the meaning, so screen readers skip it.
+function StatusDot({ state }) {
+  if (state === 'revoked') return null;
+  return <span data-testid="status-dot" data-state={state} aria-hidden="true" className={clsx('h-2 w-2 shrink-0 rounded-full', DOT_CLASS[state])} />;
+}
+
+StatusDot.propTypes = { state: PropTypes.string.isRequired };
 
 function Item({ active, onClick, children }) {
   return (
@@ -48,6 +74,23 @@ Item.propTypes = {
   children: PropTypes.node.isRequired,
 };
 
+function StatusRow({ device, silentAfterMinutes, now }) {
+  const state = stateOf(device, silentAfterMinutes, now);
+  const tone = { live: 'text-ok', recent: 'text-ok', quiet: 'font-medium text-danger' }[state] ?? 'text-muted';
+  return (
+    <span className={clsx('flex items-center gap-1.5 text-xs', tone)}>
+      <StatusDot state={state} />
+      {status(device, state, silentAfterMinutes, now)}
+    </span>
+  );
+}
+
+StatusRow.propTypes = {
+  device: deviceShape.isRequired,
+  silentAfterMinutes: PropTypes.number.isRequired,
+  now: PropTypes.number.isRequired,
+};
+
 export default function Sidebar({ devices, selected, unread, onSelect, silentAfterMinutes = 0, now }) {
   return (
     <nav aria-label="Phones" className="flex w-full gap-2 overflow-x-auto p-3 md:block md:w-64 md:space-y-0.5 md:overflow-visible">
@@ -64,18 +107,7 @@ export default function Sidebar({ devices, selected, unread, onSelect, silentAft
               </span>
             )}
           </span>
-          <span
-            className={clsx(
-              'text-xs',
-              quietFor(d, silentAfterMinutes, now) !== null
-                ? 'font-medium text-danger'
-                : isOnline(d.lastSeen, now) && !d.revokedAt
-                  ? 'text-ok'
-                  : 'text-muted',
-            )}
-          >
-            {status(d, silentAfterMinutes, now)}
-          </span>
+          <StatusRow device={d} silentAfterMinutes={silentAfterMinutes} now={now} />
         </Item>
       ))}
     </nav>

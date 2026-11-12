@@ -89,6 +89,11 @@ export default function Dashboard({ username, onLogout, pairingTiming }) {
 
   useStream({
     device_seen: (d) => markSeen(d.deviceId, d.lastSeen),
+    // The phone's connection opened or closed: the green dot follows it exactly.
+    device_presence: (d) =>
+      setDevices((list) =>
+        list.map((x) => (x.deviceId === d.deviceId ? { ...x, connected: d.connected, lastSeen: d.lastSeen } : x)),
+      ),
     message: (m) => {
       markSeen(m.deviceId, new Date().toISOString());
       if (matchesView(m, view.current)) {
@@ -101,10 +106,11 @@ export default function Dashboard({ username, onLogout, pairingTiming }) {
     device_deleted: (d) => removeDevice(d.deviceId),
     messages_cleared: (d) => clearMessagesOf(d.deviceId),
     messages_cleared_all: clearAllMessages,
+    // Merged, not replaced: this event has no `connected`, and a revoked phone is not connected.
     device: (d) =>
       setDevices((list) =>
         list.some((x) => x.deviceId === d.deviceId)
-          ? list.map((x) => (x.deviceId === d.deviceId ? d : x))
+          ? list.map((x) => (x.deviceId === d.deviceId ? { ...x, ...d, ...(d.revokedAt ? { connected: false } : {}) } : x))
           : [d, ...list],
       ),
   });

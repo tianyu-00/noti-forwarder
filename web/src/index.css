@@ -77,3 +77,13 @@ body {
   outline: 2px solid var(--fg);
   outline-offset: 2px;
 }
+
+/* The dot beside a phone that holds its connection: a soft green glow that fades in and out. */
+@keyframes status-dot-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ok) 55%, transparent); opacity: 1; }
+  50% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--ok) 0%, transparent); opacity: 0.55; }
+}
+.status-dot-live { animation: status-dot-pulse 2.4s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .status-dot-live { animation: none; }
+}
