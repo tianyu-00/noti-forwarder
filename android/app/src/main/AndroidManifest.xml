@@ -5,8 +5,32 @@
 
     <!-- HTTPS only: messages contain private data such as 2FA codes. -->
     <application
+        android:name=".NotiApp"
         android:allowBackup="false"
         android:label="Notiforwarder"
-        android:usesCleartextTraffic="false" />
+        android:theme="@android:style/Theme.Material.Light.NoActionBar"
+        android:usesCleartextTraffic="false">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Only the system may bind to this; the user still has to grant Notification access. -->
+        <service
+            android:name=".NotificationForwarderService"
+            android:exported="true"
+            android:label="Notiforwarder"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
+    </application>
 
 </manifest>
