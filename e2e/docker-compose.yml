@@ -1,0 +1,30 @@
+# Throwaway stack for the end-to-end test: built from this checkout, own database, port 3100.
+# Run with: docker compose -p notiforwarder-e2e -f e2e/docker-compose.yml up -d --build
+# The values below are test-only and never used anywhere real.
+services:
+  web:
+    build:
+      context: ../web
+    depends_on:
+      - server
+    ports:
+      - "127.0.0.1:3100:80"
+
+  server:
+    build:
+      context: ../server
+    environment:
+      DATABASE_URL: postgres://e2e:e2e-password@db:5432/e2e
+      PUBLIC_URL: http://localhost:3100
+      ADMIN_USERNAME: e2e-admin
+      ADMIN_PASSWORD: e2e-test-password-123
+      TRUST_PROXY: "1"
+    depends_on:
+      - db
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: e2e
+      POSTGRES_PASSWORD: e2e-password
+      POSTGRES_DB: e2e

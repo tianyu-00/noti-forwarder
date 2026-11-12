@@ -85,6 +85,11 @@ docker compose exec -T db psql -U notiforwarder notiforwarder < backup-2026-11-1
 - `deploy/docker-compose.yml` is tracked by git. After a `git pull`, run `docker compose up -d`
   to apply any change to it.
 
+## Keeping and deleting messages
+
+- **Settings** (top right of the dashboard) sets how long messages are kept: forever (the default) or delete everything older than N days. Saving a limit deletes the older messages at once and the server repeats it every hour. This cannot be undone, so the dashboard asks first.
+- **Erase a phone**: revoke it first, then open it and choose *Erase this phone and its messages*. The phone entry and all its messages are removed.
+
 ## Push alerts with ntfy
 
 The server can send an alert to your main phone for each new message, through

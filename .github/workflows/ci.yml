@@ -69,8 +69,25 @@ jobs:
           retention-days: 14
 
   # Publishing only happens after every test job is green, and only from the publish branch.
+  test-e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Build and start the stack (nginx, server, Postgres)
+        run: docker compose -p notiforwarder-e2e -f e2e/docker-compose.yml up -d --build
+      - name: Log in, pair a phone, send a message, see it arrive
+        run: node e2e/run.mjs
+      - name: Stack logs (only on failure, no message text is logged)
+        if: failure()
+        run: docker compose -p notiforwarder-e2e -f e2e/docker-compose.yml logs --no-color --tail 80
+      - if: always()
+        run: docker compose -p notiforwarder-e2e -f e2e/docker-compose.yml down -v
+
   publish:
-    needs: [test-server, test-web, test-android]
+    needs: [test-server, test-web, test-android, test-e2e]
     if: github.event_name == 'push' && github.ref == 'refs/heads/publish'
     runs-on: ubuntu-latest
     strategy:

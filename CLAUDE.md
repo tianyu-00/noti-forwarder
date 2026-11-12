@@ -106,6 +106,8 @@ Table `pairing_codes`: `code_hash`, `created_at`, `expires_at`, `used_at`, `devi
 
 Table `users`: `id`, `email`/`username`, `password_hash`, `totp_secret` (later). Sessions stored server-side or as signed cookies.
 
+Table `settings`: `key`, `value` (jsonb), `updated_at`. Holds dashboard settings; today only `retention_days` (absent = keep messages forever).
+
 Table `audit_log`: `id`, `event` (login, pair, revoke, ...), `actor`, `device_id`, `ip`, `created_at`.
 
 ## API (v1)
@@ -116,6 +118,8 @@ Table `audit_log`: `id`, `event` (login, pair, revoke, ...), `actor`, `device_id
 - `DELETE /api/v1/devices/:id` / `PATCH /api/v1/devices/:id` (dashboard session) : revoke / rename a phone.
 - `POST /api/v1/messages` : batch of messages from a phone. Bearer token per device. Idempotent on `id`.
 - `GET /api/v1/messages?device=&type=&q=&before=` : paginated, newest first.
+- `DELETE /api/v1/devices/:id/permanent` (dashboard session) : erase a revoked phone and all its messages (409 if not revoked yet).
+- `GET /api/v1/settings` / `PUT /api/v1/settings` (dashboard session) : message retention in days or `null`. Saving deletes older messages at once; the server repeats the purge hourly.
 - `GET /api/v1/stream` : live updates (SSE/WebSocket) for viewers.
 - `GET /api/v1/devices` : list devices and last-seen.
 - Later: `GET /api/v1/outbox` and `POST /api/v1/outbox` for queued SMS replies.
@@ -198,7 +202,8 @@ Status as of the last update: 0, 1, 1b, 2, 3, 4 and 5 are done, and 6 is built a
 5. React dashboard (Tailwind + Radix UI) with live updates, search, per-device filter. (done; unread counts are client-side only and reset on reload)
 6. ntfy push to the main phone; filters and 2FA code highlighting. (built and tested: the server detects the 2FA code and adds a `code` field to messages, the dashboard highlights it with a copy button, and ntfy push is configured by `NTFY_*` environment variables with mode/type/app filters, JSON publishing, a burst cap and no message text in logs. Filters are env-only; a dashboard settings screen would need a stored setting. The public ntfy.sh needs a long random topic; the server refuses a short one.)
 7. SMS reply from the PC (outbox polled by the phone, sent via `SmsManager`).
-Still open from earlier milestones: TOTP 2FA, retention setting, end-to-end test against the Compose stack in CI.
+Hardening (done): the phone API is rate limited per IP before the token check; a login lock that has expired starts counting from zero; a revoked phone can be erased with its messages; message retention is a dashboard setting with an hourly purge; an end-to-end test (`e2e/`) runs against the real stack in CI (API level, no browser).
+Still open: TOTP 2FA (needs a `users.totp_secret` column and an OTP library; ask first), a browser-level end-to-end test (would need Playwright).
 
 ## Working conventions
 
@@ -216,6 +221,7 @@ Still open from earlier milestones: TOTP 2FA, retention setting, end-to-end test
 - Web dev: `cd web && npm run dev` (proxies `/api` to `localhost:3000`)
 - Web tests: `cd web && npm test`; lint: `npm run lint`; build: `npm run build`
 - Stack up (on the server): `cd deploy && docker compose up -d` after copying `.env.example` to `.env` (see `deploy/README.md`)
+- End-to-end test (own throwaway stack on port 3100): `docker compose -p notiforwarder-e2e -f e2e/docker-compose.yml up -d --build && node e2e/run.mjs`, then `docker compose -p notiforwarder-e2e -f e2e/docker-compose.yml down -v`. CI runs it as `test-e2e` before publishing.
 - Release images: `git push origin main:publish`
 - Android unit tests: `cd android && ./gradlew testDebugUnitTest` (needs `JAVA_HOME`/`ANDROID_HOME`; JDK 21 and the SDK are under `~/android-dev`)
 - Android lint + build: `cd android && ./gradlew lintDebug assembleDebug` (APK at `app/build/outputs/apk/debug/`; CI also uploads it as an artifact)
