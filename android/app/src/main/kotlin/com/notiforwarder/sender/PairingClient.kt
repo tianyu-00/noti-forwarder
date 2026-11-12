@@ -1,10 +1,8 @@
 package com.notiforwarder.sender
 
 import java.io.IOException
-import java.util.concurrent.TimeUnit
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -27,14 +25,14 @@ private data class PairResponse(val deviceId: String, val token: String)
 
 /** Blocking: call it off the main thread. */
 class PairingClient(
-    private val http: OkHttpClient = OkHttpClient.Builder().callTimeout(20, TimeUnit.SECONDS).build(),
+    private val http: OkHttpClient = defaultHttpClient(),
 ) {
     private val json = Json { ignoreUnknownKeys = true }
 
     fun pair(target: PairingTarget, device: DeviceInfo): PairOutcome {
         val body = json.encodeToString(
             PairRequest(target.code, device.name, device.model, device.appVersion),
-        ).toRequestBody("application/json".toMediaType())
+        ).toRequestBody(JSON_MEDIA_TYPE)
         val request = Request.Builder()
             .url("${target.serverUrl}/api/v1/pair")
             .header("X-App-Version", device.appVersion)

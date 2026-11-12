@@ -2,6 +2,7 @@ package com.notiforwarder.sender
 
 import java.time.Instant
 import java.util.UUID
+import kotlinx.serialization.Serializable
 
 /**
  * Plain copy of the fields we need from Android's StatusBarNotification, so the
@@ -19,6 +20,7 @@ data class RawNotification(
 )
 
 /** A captured message in the shape the server expects (ids make retries idempotent). */
+@Serializable
 data class Message(
     val id: String,
     val type: String,
