@@ -5,6 +5,7 @@ import { messagesRouter } from './routes/messages.js';
 import { authRouter } from './routes/auth.js';
 import { pairingRouter } from './routes/pairing.js';
 import { devicesRouter } from './routes/devices.js';
+import { settingsRouter } from './routes/settings.js';
 import { streamRouter } from './routes/stream.js';
 import { createEventHub } from './events.js';
 import { requireSession } from './auth/sessions.js';
@@ -39,6 +40,7 @@ export function createApp({
     app.use('/api/v1', authRouter({ db, requireViewer: viewer, cookieSecure, loginRateLimit }));
     app.use('/api/v1', pairingRouter({ db, requireViewer: viewer, events, publicUrl, pairRateLimit }));
     app.use('/api/v1', devicesRouter({ db, requireViewer: viewer, events }));
+    app.use('/api/v1', settingsRouter({ db, requireViewer: viewer }));
     app.use('/api/v1', messagesRouter({ db, requireViewer: viewer, events, notifier, messageRateLimit, preAuthRateLimit }));
     app.use('/api/v1', streamRouter({ requireViewer: viewer, events }));
   }

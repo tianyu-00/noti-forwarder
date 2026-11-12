@@ -5,6 +5,7 @@ import { loadBuildInfo } from './config.js';
 import { runMigrations } from './db/migrate.js';
 import { ensureAdminUser } from './auth/users.js';
 import { ntfyFromEnv } from './ntfy.js';
+import { startRetentionJob } from './retention.js';
 
 const port = Number(process.env.PORT) || 3000;
 
@@ -64,6 +65,8 @@ try {
 console.log(notifier ? 'ntfy push enabled' : 'ntfy push off (set NTFY_TOPIC to turn it on)');
 
 const app = createApp({ ...loadBuildInfo(process.env), db, publicUrl, trustProxy, notifier });
+
+startRetentionJob(db);
 
 app.listen(port, () => {
   console.log(`server listening on :${port}`);
