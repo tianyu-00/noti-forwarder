@@ -51,6 +51,30 @@ class NotificationCaptureTest {
 
     private fun capture() = NotificationCapture(NotificationParser("com.notiforwarder.sender"), queue, scheduler)
 
+    // Settings, the SMS de-duplication and the 3 second hold are all wired in for these tests.
+    private var settings = CaptureSettings()
+    private val smsDedupe = SmsDeduplicator()
+    private val held = mutableListOf<() -> Unit>()
+    private val smsApp = "com.android.mms"
+
+    private fun fullCapture() = NotificationCapture(
+        parser = NotificationParser("com.notiforwarder.sender"),
+        queue = queue,
+        scheduler = scheduler,
+        settings = { settings },
+        dedupe = smsDedupe,
+        smsPackages = { setOf(smsApp) },
+        delayer = { _, block -> held += block },
+    )
+
+    private fun releaseHeld() {
+        val toRun = held.toList()
+        held.clear()
+        toRun.forEach { it() }
+    }
+
+    private fun rawWithText(pkg: String, text: String) = raw(pkg).copy(text = text)
+
     @Test
     fun `writes the message to the queue first, then asks for a flush`() {
         assertTrue(capture().onNotification(raw()))
@@ -76,5 +100,76 @@ class NotificationCaptureTest {
         capture().onNotification(raw())
 
         assertEquals(2, queue.count())
+    }
+
+    @Test
+    fun `the notifications switch turns off every notification`() {
+        settings = CaptureSettings(sendNotifications = false)
+
+        assertFalse(fullCapture().onNotification(raw()))
+
+        assertEquals(0, queue.count())
+        assertEquals(emptyList<String>(), flushRequests)
+    }
+
+    @Test
+    fun `a blocked app is never queued, and other apps still are`() {
+        settings = CaptureSettings(blockedApps = setOf("com.game"))
+
+        fullCapture().onNotification(raw(pkg = "com.game"))
+        fullCapture().onNotification(raw(pkg = "com.bank"))
+
+        assertEquals(listOf("com.bank"), queue.nextBatch(10).map { it.message.app })
+    }
+
+    @Test
+    fun `a notification from the sms app is dropped when it repeats a text we already captured`() {
+        smsDedupe.recordSms("Your code is 123456")
+
+        fullCapture().onNotification(rawWithText(smsApp, "Your code is 123456"))
+        releaseHeld()
+
+        assertEquals(0, queue.count())
+    }
+
+    @Test
+    fun `a notification from the sms app that is not a repeat is sent after a short hold`() {
+        fullCapture().onNotification(rawWithText(smsApp, "Hello from a friend"))
+        assertEquals(0, queue.count()) // held, so the sms broadcast has time to arrive
+
+        releaseHeld()
+
+        assertEquals("Hello from a friend", queue.nextBatch(10).single().message.body)
+    }
+
+    @Test
+    fun `if the notification arrives first, the sms that follows during the hold still wins`() {
+        fullCapture().onNotification(rawWithText(smsApp, "Your code is 123456"))
+        smsDedupe.recordSms("Your code is 123456") // the sms broadcast arrives while it is held
+
+        releaseHeld()
+
+        assertEquals(0, queue.count())
+    }
+
+    @Test
+    fun `the same text from another app is not treated as a duplicate`() {
+        smsDedupe.recordSms("Your code is 123456")
+
+        fullCapture().onNotification(rawWithText("com.whatsapp", "Your code is 123456"))
+        releaseHeld()
+
+        assertEquals(listOf("com.whatsapp"), queue.nextBatch(10).map { it.message.app })
+    }
+
+    @Test
+    fun `with sms turned off, the sms app's notifications are not leaked as notifications`() {
+        settings = CaptureSettings(sendSms = false, sendNotifications = true)
+
+        fullCapture().onNotification(rawWithText(smsApp, "Your code is 123456"))
+        fullCapture().onNotification(rawWithText("com.bank", "A payment was made"))
+        releaseHeld()
+
+        assertEquals(listOf("com.bank"), queue.nextBatch(10).map { it.message.app })
     }
 }
