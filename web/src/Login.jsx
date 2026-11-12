@@ -24,6 +24,12 @@ export default function Login({ onSubmit, error, needsCode = false }) {
           <p className="text-sm font-semibold tracking-tight text-muted">Notiforwarder</p>
           <h1 className="text-2xl font-semibold tracking-tight text-fg">Sign in</h1>
         </div>
+        {!window.isSecureContext && (
+          <p role="status" className="rounded-md border border-line bg-surface p-3 text-sm text-muted">
+            This page is not using HTTPS, so your browser will not keep you signed in and you will have to sign
+            in again after every refresh. Open the dashboard through its https:// address.
+          </p>
+        )}
         {error && (
           <p role="alert" className="text-sm text-danger">
             {error}

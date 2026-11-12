@@ -68,6 +68,36 @@ describe('login', () => {
   });
 });
 
+describe('insecure connection notice', () => {
+  const original = Object.getOwnPropertyDescriptor(window, 'isSecureContext');
+  function setSecure(value) {
+    Object.defineProperty(window, 'isSecureContext', { value, configurable: true });
+  }
+  afterEach(() => {
+    if (original) Object.defineProperty(window, 'isSecureContext', original);
+    else delete window.isSecureContext;
+  });
+
+  it('warns on the sign-in page that staying signed in needs HTTPS', async () => {
+    setSecure(false);
+    server.use(http.get('/api/v1/auth/me', () => HttpResponse.json({ error: 'unauthorized' }, { status: 401 })));
+
+    render(<App />);
+
+    expect(await screen.findByRole('status')).toHaveTextContent(/https/i);
+  });
+
+  it('shows no warning on a secure page', async () => {
+    setSecure(true);
+    server.use(http.get('/api/v1/auth/me', () => HttpResponse.json({ error: 'unauthorized' }, { status: 401 })));
+
+    render(<App />);
+
+    await screen.findByRole('heading', { name: /sign in/i });
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+});
+
 describe('login with two-factor on', () => {
   const loggedOut = () => http.get('/api/v1/auth/me', () => HttpResponse.json({ error: 'unauthorized' }, { status: 401 }));
   const submit = async (user, label) => {
