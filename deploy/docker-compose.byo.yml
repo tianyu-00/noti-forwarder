@@ -24,9 +24,12 @@ services:
     image: ghcr.io/${GHCR_OWNER:-tianyu-00}/notiforwarder-server:${VERSION:-latest}
     restart: unless-stopped
     environment:
-      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL, e.g. postgres://notiforwarder:PASSWORD@192.168.1.10:5432/notiforwarder}
-      PUBLIC_URL: ${PUBLIC_URL:?set PUBLIC_URL, e.g. https://notifications.example.com}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?set ADMIN_PASSWORD (at least 12 characters)}
+      # postgres://notiforwarder:PASSWORD@192.168.1.10:5432/notiforwarder
+      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL}
+      # https://notifications.example.com
+      PUBLIC_URL: ${PUBLIC_URL:?set PUBLIC_URL}
+      # At least 12 characters
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?set ADMIN_PASSWORD}
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
       TRUST_PROXY: ${TRUST_PROXY:-2}
       # Optional push alerts through ntfy; leave unset to keep them off.
