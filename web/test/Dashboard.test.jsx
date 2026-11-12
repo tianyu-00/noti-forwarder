@@ -153,7 +153,7 @@ describe('sidebar', () => {
   it('lists phones with their online status', async () => {
     mockApi({
       devices: [
-        device({ deviceId: 'a', name: 'Kitchen phone', lastSeen: minutesAgo(0.5) }),
+        device({ deviceId: 'a', name: 'Kitchen phone', lastSeen: minutesAgo(0.5), connected: true }),
         device({ deviceId: 'b', name: 'Spare phone', lastSeen: minutesAgo(90) }),
         device({ deviceId: 'c', name: 'Old phone', revokedAt: minutesAgo(5) }),
         device({ deviceId: 'd', name: 'New phone', lastSeen: null }),

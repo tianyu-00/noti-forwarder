@@ -24,10 +24,19 @@ describe('phones that have gone quiet', () => {
     expect(status(/kitchen/i)).toHaveTextContent('Quiet for 3 h');
   });
 
-  it('keeps "Online" for a phone that checked in recently (heartbeats come every 15 minutes)', async () => {
-    const status = await open([device({ deviceId: 'a', name: 'Kitchen', lastSeen: minutesAgo(14) })], { silentAfterMinutes: 120 });
+  it('shows "Online" for a connected phone, however old its last message is', async () => {
+    const status = await open(
+      [device({ deviceId: 'a', name: 'Kitchen', lastSeen: minutesAgo(600), connected: true })],
+      { silentAfterMinutes: 120 },
+    );
 
     expect(status(/kitchen/i)).toHaveTextContent('Online');
+  });
+
+  it('shows "Last seen" for a phone that checked in recently but is not connected', async () => {
+    const status = await open([device({ deviceId: 'a', name: 'Kitchen', lastSeen: minutesAgo(14) })], { silentAfterMinutes: 120 });
+
+    expect(status(/kitchen/i)).toHaveTextContent(/last seen 14 min ago/i);
   });
 
   it('uses "Last seen" between online and quiet', async () => {
@@ -48,7 +57,7 @@ describe('phones that have gone quiet', () => {
 
     act(() => FakeEventSource.current.emit('device_seen', { deviceId: 'a', lastSeen: new Date().toISOString() }));
 
-    expect(status(/kitchen/i)).toHaveTextContent('Online');
+    expect(status(/kitchen/i)).toHaveTextContent(/last seen just now/i);
   });
 
   it('clears the label when a message arrives from that phone', async () => {
@@ -56,7 +65,7 @@ describe('phones that have gone quiet', () => {
 
     act(() => FakeEventSource.current.emit('message', message({ deviceId: 'a', body: 'hello' })));
 
-    expect(status(/kitchen/i)).toHaveTextContent('Online');
+    expect(status(/kitchen/i)).toHaveTextContent(/last seen just now/i);
   });
 });
 

@@ -36,16 +36,18 @@ describe('connection dot', () => {
     const { status, dot } = await open([kitchen({ lastSeen: minutesAgo(600), connected: true })]);
 
     act(() => FakeEventSource.current.emit('device_presence', { deviceId: 'a', connected: false, lastSeen: minutesAgo(0) }));
-    expect(dot()).toHaveAttribute('data-state', 'recent');
-    expect(status()).toHaveTextContent('Online');
+    expect(dot()).toHaveAttribute('data-state', 'idle');
+    expect(status()).toHaveTextContent(/last seen just now/i); // not "Online": the connection is gone
 
     act(() => FakeEventSource.current.emit('device_presence', { deviceId: 'a', connected: true, lastSeen: minutesAgo(0) }));
     expect(dot()).toHaveAttribute('data-state', 'live');
   });
 
-  it('shows a steady green dot for a recently seen phone, grey for an idle one and red for a quiet one', async () => {
-    const recent = await open([kitchen({ lastSeen: minutesAgo(10), connected: false })]);
-    expect(recent.dot()).toHaveAttribute('data-state', 'recent');
+  it('is not "Online" just because a message or check-in was recent: only the connection counts', async () => {
+    const { dot, status } = await open([kitchen({ lastSeen: minutesAgo(1), connected: false })]);
+
+    expect(status()).toHaveTextContent(/last seen 1 min ago/i);
+    expect(dot()).toHaveAttribute('data-state', 'idle');
   });
 
   it('is grey when seen a while ago', async () => {

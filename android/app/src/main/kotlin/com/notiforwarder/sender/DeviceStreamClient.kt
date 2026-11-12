@@ -1,6 +1,9 @@
 package com.notiforwarder.sender
 
 import java.io.IOException
+import java.util.concurrent.Executors
+import java.util.concurrent.ScheduledExecutorService
+import java.util.concurrent.TimeUnit
 import okhttp3.Call
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -26,6 +29,13 @@ class DeviceStreamClient(
     private val store: TokenStore,
     private val appVersion: String,
     private val http: OkHttpClient = streamHttpClient(),
+    /**
+     * A small check-in sent while the connection is open. A phone that loses its network never
+     * closes the connection, and the server cannot tell from its side for many minutes, so the
+     * phone proves it is alive and the server drops it after a minute of silence.
+     */
+    private val beat: () -> Unit = {},
+    private val beatIntervalMs: Long = 25_000,
 ) {
     @Volatile private var call: Call? = null
 
@@ -44,7 +54,14 @@ class DeviceStreamClient(
                 when {
                     response.code == 401 -> StreamEnd.Revoked
                     !response.isSuccessful -> StreamEnd.Dropped(wasConnected = false)
-                    else -> readEvents(response.body.source())
+                    else -> {
+                        val timer = startBeating()
+                        try {
+                            readEvents(response.body.source())
+                        } finally {
+                            timer.shutdownNow()
+                        }
+                    }
                 }
             }
         } catch (e: IOException) {
@@ -54,6 +71,17 @@ class DeviceStreamClient(
             call = null
         }
     }
+
+    // Runs only while connected. A failed check-in is ignored: the next one tries again, and a
+    // dead connection ends the read anyway.
+    private fun startBeating(): ScheduledExecutorService =
+        Executors.newSingleThreadScheduledExecutor { r -> Thread(r, "device-stream-beat").apply { isDaemon = true } }
+            .also { timer ->
+                timer.scheduleWithFixedDelay(
+                    { runCatching { beat() } },
+                    beatIntervalMs, beatIntervalMs, TimeUnit.MILLISECONDS,
+                )
+            }
 
     fun cancel() {
         call?.cancel()

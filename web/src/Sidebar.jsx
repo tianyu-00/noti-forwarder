@@ -1,6 +1,6 @@
 import PropTypes from 'prop-types';
 import clsx from 'clsx';
-import { formatQuiet, isOnline, timeAgo } from './time.js';
+import { formatQuiet, timeAgo } from './time.js';
 
 export const deviceShape = PropTypes.shape({
   deviceId: PropTypes.string.isRequired,
@@ -20,26 +20,26 @@ function quietFor(device, silentAfterMinutes, now) {
   return Number.isNaN(since) || now - since < silentAfterMinutes * 60000 ? null : now - since;
 }
 
-// live: holds its connection right now. recent: seen within the online window. quiet: silent for
-// too long. idle: seen a while ago. A phone that holds its connection is never quiet, however old
-// its last message is.
+// live: holds its connection to the server right now (the only thing that counts as online: a
+// phone that lost its network drops off within about a minute). quiet: silent for too long.
+// idle: not connected, seen a while ago. A connected phone is never quiet, however old its last
+// message is.
 function stateOf(device, silentAfterMinutes, now) {
   if (device.revokedAt) return 'revoked';
   if (device.connected) return 'live';
   if (quietFor(device, silentAfterMinutes, now) !== null) return 'quiet';
-  return isOnline(device.lastSeen, now) ? 'recent' : 'idle';
+  return 'idle';
 }
 
 function status(device, state, silentAfterMinutes, now) {
   if (state === 'revoked') return 'Revoked';
-  if (state === 'live' || state === 'recent') return 'Online';
+  if (state === 'live') return 'Online';
   if (state === 'quiet') return `Quiet for ${formatQuiet(quietFor(device, silentAfterMinutes, now))}`;
   return device.lastSeen ? `Last seen ${timeAgo(device.lastSeen, now)}` : 'Never connected';
 }
 
 const DOT_CLASS = {
   live: 'status-dot-live bg-ok',
-  recent: 'bg-ok',
   idle: 'bg-faint',
   quiet: 'bg-danger',
 };
@@ -76,7 +76,7 @@ Item.propTypes = {
 
 function StatusRow({ device, silentAfterMinutes, now }) {
   const state = stateOf(device, silentAfterMinutes, now);
-  const tone = { live: 'text-ok', recent: 'text-ok', quiet: 'font-medium text-danger' }[state] ?? 'text-muted';
+  const tone = { live: 'text-ok', quiet: 'font-medium text-danger' }[state] ?? 'text-muted';
   return (
     <span className={clsx('flex items-center gap-1.5 text-xs', tone)}>
       <StatusDot state={state} />

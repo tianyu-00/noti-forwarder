@@ -26,7 +26,10 @@ class NotiApp : Application() {
     }
     // The phone's open connection to the server: it shows as connected on the dashboard, and a
     // revoke made there arrives here at once. Reconnects by itself after a drop.
-    private val streamClient by lazy { DeviceStreamClient(store, appVersion = BuildConfig.VERSION_NAME) }
+    private val streamClient by lazy {
+        // While connected it also checks in every 25 s: only the phone can prove it is still alive.
+        DeviceStreamClient(store, appVersion = BuildConfig.VERSION_NAME, beat = { heartbeat.send() })
+    }
     val deviceStream: DeviceStreamRunner by lazy {
         DeviceStreamRunner(
             connect = streamClient::run,

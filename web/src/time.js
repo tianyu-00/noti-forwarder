@@ -1,10 +1,3 @@
-// Phones check in every ~15 minutes even when idle, so "online" means seen within a little more.
-export const ONLINE_WINDOW_MS = 20 * 60 * 1000;
-
-export function isOnline(lastSeen, now = Date.now()) {
-  return Boolean(lastSeen) && now - new Date(lastSeen).getTime() < ONLINE_WINDOW_MS;
-}
-
 export function timeAgo(iso, now = Date.now()) {
   const seconds = Math.max(0, Math.round((now - new Date(iso).getTime()) / 1000));
   if (seconds < 60) return 'just now';

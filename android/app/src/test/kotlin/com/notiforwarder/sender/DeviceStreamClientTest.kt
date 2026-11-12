@@ -4,6 +4,7 @@ import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
@@ -83,5 +84,35 @@ class DeviceStreamClientTest {
 
         assertEquals(StreamEnd.NotPaired, client().run())
         assertEquals(0, server.requestCount)
+    }
+
+    @Test
+    fun `checks in regularly while the connection is open, and stops when it ends`() {
+        // The server's pings cannot prove the phone is alive (a phone in airplane mode never says
+        // goodbye), so the phone proves it: a check-in every interval while connected.
+        server.enqueue(
+            MockResponse.Builder().code(200).body(": connected\n\n")
+                .bodyDelay(400, java.util.concurrent.TimeUnit.MILLISECONDS).build(),
+        )
+        var beats = 0
+        val client = DeviceStreamClient(store, appVersion = "0.1.9", beat = { beats++ }, beatIntervalMs = 50)
+
+        client.run()
+
+        assertTrue("expected several check-ins, got $beats", beats >= 3)
+        val after = beats
+        Thread.sleep(200)
+        assertEquals("check-ins must stop with the connection", after, beats)
+    }
+
+    @Test
+    fun `does not check in when it could not connect`() {
+        server.enqueue(MockResponse.Builder().code(503).build())
+        var beats = 0
+
+        DeviceStreamClient(store, appVersion = "0.1.9", beat = { beats++ }, beatIntervalMs = 20).run()
+        Thread.sleep(100)
+
+        assertEquals(0, beats)
     }
 }
