@@ -9,6 +9,18 @@ services:
     ports:
       - "127.0.0.1:3000:80"
 
+  # Optional Cloudflare tunnel: start with `docker compose --profile tunnel up -d`.
+  # Skip it if cloudflared already runs on the host; point that at http://localhost:3000 instead.
+  cloudflared:
+    profiles: ["tunnel"]
+    image: cloudflare/cloudflared:2026.10.7
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN}
+    depends_on:
+      - web
+
   server:
     image: ghcr.io/${GHCR_OWNER}/notiforwarder-server:${VERSION}
     restart: unless-stopped
