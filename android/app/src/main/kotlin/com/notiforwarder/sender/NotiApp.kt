@@ -3,10 +3,14 @@ package com.notiforwarder.sender
 import android.app.Application
 import android.os.Build
 import android.provider.Settings
+import android.provider.Telephony
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 /** Wires the pure classes together once per process. */
 class NotiApp : Application() {
     val store: TokenStore by lazy { EncryptedTokenStore(this) }
+    val settingsStore: SettingsStore by lazy { PrefsSettingsStore(this) }
     val parser by lazy { NotificationParser(ownPackage = packageName) }
     private val database by lazy { AppDatabase.open(this) }
     val queue by lazy { MessageQueue(database.queueDao()) }
@@ -18,8 +22,26 @@ class NotiApp : Application() {
         MessageSender(store, appVersion = BuildConfig.VERSION_NAME, onRevoked = { controller.refresh() })
     }
     val flushRunner by lazy { FlushRunner(Flusher(queue, sender, sendStatus)::flush, scheduler) }
-    val capture by lazy { NotificationCapture(parser, queue, scheduler) }
     val statusReader by lazy { StatusReader(queue, sendStatus) }
+
+    private val smsDedupe = SmsDeduplicator()
+    private val holdExecutor by lazy { Executors.newSingleThreadScheduledExecutor() }
+
+    val capture by lazy {
+        NotificationCapture(
+            parser = parser,
+            queue = queue,
+            scheduler = scheduler,
+            settings = settingsStore::load,
+            dedupe = smsDedupe,
+            // The default SMS app can change, so ask each time.
+            smsPackages = { Telephony.Sms.getDefaultSmsPackage(this)?.let(::setOf).orEmpty() },
+            delayer = { delayMillis, block -> holdExecutor.schedule(block, delayMillis, TimeUnit.MILLISECONDS) },
+        )
+    }
+    val smsCapture by lazy {
+        SmsCapture(SmsParser(), queue, scheduler, settings = settingsStore::load, dedupe = smsDedupe)
+    }
 
     val controller by lazy {
         PairingController(

@@ -8,6 +8,7 @@ import androidx.core.content.ContextCompat
 /** After a reboot or an app update: restart the keep-alive service and send anything still queued. */
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
+        if (intent.action != Intent.ACTION_BOOT_COMPLETED && intent.action != Intent.ACTION_MY_PACKAGE_REPLACED) return
         val app = context.applicationContext as NotiApp
         app.scheduler.flushSoon()
         // Only keep a notice on screen for a phone that is actually paired.

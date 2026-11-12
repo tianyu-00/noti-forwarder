@@ -50,6 +50,7 @@ class MainActivity : ComponentActivity() {
     private var accessGranted by mutableStateOf(false)
     private var notificationsAllowed by mutableStateOf(true)
     private var batteryExempt by mutableStateOf(false)
+    private var smsAllowed by mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -62,6 +63,7 @@ class MainActivity : ComponentActivity() {
                         accessGranted = accessGranted,
                         notificationsAllowed = notificationsAllowed,
                         batteryExempt = batteryExempt,
+                        smsAllowed = smsAllowed,
                         onOpenAccessSettings = {
                             // Android has no runtime prompt for this: the user must switch it on here.
                             startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
@@ -89,6 +91,8 @@ class MainActivity : ComponentActivity() {
             ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) ==
             PackageManager.PERMISSION_GRANTED
         batteryExempt = getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(packageName)
+        smsAllowed = ContextCompat.checkSelfPermission(this, Manifest.permission.RECEIVE_SMS) ==
+            PackageManager.PERMISSION_GRANTED
         app.controller.refresh() // picks up a revocation seen in the background
         if (app.store.load() != null) {
             // Android 12+ only allows starting a foreground service from a visible app like this.
@@ -112,6 +116,7 @@ private fun MainScreen(
     accessGranted: Boolean,
     notificationsAllowed: Boolean,
     batteryExempt: Boolean,
+    smsAllowed: Boolean,
     onOpenAccessSettings: () -> Unit,
     onRequestBatteryExemption: () -> Unit,
     onScan: ((String) -> Unit) -> Unit,
@@ -124,6 +129,18 @@ private fun MainScreen(
     var queueStatus by remember { mutableStateOf<QueueStatus?>(null) }
     var now by remember { mutableStateOf(System.currentTimeMillis()) }
     val askNotifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
+    val askSms = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
+    var settings by remember { mutableStateOf(app.settingsStore.load()) }
+    var showApps by remember { mutableStateOf(false) }
+    val changeSettings = { updated: CaptureSettings ->
+        settings = updated
+        app.settingsStore.save(updated)
+    }
+
+    if (showApps) {
+        AppsScreen(settings = settings, onChange = changeSettings, onBack = { showApps = false })
+        return
+    }
 
     // Refresh the queue numbers while the screen is visible.
     LaunchedEffect(Unit) {
@@ -187,6 +204,20 @@ private fun MainScreen(
                 )
             }
         } ?: Text("Loading…")
+
+        Text("What to forward", style = MaterialTheme.typography.titleMedium)
+        ForwardingSwitches(settings, changeSettings)
+        if (settings.sendSms && !smsAllowed) {
+            Text("Texts can only be read once you allow the SMS permission.")
+            Button(
+                onClick = { askSms.launch(Manifest.permission.RECEIVE_SMS) },
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text("Allow reading texts") }
+        }
+        OutlinedButton(onClick = { showApps = true }, modifier = Modifier.fillMaxWidth()) {
+            val blocked = settings.blockedApps.size
+            Text(if (blocked == 0) "Choose apps to forward" else "Choose apps to forward ($blocked off)")
+        }
 
         Text("Notification access", style = MaterialTheme.typography.titleMedium)
         if (accessGranted) {
