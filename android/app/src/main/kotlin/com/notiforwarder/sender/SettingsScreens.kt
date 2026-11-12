@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -59,7 +58,7 @@ internal fun AppsScreen(settings: CaptureSettings, onChange: (CaptureSettings) -
     LaunchedEffect(Unit) { apps = withContext(Dispatchers.IO) { launcherApps(context) } }
 
     Column(modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 16.dp)) {
-        OutlinedButton(onClick = onBack) { Text("Back") }
+        SecondaryButton(onClick = onBack) { Text("Back") }
         Text("Apps to forward", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(top = 12.dp))
         Text("Switch an app off to keep its notifications on this phone.")
         OutlinedTextField(

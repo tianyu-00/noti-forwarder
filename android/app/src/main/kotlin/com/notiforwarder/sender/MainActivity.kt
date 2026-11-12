@@ -1,6 +1,7 @@
 package com.notiforwarder.sender
 
 import android.Manifest
+import android.graphics.Color
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -10,6 +11,8 @@ import android.os.PowerManager
 import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -18,11 +21,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -54,10 +57,16 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Draw behind the system bars with light icons: Android 15+ requires edge-to-edge, and the
+        // page is dark. safeDrawingPadding below keeps the content clear of the bars.
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
+        )
         val app = application as NotiApp
         setContent {
-            MaterialTheme {
-                Surface(modifier = Modifier.fillMaxSize()) {
+            NotiTheme {
+                Surface(modifier = Modifier.fillMaxSize().safeDrawingPadding()) {
                     MainScreen(
                         app = app,
                         accessGranted = accessGranted,
@@ -159,9 +168,9 @@ private fun MainScreen(
 
         when (val s = state) {
             is UiState.Paired -> {
-                Text("Paired", style = MaterialTheme.typography.titleMedium)
+                Text("Paired", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.tertiary)
                 Text("Server: ${s.serverUrl}")
-                OutlinedButton(onClick = controller::unpair) { Text("Unpair this phone") }
+                SecondaryButton(onClick = controller::unpair) { Text("Unpair this phone") }
             }
             UiState.Pairing -> Text("Pairing…")
             is UiState.Unpaired -> {
@@ -186,7 +195,7 @@ private fun MainScreen(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                OutlinedButton(
+                SecondaryButton(
                     onClick = { scope.launch { controller.pairManual(address, key) } },
                     modifier = Modifier.fillMaxWidth(),
                 ) { Text("Pair") }
@@ -214,14 +223,17 @@ private fun MainScreen(
                 modifier = Modifier.fillMaxWidth(),
             ) { Text("Allow reading texts") }
         }
-        OutlinedButton(onClick = { showApps = true }, modifier = Modifier.fillMaxWidth()) {
+        SecondaryButton(onClick = { showApps = true }, modifier = Modifier.fillMaxWidth()) {
             val blocked = settings.blockedApps.size
             Text(if (blocked == 0) "Choose apps to forward" else "Choose apps to forward ($blocked off)")
         }
 
         Text("Notification access", style = MaterialTheme.typography.titleMedium)
         if (accessGranted) {
-            Text("Granted. Notifications on this phone are queued and forwarded to your server.")
+            Text(
+                "Granted. Notifications on this phone are queued and forwarded to your server.",
+                color = MaterialTheme.colorScheme.tertiary,
+            )
         } else {
             Text("Not granted. Without it nothing can be forwarded.")
             Button(onClick = onOpenAccessSettings, modifier = Modifier.fillMaxWidth()) {
@@ -238,7 +250,7 @@ private fun MainScreen(
             ) { Text("Allow notifications") }
         }
         if (batteryExempt) {
-            Text("Battery optimisation is off for this app.")
+            Text("Battery optimisation is off for this app.", color = MaterialTheme.colorScheme.tertiary)
         } else {
             Text("Battery optimisation may stop this app in the background. On OnePlus, also allow auto-start.")
             Button(onClick = onRequestBatteryExemption, modifier = Modifier.fillMaxWidth()) {
