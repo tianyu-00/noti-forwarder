@@ -13,8 +13,30 @@ android {
         applicationId = "com.notiforwarder.sender"
         minSdk = 29 // Android 10: the OnePlus 7T Pro shipped with it
         targetSdk = 37
-        versionCode = 1
-        versionName = "0.1.0"
+        // CI sets these on a release build (see .github/workflows/ci.yml); local builds get a dev version.
+        versionCode = System.getenv("APP_VERSION_CODE")?.toIntOrNull() ?: 1
+        versionName = System.getenv("APP_VERSION_NAME") ?: "0.1.0-dev"
+    }
+
+    // Updating an installed app in place needs every release signed with the same key, so CI signs
+    // with a keystore kept in GitHub secrets. Without one (a fork, a local build) the debug key is
+    // used: it installs fine, but a later build signed by another key needs an uninstall first.
+    val releaseKeystore = System.getenv("ANDROID_KEYSTORE_FILE")?.takeIf { file(it).exists() }
+    signingConfigs {
+        if (releaseKeystore != null) {
+            create("release") {
+                storeFile = file(releaseKeystore)
+                storePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("ANDROID_KEY_ALIAS")
+                keyPassword = System.getenv("ANDROID_KEY_PASSWORD")
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
+        }
     }
 
     buildFeatures {

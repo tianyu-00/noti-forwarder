@@ -102,6 +102,21 @@ docker compose exec -T db psql -U notiforwarder notiforwarder < backup-2026-11-1
 - `deploy/docker-compose.yml` is tracked by git. After a `git pull`, run `docker compose up -d`
   to apply any change to it.
 
+## Android app releases
+
+Every time you publish (`git push origin main:publish`), CI also builds the Android app and attaches it to a **GitHub Release** named after the version (for example `v0.1.57`). Download `notiforwarder-0.1.57.apk` from the repository's Releases page on your phone and install it. The version is `MAJOR.MINOR` from the `VERSION` file plus the CI run number, and the server and web images carry the same number (see the footer of the dashboard). To start `0.2.x`, change `VERSION` to `0.2`.
+
+**One-time setup so the app can update in place.** An update only installs over the old app if both are signed with the same key. Make one key and keep it forever:
+
+```bash
+keytool -genkeypair -keystore notiforwarder-release.jks -alias notiforwarder -keyalg RSA -keysize 4096 -validity 36500
+base64 -w0 notiforwarder-release.jks    # copy the output
+```
+
+In the GitHub repository open **Settings**, **Secrets and variables**, **Actions**, and add four secrets: `ANDROID_KEYSTORE_BASE64` (the base64 text), `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` (`notiforwarder`) and `ANDROID_KEY_PASSWORD`. Back the `.jks` file up somewhere safe and do not commit it: if you lose it, phones must uninstall the app before they can install a build signed with a new key. Without these secrets CI still builds, but signs with a throwaway debug key and prints a warning.
+
+Moving to the first release-signed build means uninstalling the debug-signed app once, which removes its pairing, so pair the phone again afterwards.
+
 ## Two-step login
 
 Optional but recommended, because messages hold 2FA codes for your other accounts. In the dashboard open **Settings**, then **Two-step login**, and choose *Turn on*. Scan the QR code with an authenticator app (Google Authenticator, Authy, 1Password…), type the code it shows, and **save the 10 backup codes** (each works once, and they are shown only once). From then on the sign-in form asks for a code after your password.
