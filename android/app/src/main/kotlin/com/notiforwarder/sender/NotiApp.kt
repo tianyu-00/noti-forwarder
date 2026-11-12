@@ -21,6 +21,9 @@ class NotiApp : Application() {
     private val sender by lazy {
         MessageSender(store, appVersion = BuildConfig.VERSION_NAME, onRevoked = { controller.refresh() })
     }
+    val heartbeat by lazy {
+        HeartbeatSender(store, appVersion = BuildConfig.VERSION_NAME, onRevoked = { controller.refresh() })
+    }
     val flushRunner by lazy { FlushRunner(Flusher(queue, sender, sendStatus)::flush, scheduler) }
     val statusReader by lazy { StatusReader(queue, sendStatus) }
 
@@ -65,5 +68,6 @@ class NotiApp : Application() {
     override fun onCreate() {
         super.onCreate()
         scheduler.flushSoon() // an app start sends anything left in the queue
+        HeartbeatWorker.schedule(this) // checks in every ~15 minutes while the phone has a network
     }
 }
