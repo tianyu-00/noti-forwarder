@@ -45,7 +45,13 @@ function PairingPanel({ devices, onDevicesLoaded, onClose, timing }) {
     setAttempt((n) => n + 1);
   }
 
-  const connected = devices.find((d) => !knownIds.has(d.deviceId));
+  // A new phone has an id we have not seen. A phone pairing again keeps its id but its
+  // pairedAt moves past the moment this code was created.
+  const connected = devices.find(
+    (d) =>
+      !knownIds.has(d.deviceId) ||
+      (pairing?.createdAt && new Date(d.pairedAt).getTime() >= new Date(pairing.createdAt).getTime()),
+  );
   const expired = pairing ? new Date(pairing.expiresAt).getTime() - now <= 0 : false;
   const waiting = Boolean(pairing) && !expired && !connected;
 

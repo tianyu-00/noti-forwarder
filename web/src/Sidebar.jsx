@@ -5,6 +5,7 @@ import { isOnline, timeAgo } from './time.js';
 export const deviceShape = PropTypes.shape({
   deviceId: PropTypes.string.isRequired,
   name: PropTypes.string.isRequired,
+  pairedAt: PropTypes.string,
   lastSeen: PropTypes.string,
   revokedAt: PropTypes.string,
 });

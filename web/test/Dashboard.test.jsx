@@ -560,4 +560,48 @@ describe('add phone: scan feedback', () => {
     await new Promise((r) => setTimeout(r, 200));
     expect(polls).toBe(after);
   });
+
+  // A phone that is already listed pairs again: its id is not new, only its pairedAt moves.
+  function setupKnownPhone() {
+    const createdAt = new Date().toISOString();
+    const kitchen = device({ deviceId: 'a', name: 'Kitchen phone', pairedAt: '2026-11-01T10:00:00.000Z' });
+    let devices = [kitchen];
+    mockApi({ devices });
+    server.use(
+      http.get('/api/v1/devices', () => HttpResponse.json({ devices })),
+      http.post('/api/v1/pairing-codes', () => HttpResponse.json({ ...pairing, createdAt }, { status: 201 })),
+    );
+    render(<Dashboard username="admin" onLogout={() => {}} pairingTiming={timing} />);
+    return {
+      pairAgain: () => {
+        devices = [{ ...kitchen, pairedAt: new Date(Date.now() + 1000).toISOString() }];
+      },
+    };
+  }
+
+  it('notices a phone that was already on the list pairing again', async () => {
+    const { pairAgain } = setupKnownPhone();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: /add phone/i }));
+    const dialog = await screen.findByRole('dialog');
+    await within(dialog).findByRole('img', { name: /pairing qr code/i });
+
+    pairAgain();
+
+    expect(await within(dialog).findByText(/kitchen phone connected/i)).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  });
+
+  it('keeps waiting while the listed phones were paired before this code was made', async () => {
+    setupKnownPhone();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: /add phone/i }));
+    const dialog = await screen.findByRole('dialog');
+    await within(dialog).findByRole('img', { name: /pairing qr code/i });
+
+    await new Promise((r) => setTimeout(r, 300)); // several polls, nothing changes
+
+    expect(within(dialog).getByText(/waiting for the phone/i)).toBeInTheDocument();
+    expect(within(dialog).queryByText(/connected/i)).not.toBeInTheDocument();
+  });
 });
