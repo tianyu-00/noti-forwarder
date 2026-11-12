@@ -99,3 +99,50 @@ describe('DELETE /api/v1/devices/:id (revoke)', () => {
     expect(rows).toEqual([{ actor: 'admin' }]);
   });
 });
+
+describe('DELETE /api/v1/devices/:id/permanent (erase)', () => {
+  const erase = (id, token = csrf) => agent.delete(`/api/v1/devices/${id}/permanent`).set('X-CSRF-Token', token);
+  const revoke = (id) => agent.delete(`/api/v1/devices/${id}`).set('X-CSRF-Token', csrf);
+
+  it('needs a session and a CSRF token', async () => {
+    const d = await ctx.addDevice({ revoked: true });
+    expect((await request(ctx.app).delete(`/api/v1/devices/${d.deviceId}/permanent`)).status).toBe(401);
+    expect((await agent.delete(`/api/v1/devices/${d.deviceId}/permanent`)).status).toBe(403);
+  });
+
+  it('erases a revoked phone and its messages, and leaves other phones alone', async () => {
+    const gone = await ctx.addDevice();
+    const kept = await ctx.addDevice();
+    await send(gone.token, [msg()]);
+    await send(kept.token, [msg()]);
+    await revoke(gone.deviceId);
+
+    expect((await erase(gone.deviceId)).status).toBe(204);
+
+    const list = await agent.get('/api/v1/devices');
+    expect(list.body.devices.some((x) => x.deviceId === gone.deviceId)).toBe(false);
+    const rows = await ctx.pool.query('SELECT device_id FROM messages WHERE device_id = ANY($1)', [
+      [gone.deviceId, kept.deviceId],
+    ]);
+    expect(rows.rows).toEqual([{ device_id: kept.deviceId }]);
+  });
+
+  it('refuses to erase a phone that is still active', async () => {
+    const d = await ctx.addDevice();
+    await send(d.token, [msg()]);
+    expect((await erase(d.deviceId)).status).toBe(409);
+    const { rows } = await ctx.pool.query('SELECT 1 FROM messages WHERE device_id = $1', [d.deviceId]);
+    expect(rows).toHaveLength(1);
+  });
+
+  it('404s for an unknown phone and writes an audit entry when it erases', async () => {
+    expect((await erase('nope')).status).toBe(404);
+    const d = await ctx.addDevice({ revoked: true });
+    await erase(d.deviceId);
+    const { rows } = await ctx.pool.query(
+      "SELECT actor FROM audit_log WHERE event = 'erase' AND device_id = $1",
+      [d.deviceId],
+    );
+    expect(rows).toEqual([{ actor: 'admin' }]);
+  });
+});
