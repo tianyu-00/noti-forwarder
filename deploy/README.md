@@ -17,6 +17,35 @@ Roll back by changing `VERSION` and running step 4 again.
 
 CI builds `linux/amd64` and `linux/arm64`; narrow it once you confirm the host with `uname -m`.
 
+## First deploy on a production VM (fresh start, public images)
+
+Starts empty: new database, new admin login, phones pair again. Nothing is copied from another machine.
+
+**Once, on GitHub: make the images public** so the VM needs no login. Your profile, **Packages**, then for each of `notiforwarder-server` and `notiforwarder-web`: **Package settings**, **Danger Zone**, **Change visibility**, **Public**. The images hold the app code only, never `.env` or any secret.
+
+**On the VM** (Docker with the compose plugin; `docker --version && docker compose version` to check, and `uname -m` should say `x86_64` or `aarch64`, both are built):
+
+1. Get the two files over, from the machine that has the project. Do not copy its `.env`: it holds that machine's passwords and tunnel token.
+   ```bash
+   ssh <vm> mkdir -p ~/notiforwarder
+   scp deploy/docker-compose.yml deploy/.env.example <vm>:~/notiforwarder/
+   ```
+2. On the VM:
+   ```bash
+   cd ~/notiforwarder
+   cp .env.example .env && chmod 600 .env
+   nano .env
+   ```
+   Set `GHCR_OWNER`, `VERSION` (a `sha-xxxxxxx` tag from the Packages page, so production only changes when you choose; `publish` always follows the newest build), a new `POSTGRES_PASSWORD` (`openssl rand -base64 24`), `PUBLIC_URL`, `TRUST_PROXY=2`, `ADMIN_USERNAME`, `ADMIN_PASSWORD` (12+ characters), and `TUNNEL_TOKEN` with `COMPOSE_PROFILES=tunnel`. Leave `COMPOSE_PROJECT_NAME` alone once the first start has happened.
+3. Make a tunnel for this VM (see below), then `docker compose up -d`.
+4. Check: `docker compose ps` (four running), `curl localhost:3000/api/v1/health`, and `docker compose logs server` shows `applied migrations` and `created admin user`.
+5. Sign in at `PUBLIC_URL`, choose **Add phone**, and scan the code with the app. If the app still shows the old pairing, tap **Unpair this phone** first. Then turn two-step login on again in Settings.
+6. Nothing needs opening on the firewall: the tunnel only makes outgoing connections, and port 3000 is bound to `127.0.0.1`.
+
+If you reuse the hostname the old machine served (so the phones keep the same address), stop the old machine's stack first (`docker compose down`, without `-v`) and repoint the hostname to the new tunnel. Two machines connected to one tunnel would split the traffic between two different databases.
+
+Update later with `docker compose pull && docker compose up -d` after changing `VERSION`, and back up with the `pg_dump` command in the main README.
+
 ## Public access with a Cloudflare tunnel
 Cloudflare presents the HTTPS certificate, so nothing needs opening on your router and there is no certificate to renew. The domain must use Cloudflare DNS.
 
