@@ -31,14 +31,18 @@ export function pairingRouter({
   router.post('/pairing-codes', requireViewer, requireCsrf, async (req, res, next) => {
     try {
       const code = generatePairingCode();
-      const expiresAt = new Date(Date.now() + PAIRING_TTL_MS);
-      await db.query('INSERT INTO pairing_codes (code_hash, expires_at) VALUES ($1, $2)', [
-        hashCode(code),
-        expiresAt,
-      ]);
+      // Both timestamps come from the database clock, the same one that stamps paired_at,
+      // so the dashboard can compare them reliably.
+      const { rows } = await db.query(
+        `INSERT INTO pairing_codes (code_hash, expires_at)
+         VALUES ($1, now() + ($2 || ' milliseconds')::interval)
+         RETURNING created_at, expires_at`,
+        [hashCode(code), String(PAIRING_TTL_MS)],
+      );
       res.status(201).json({
         code,
-        expiresAt: expiresAt.toISOString(),
+        createdAt: rows[0].created_at.toISOString(),
+        expiresAt: rows[0].expires_at.toISOString(),
         qrPayload: JSON.stringify({ u: publicUrl, c: code }),
       });
     } catch (err) {
@@ -78,7 +82,8 @@ export function pairingRouter({
          DO UPDATE SET token_hash = EXCLUDED.token_hash,
                        model = COALESCE(EXCLUDED.model, devices.model),
                        app_version = COALESCE(EXCLUDED.app_version, devices.app_version),
-                       revoked_at = NULL
+                       revoked_at = NULL,
+                       paired_at = now()
          RETURNING device_id, (xmax = 0) AS inserted`,
         [randomUUID(), name, model ?? null, appVersion ?? null, hashToken(token), hardwareId ?? null],
       );

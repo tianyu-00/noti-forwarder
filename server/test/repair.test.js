@@ -123,4 +123,25 @@ describe('pairing the same phone again', () => {
     expect((await pair({ name: 'Phone', hardwareId: 'x'.repeat(101) })).status).toBe(400);
     expect((await pair({ name: 'Phone', hardwareId: '' })).status).toBe(400);
   });
+
+  it('reports when the code was created, so the dashboard can tell which pairings are new', async () => {
+    const res = await agent.post('/api/v1/pairing-codes').set('X-CSRF-Token', csrf);
+
+    const created = new Date(res.body.createdAt).getTime();
+    expect(Math.abs(created - Date.now())).toBeLessThan(5000);
+    expect(new Date(res.body.expiresAt).getTime() - created).toBe(10 * 60 * 1000);
+  });
+
+  it('refreshes pairedAt when a known phone pairs again, so it reads as newer than the code', async () => {
+    const first = await pair({ name: 'Phone', hardwareId: 'hw-paired-at' });
+    const code = await agent.post('/api/v1/pairing-codes').set('X-CSRF-Token', csrf);
+    const codeCreated = new Date(code.body.createdAt).getTime();
+    const before = (await agent.get('/api/v1/devices')).body.devices.find((d) => d.deviceId === first.body.deviceId);
+    expect(new Date(before.pairedAt).getTime()).toBeLessThan(codeCreated);
+
+    await request(ctx.app).post('/api/v1/pair').send({ code: code.body.code, name: 'Phone', hardwareId: 'hw-paired-at' });
+
+    const after = (await agent.get('/api/v1/devices')).body.devices.find((d) => d.deviceId === first.body.deviceId);
+    expect(new Date(after.pairedAt).getTime()).toBeGreaterThanOrEqual(codeCreated);
+  });
 });
