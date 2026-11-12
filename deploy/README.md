@@ -73,4 +73,4 @@ If Nginx Proxy Manager also sits in the path, there is one more proxy: set `TRUS
 
 ## Without a domain (plain http)
 
-Set `PUBLIC_URL` to the address you open the dashboard on, for example `http://192.168.1.20:3000`. With `http://` the server stops marking the session cookie Secure, so signing in sticks. Nothing is encrypted in that mode: use it only on a network you trust. The Android app still refuses plain http, so phones need an https address.
+Set `PUBLIC_URL` to the address you open the dashboard on, for example `http://192.168.1.20:3000`. With `http://` the server stops marking the session cookie Secure, so signing in sticks. Nothing is encrypted in that mode: use it only on a network you trust. The Android app also accepts `http://` for the server, but only when it is on the phone's own network (192.168.x.x, 10.x.x.x, 172.16-31.x.x, `localhost`, `*.local` or a single-word name such as `rpi-server`). Anything on the internet must use https. Pair the phone while it is on the same Wi-Fi, and it only syncs while it can reach that address.

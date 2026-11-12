@@ -50,4 +50,33 @@ class PairingInputTest {
         assertInvalid(PairingInput.fromManual("", code))
         assertInvalid(PairingInput.fromManual("nf.example.com", "   "))
     }
+
+    @Test
+    fun `accepts a cleartext address on the local network`() {
+        val qr = PairingInput.fromQr("""{"u":"http://192.168.1.20:8006","c":"$code"}""")
+        val manual = PairingInput.fromManual("http://rpi-server:8006/", code)
+
+        assertEquals(PairingResult.Ok(PairingTarget("http://192.168.1.20:8006", code)), qr)
+        assertEquals(PairingResult.Ok(PairingTarget("http://rpi-server:8006", code)), manual)
+    }
+
+    @Test
+    fun `refuses cleartext for anything that is not on the local network`() {
+        assertInvalid(PairingInput.fromManual("http://8.8.8.8:3000", code))
+        assertInvalid(PairingInput.fromManual("http://192.168.1.20.evil.com", code))
+        assertInvalid(PairingInput.fromManual("http://192.168.1.20@evil.com", code))
+        assertInvalid(PairingInput.fromQr("""{"u":"http://172.32.0.1","c":"$code"}"""))
+    }
+
+    @Test
+    fun `manual entry without a scheme uses http on the local network and https elsewhere`() {
+        assertEquals(
+            PairingResult.Ok(PairingTarget("http://192.168.1.20:8006", code)),
+            PairingInput.fromManual("192.168.1.20:8006", code),
+        )
+        assertEquals(
+            PairingResult.Ok(PairingTarget("https://nf.example.com", code)),
+            PairingInput.fromManual("nf.example.com", code),
+        )
+    }
 }

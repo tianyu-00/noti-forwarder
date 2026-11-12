@@ -45,7 +45,7 @@ Self-hosted system that captures SMS and app notifications from multiple Android
 
 The phone sends to a public domain (via Cloudflare tunnel), so it works from any network. Because messages contain private data and 2FA codes, treat the server as internet-facing:
 
-- HTTPS only. Redirect HTTP, enable HSTS. The Android app refuses cleartext traffic (`usesCleartextTraffic=false`).
+- HTTPS for anything on the internet. Redirect HTTP, enable HSTS. Not everyone has a domain, so plain `http://` is allowed on the local network only: the server sets a non-Secure session cookie when `PUBLIC_URL` starts with `http://`, and the Android app accepts `http://` only for private addresses (10.x, 172.16-31.x, 192.168.x, 169.254.x, 127.x, `localhost`, single-word names, `*.local`). Android cannot limit cleartext to IP ranges, so the manifest sets `usesCleartextTraffic=true` and `LocalNetwork.kt` plus an OkHttp interceptor in `Http.kt` do the refusing (no redirects followed). IPv6 is not treated as local.
 - Web login required: single-user to start. Password hashed with argon2 (or bcrypt), httpOnly + Secure + SameSite session cookie, login rate limiting and lockout, CSRF protection. TOTP 2FA as a follow-up.
 - Device tokens: long random, hashed at rest, per device, revocable, never logged. Pairing codes are single-use and short-lived.
 - Rate limiting and request size limits on every endpoint; strict input validation (schema validation on all payloads); Helmet security headers; CORS restricted to the dashboard origin.

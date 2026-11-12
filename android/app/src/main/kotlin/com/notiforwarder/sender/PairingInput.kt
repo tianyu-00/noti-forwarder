@@ -33,27 +33,32 @@ object PairingInput {
 
     private fun build(address: String, key: String): PairingResult {
         val server = normalizeServer(address)
-            ?: return PairingResult.Invalid("Enter an https:// server address.")
+            ?: return PairingResult.Invalid("Enter an https:// server address (http:// is allowed only on your own network).")
         val code = key.trim()
         if (code.isEmpty()) return PairingResult.Invalid("Enter the security key.")
         return PairingResult.Ok(PairingTarget(server, code))
     }
 
-    /** HTTPS only: the app refuses cleartext traffic. Returns null if unusable. */
+    /**
+     * HTTPS everywhere, except that plain http:// is accepted for a server on the local network
+     * (see [LocalNetwork]). Returns null if the address is unusable.
+     */
     private fun normalizeServer(raw: String): String? {
-        var value = raw.trim()
+        var value = raw.trim().trimEnd('/')
         if (value.isEmpty()) return null
-        if ("://" in value) {
-            if (!value.startsWith("https://", ignoreCase = true)) return null
-        } else {
-            value = "https://$value"
-        }
-        value = value.trimEnd('/')
+        val explicitScheme = if ("://" in value) value.substringBefore("://").lowercase() else null
+        if (explicitScheme != null && explicitScheme != "http" && explicitScheme != "https") return null
+
         val host = try {
-            URI(value).host
+            URI(if (explicitScheme == null) "http://$value" else value).host
         } catch (e: Exception) {
             null
         }
-        return if (host.isNullOrEmpty()) null else value
+        if (host.isNullOrEmpty()) return null
+
+        val local = LocalNetwork.isLocalHost(host)
+        if (explicitScheme == "http" && !local) return null
+        if (explicitScheme == null) value = "${if (local) "http" else "https"}://$value"
+        return value
     }
 }
