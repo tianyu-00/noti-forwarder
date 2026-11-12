@@ -187,14 +187,14 @@ Current setup (decided during Milestone 0; the earlier plan for release-please, 
 
 ## Milestones
 
-Status as of the last update: 0, 1, 1b, 2, 3, 4 and 5 are done. 3's reboot survival and the OnePlus battery/auto-start settings still need a manual check on the phone. 6 and 7 are not started.
+Status as of the last update: 0, 1, 1b, 2, 3, 4 and 5 are done. 3's reboot survival is verified on a real phone; the OnePlus battery/auto-start settings still depend on the user toggling them. 6 and 7 are not started.
 
 0. Pipeline first: CI runs lint and tests, then builds and publishes images from the `publish` branch, compose file, `/health` showing the version. (done; release-please and SSH deploy dropped)
 1. Server: Express + Postgres, `POST /messages`, `GET /messages`, Docker Compose. (done)
    1b. Auth and pairing: web login, pairing code + QR, `/pair` endpoint, device tokens, revoke. (done)
 2. Android: pair with the server (QR/key), then notification listener that POSTs one notification to the server. (done; re-pairing the same phone reuses its entry via `hardware_id`)
-3. Reliability: Room queue, retry with backoff, foreground service, survives reboot. (done: queue, backoff, WorkManager, foreground keep-alive service and boot receiver; verified offline then online on a real phone, reboot not yet verified)
-4. SMS capture + de-duplication, plus phone settings: SMS/notification toggles and the app blacklist. (done and verified on a real phone: texts arrive once, the toggles and blocked apps work. Known gaps: a notification held 3s for SMS de-duplication is lost if Android kills the app in that window; the app has no launcher icon yet)
+3. Reliability: Room queue, retry with backoff, foreground service, survives reboot. (done and verified on a real phone: offline then online, and a reboot — the listener rebinds and the boot receiver starts the keep-alive service by itself)
+4. SMS capture + de-duplication, plus phone settings: SMS/notification toggles and the app blacklist. (done and verified on a real phone: texts arrive once, the toggles and blocked apps work. A notification from the SMS app is stored at once with a 3s "not before" time and removed when its SMS arrives, so nothing is held only in memory)
 5. React dashboard (Tailwind + Radix UI) with live updates, search, per-device filter. (done; unread counts are client-side only and reset on reload)
 6. ntfy push to the main phone; filters and 2FA code highlighting.
 7. SMS reply from the PC (outbox polled by the phone, sent via `SmsManager`).
