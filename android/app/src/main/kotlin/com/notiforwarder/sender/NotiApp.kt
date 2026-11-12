@@ -10,6 +10,7 @@ import android.provider.Telephony
 class NotiApp : Application() {
     val store: TokenStore by lazy { EncryptedTokenStore(this) }
     val settingsStore: SettingsStore by lazy { PrefsSettingsStore(this) }
+    val themeStore: ThemeStore by lazy { PrefsThemeStore(this) }
     val parser by lazy { NotificationParser(ownPackage = packageName) }
     private val database by lazy { AppDatabase.open(this) }
     val queue by lazy { MessageQueue(database.queueDao()) }

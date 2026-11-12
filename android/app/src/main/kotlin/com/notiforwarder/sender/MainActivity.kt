@@ -17,6 +17,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -24,7 +25,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -37,6 +37,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
@@ -57,15 +58,20 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // Draw behind the system bars with light icons: Android 15+ requires edge-to-edge, and the
-        // page is dark. safeDrawingPadding below keeps the content clear of the bars.
-        enableEdgeToEdge(
-            statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
-            navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
-        )
         val app = application as NotiApp
         setContent {
-            NotiTheme {
+            var themeMode by remember { mutableStateOf(app.themeStore.load()) }
+            val dark = themeMode.isDark(isSystemInDarkTheme())
+            // Draw behind the system bars (Android 15+ requires it); the icons must match the page.
+            LaunchedEffect(dark) {
+                val bar = if (dark) {
+                    SystemBarStyle.dark(Color.TRANSPARENT)
+                } else {
+                    SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT)
+                }
+                enableEdgeToEdge(statusBarStyle = bar, navigationBarStyle = bar)
+            }
+            NotiTheme(dark) {
                 Surface(modifier = Modifier.fillMaxSize().safeDrawingPadding()) {
                     MainScreen(
                         app = app,
@@ -84,6 +90,11 @@ class MainActivity : ComponentActivity() {
                                     Uri.parse("package:$packageName"),
                                 ),
                             )
+                        },
+                        themeMode = themeMode,
+                        onThemeChange = {
+                            themeMode = it
+                            app.themeStore.save(it)
                         },
                         onScan = { onResult -> scanQr(onResult) },
                     )
@@ -128,6 +139,8 @@ private fun MainScreen(
     smsAllowed: Boolean,
     onOpenAccessSettings: () -> Unit,
     onRequestBatteryExemption: () -> Unit,
+    themeMode: ThemeMode,
+    onThemeChange: (ThemeMode) -> Unit,
     onScan: ((String) -> Unit) -> Unit,
 ) {
     val controller = app.controller
@@ -161,26 +174,28 @@ private fun MainScreen(
     }
 
     Column(
-        modifier = Modifier.verticalScroll(rememberScrollState()).padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        modifier = Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(28.dp),
     ) {
-        Text("Notiforwarder", style = MaterialTheme.typography.headlineMedium)
+        Text("Notiforwarder", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
 
         when (val s = state) {
-            is UiState.Paired -> {
+            is UiState.Paired -> Section("Connection") {
                 Text("Paired", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.tertiary)
-                Text("Server: ${s.serverUrl}")
-                SecondaryButton(onClick = controller::unpair) { Text("Unpair this phone") }
+                Text(s.serverUrl, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                SecondaryButton(onClick = controller::unpair, modifier = Modifier.fillMaxWidth()) {
+                    Text("Unpair this phone")
+                }
             }
-            UiState.Pairing -> Text("Pairing…")
-            is UiState.Unpaired -> {
+            UiState.Pairing -> Section("Connection") { Text("Pairing…") }
+            is UiState.Unpaired -> Section("Connection") {
                 Text("Not paired", style = MaterialTheme.typography.titleMedium)
                 s.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-                Button(
+                PrimaryButton(
                     onClick = { onScan { text -> scope.launch { controller.pairFromQr(text) } } },
                     modifier = Modifier.fillMaxWidth(),
                 ) { Text("Scan QR code") }
-                Text("or enter the details by hand")
+                Text("or enter the details by hand", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 OutlinedTextField(
                     value = address,
                     onValueChange = { address = it },
@@ -202,60 +217,75 @@ private fun MainScreen(
             }
         }
 
-        Text("Sending", style = MaterialTheme.typography.titleMedium)
-        queueStatus?.let { q ->
-            Text("Waiting to send: ${q.queued}")
-            Text("Last successful send: ${describeAgo(q.lastSuccessAt, now)}")
-            if (q.quarantined > 0) {
+        Section("Sending") {
+            queueStatus?.let { q ->
+                Text("Waiting to send: ${q.queued}")
+                Text("Last successful send: ${describeAgo(q.lastSuccessAt, now)}")
+                if (q.quarantined > 0) {
+                    Text(
+                        "Rejected by the server and kept: ${q.quarantined}",
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            } ?: Text("Loading…")
+        }
+
+        Section("What to forward") {
+            ForwardingSwitches(settings, changeSettings)
+            if (settings.sendSms && !smsAllowed) {
                 Text(
-                    "Rejected by the server and kept: ${q.quarantined}",
-                    color = MaterialTheme.colorScheme.error,
+                    "Texts can only be read once you allow the SMS permission.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                PrimaryButton(
+                    onClick = { askSms.launch(Manifest.permission.RECEIVE_SMS) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("Allow reading texts") }
             }
-        } ?: Text("Loading…")
-
-        Text("What to forward", style = MaterialTheme.typography.titleMedium)
-        ForwardingSwitches(settings, changeSettings)
-        if (settings.sendSms && !smsAllowed) {
-            Text("Texts can only be read once you allow the SMS permission.")
-            Button(
-                onClick = { askSms.launch(Manifest.permission.RECEIVE_SMS) },
-                modifier = Modifier.fillMaxWidth(),
-            ) { Text("Allow reading texts") }
-        }
-        SecondaryButton(onClick = { showApps = true }, modifier = Modifier.fillMaxWidth()) {
-            val blocked = settings.blockedApps.size
-            Text(if (blocked == 0) "Choose apps to forward" else "Choose apps to forward ($blocked off)")
+            SecondaryButton(onClick = { showApps = true }, modifier = Modifier.fillMaxWidth()) {
+                val blocked = settings.blockedApps.size
+                Text(if (blocked == 0) "Choose apps to forward" else "Choose apps to forward ($blocked off)")
+            }
         }
 
-        Text("Notification access", style = MaterialTheme.typography.titleMedium)
-        if (accessGranted) {
-            Text(
-                "Granted. Notifications on this phone are queued and forwarded to your server.",
-                color = MaterialTheme.colorScheme.tertiary,
+        Section("Notification access") {
+            if (accessGranted) {
+                Text(
+                    "Granted. Notifications on this phone are queued and forwarded to your server.",
+                    color = MaterialTheme.colorScheme.tertiary,
+                )
+            } else {
+                Text("Not granted. Without it nothing can be forwarded.")
+                PrimaryButton(onClick = onOpenAccessSettings, modifier = Modifier.fillMaxWidth()) {
+                    Text("Open notification access settings")
+                }
+            }
+        }
+
+        Section("Keep it running") {
+            if (!notificationsAllowed) {
+                Text("Allow notifications so Android can show the \"running\" notice that keeps the app alive.")
+                PrimaryButton(
+                    onClick = { askNotifications.launch(Manifest.permission.POST_NOTIFICATIONS) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("Allow notifications") }
+            }
+            if (batteryExempt) {
+                Text("Battery optimisation is off for this app.", color = MaterialTheme.colorScheme.tertiary)
+            } else {
+                Text("Battery optimisation may stop this app in the background. On OnePlus, also allow auto-start.")
+                PrimaryButton(onClick = onRequestBatteryExemption, modifier = Modifier.fillMaxWidth()) {
+                    Text("Turn off battery optimisation")
+                }
+            }
+        }
+
+        Section("Appearance") {
+            Choice(
+                options = listOf(ThemeMode.SYSTEM to "System", ThemeMode.LIGHT to "Light", ThemeMode.DARK to "Dark"),
+                selected = themeMode,
+                onSelect = onThemeChange,
             )
-        } else {
-            Text("Not granted. Without it nothing can be forwarded.")
-            Button(onClick = onOpenAccessSettings, modifier = Modifier.fillMaxWidth()) {
-                Text("Open notification access settings")
-            }
-        }
-
-        Text("Keep it running", style = MaterialTheme.typography.titleMedium)
-        if (!notificationsAllowed) {
-            Text("Allow notifications so Android can show the \"running\" notice that keeps the app alive.")
-            Button(
-                onClick = { askNotifications.launch(Manifest.permission.POST_NOTIFICATIONS) },
-                modifier = Modifier.fillMaxWidth(),
-            ) { Text("Allow notifications") }
-        }
-        if (batteryExempt) {
-            Text("Battery optimisation is off for this app.", color = MaterialTheme.colorScheme.tertiary)
-        } else {
-            Text("Battery optimisation may stop this app in the background. On OnePlus, also allow auto-start.")
-            Button(onClick = onRequestBatteryExemption, modifier = Modifier.fillMaxWidth()) {
-                Text("Turn off battery optimisation")
-            }
         }
     }
 }

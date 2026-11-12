@@ -23,6 +23,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
@@ -37,7 +38,9 @@ internal fun ForwardingSwitches(settings: CaptureSettings, onChange: (CaptureSet
         onChange(settings.copy(clearAfterForwarding = it))
     }
     Text(
-        "Dismisses each forwarded notification on this phone. Android drops new notifications " +
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        text = "Dismisses each forwarded notification on this phone. Android drops new notifications " +
             "once an app has 50 waiting, so turn this on for a phone you leave untouched.",
     )
 }
@@ -66,8 +69,13 @@ internal fun AppsScreen(settings: CaptureSettings, onChange: (CaptureSettings) -
 
     Column(modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 16.dp)) {
         SecondaryButton(onClick = onBack) { Text("Back") }
-        Text("Apps to forward", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(top = 12.dp))
-        Text("Switch an app off to keep its notifications on this phone.")
+        Text(
+            "Apps to forward",
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(top = 20.dp),
+        )
+        Text("Switch an app off to keep its notifications on this phone.", color = MaterialTheme.colorScheme.onSurfaceVariant)
         OutlinedTextField(
             value = query,
             onValueChange = { query = it },
@@ -88,7 +96,7 @@ internal fun AppsScreen(settings: CaptureSettings, onChange: (CaptureSettings) -
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(app.label)
-                            Text(app.packageName, style = MaterialTheme.typography.bodySmall)
+                            Text(app.packageName, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         Switch(
                             checked = !settings.isBlocked(app.packageName),

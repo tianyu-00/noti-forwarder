@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Dark from the first frame, so there is no white flash before Compose draws. -->
-    <style name="Theme.Notiforwarder" parent="android:Theme.Material.NoActionBar">
-        <item name="android:windowBackground">@color/ic_launcher_background</item>
-        <item name="android:colorBackground">@color/ic_launcher_background</item>
+    <!-- Light from the first frame when the phone is in light mode (see values-night for dark),
+         so there is no flash before Compose draws. -->
+    <style name="Theme.Notiforwarder" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@android:color/white</item>
+        <item name="android:colorBackground">@android:color/white</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
     </style>
