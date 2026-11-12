@@ -8,6 +8,8 @@ import ManagePhoneDialog from './ManagePhoneDialog.jsx';
 import SettingsDialog from './SettingsDialog.jsx';
 import Sidebar from './Sidebar.jsx';
 import Filters from './Filters.jsx';
+import ThemeToggle from './ThemeToggle.jsx';
+import { Button } from './ui.jsx';
 import { useStream } from './useStream.js';
 import { matchesView } from './matches.js';
 
@@ -163,47 +165,41 @@ export default function Dashboard({ username, onLogout, pairingTiming }) {
   const title = selected ? (deviceNames[selected] ?? 'Phone') : 'All phones';
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100">
-      <header className="flex items-center justify-between border-b border-slate-800 p-4 text-sm text-slate-400">
-        <span>Signed in as {username}</span>
-        <div className="flex gap-2">
-          <button type="button" onClick={() => setSettingsOpen(true)} className="rounded px-3 py-1 hover:bg-slate-800">
+    <div className="min-h-screen bg-bg text-fg">
+      <header className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
+        <span className="text-sm font-semibold tracking-tight">Notiforwarder</span>
+        <div className="flex items-center gap-1">
+          <span className="hidden text-sm text-muted sm:inline">Signed in as {username}</span>
+          <ThemeToggle />
+          <Button variant="ghost" onClick={() => setSettingsOpen(true)}>
             Settings
-          </button>
-          <button type="button" onClick={signOut} className="rounded px-3 py-1 hover:bg-slate-800">
+          </Button>
+          <Button variant="ghost" onClick={signOut}>
             Sign out
-          </button>
+          </Button>
         </div>
       </header>
       <div className="md:flex">
-        <div>
+        <div className="md:border-r md:border-line">
           <Sidebar devices={devices} selected={selected} unread={unread} onSelect={select} />
-          <div className="px-2 pb-2">
-            <button
-              type="button"
-              onClick={() => setAddOpen(true)}
-              className="w-full rounded bg-sky-600 px-3 py-2 text-sm font-medium hover:bg-sky-500"
-            >
+          <div className="px-3 pb-3">
+            <Button onClick={() => setAddOpen(true)} className="w-full">
               Add phone
-            </button>
+            </Button>
           </div>
         </div>
         <main className="min-w-0 flex-1">
-          <div className="flex items-center justify-between gap-2 p-4">
-            <h1 className="text-lg font-semibold">{title}</h1>
+          <div className="flex items-center justify-between gap-2 px-4 py-4">
+            <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
             {selectedDevice && (
-              <button
-                type="button"
-                onClick={() => setManageOpen(true)}
-                className="rounded bg-slate-800 px-3 py-1 text-sm hover:bg-slate-700"
-              >
+              <Button variant="secondary" onClick={() => setManageOpen(true)}>
                 Manage phone
-              </button>
+              </Button>
             )}
           </div>
           <Filters filters={filters} apps={apps} onChange={setFilters} />
           {loadError && (
-            <p role="alert" className="px-4 pb-2 text-sm text-red-400">
+            <p role="alert" className="px-4 pb-3 text-sm text-danger">
               {loadError}
             </p>
           )}
@@ -212,11 +208,11 @@ export default function Dashboard({ username, onLogout, pairingTiming }) {
             <div className="p-4 text-center">
               <div ref={endRef} className="h-px" />
               {olderFailed || !canWatchScroll ? (
-                <button type="button" onClick={loadOlder} className="rounded bg-slate-800 px-4 py-2 text-sm hover:bg-slate-700">
+                <Button variant="secondary" onClick={loadOlder}>
                   {olderFailed ? 'Try again' : 'Load older'}
-                </button>
+                </Button>
               ) : (
-                loadingOlder && <p className="text-sm text-slate-500">Loading older messages…</p>
+                loadingOlder && <p className="text-sm text-muted">Loading older messages…</p>
               )}
             </div>
           )}

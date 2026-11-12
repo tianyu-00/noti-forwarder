@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
-import * as Dialog from '@radix-ui/react-dialog';
 import { api } from './api.js';
 import SecuritySection from './SecuritySection.jsx';
+import { Button, Modal } from './ui.jsx';
 
 const MAX_DAYS = 3650;
 
@@ -64,18 +64,18 @@ function RetentionForm({ onPurged }) {
     setConfirming(true);
   }
 
-  if (!loaded && !error) return <p className="text-sm text-slate-400">Loading…</p>;
+  if (!loaded && !error) return <p className="text-sm text-muted">Loading…</p>;
 
   return (
-    <form onSubmit={submit} noValidate className="space-y-3">
-      <fieldset className="space-y-2 text-sm">
-        <legend className="mb-1 font-medium">How long to keep messages</legend>
-        <label className="flex items-center gap-2">
-          <input type="radio" name="retention" checked={!limited} onChange={() => setLimited(false)} />
+    <form onSubmit={submit} noValidate className="space-y-4">
+      <fieldset className="space-y-3 text-sm">
+        <legend className="mb-2 text-sm font-semibold">How long to keep messages</legend>
+        <label className="flex items-center gap-2.5">
+          <input type="radio" name="retention" className="accent-[var(--primary)]" checked={!limited} onChange={() => setLimited(false)} />
           Keep messages forever
         </label>
-        <label className="flex items-center gap-2">
-          <input type="radio" name="retention" checked={limited} onChange={() => setLimited(true)} />
+        <label className="flex flex-wrap items-center gap-2.5">
+          <input type="radio" name="retention" className="accent-[var(--primary)]" checked={limited} onChange={() => setLimited(true)} />
           Delete messages older than
           <input
             type="number"
@@ -85,37 +85,35 @@ function RetentionForm({ onPurged }) {
             value={days}
             disabled={!limited}
             onChange={(e) => setDays(e.target.value)}
-            className="w-20 rounded bg-slate-700 p-1 disabled:opacity-50"
+            className="w-20 rounded-md border border-line bg-bg px-2 py-1 text-sm text-fg disabled:opacity-50"
           />
           days
         </label>
       </fieldset>
 
       {error && (
-        <p role="alert" className="text-sm text-red-400">
+        <p role="alert" className="text-sm text-danger">
           {error}
         </p>
       )}
-      {result && <p className="text-sm text-emerald-400">{result}</p>}
+      {result && <p className="text-sm text-ok">{result}</p>}
 
       {confirming ? (
-        <div className="space-y-2 rounded border border-red-500/40 p-3 text-sm">
+        <div className="space-y-3 rounded-lg border border-line bg-surface p-4 text-sm">
           <p>
             Messages older than {Number(days)} days are deleted now and then every hour. This cannot be undone.
           </p>
           <div className="flex gap-2">
-            <button type="button" onClick={save} className="rounded bg-red-600 px-3 py-1">
+            <Button variant="danger" onClick={save}>
               Yes, save
-            </button>
-            <button type="button" onClick={() => setConfirming(false)} className="rounded bg-slate-700 px-3 py-1">
+            </Button>
+            <Button variant="secondary" onClick={() => setConfirming(false)}>
               Cancel
-            </button>
+            </Button>
           </div>
         </div>
       ) : (
-        <button type="submit" className="rounded bg-sky-600 px-3 py-1 text-sm">
-          Save
-        </button>
+        <Button type="submit">Save</Button>
       )}
     </form>
   );
@@ -125,20 +123,10 @@ RetentionForm.propTypes = { onPurged: PropTypes.func.isRequired };
 
 export default function SettingsDialog({ open, onOpenChange, onPurged }) {
   return (
-    <Dialog.Root open={open} onOpenChange={onOpenChange}>
-      <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-black/60" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 w-[90vw] max-h-[90vh] max-w-md -translate-x-1/2 -translate-y-1/2 space-y-4 overflow-y-auto rounded-lg bg-slate-800 p-6 text-slate-100">
-          <Dialog.Title className="text-lg font-semibold">Settings</Dialog.Title>
-          <Dialog.Description className="text-sm text-slate-400">
-            Message retention applies to every phone.
-          </Dialog.Description>
-          <RetentionForm onPurged={onPurged} />
-          <SecuritySection />
-          <Dialog.Close className="rounded bg-slate-700 px-3 py-1 text-sm">Close</Dialog.Close>
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
+    <Modal open={open} onOpenChange={onOpenChange} title="Settings" description="Message retention applies to every phone.">
+      <RetentionForm onPurged={onPurged} />
+      <SecuritySection />
+    </Modal>
   );
 }
 

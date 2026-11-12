@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
 import * as Tabs from '@radix-ui/react-tabs';
+import { fieldClass } from './ui.jsx';
 
 const TYPES = [
   { value: 'all', label: 'All' },
@@ -21,17 +22,17 @@ export default function Filters({ filters, apps, onChange }) {
   }, [text, filters, onChange]);
 
   return (
-    <div className="flex flex-wrap items-center gap-2 px-4 pb-3">
+    <div className="flex flex-wrap items-center gap-2 px-4 pb-4">
       <Tabs.Root
         value={filters.type || 'all'}
         onValueChange={(v) => onChange({ ...filters, type: v === 'all' ? '' : v })}
       >
-        <Tabs.List aria-label="Message type" className="flex rounded bg-slate-800 p-1 text-sm">
+        <Tabs.List aria-label="Message type" className="flex rounded-md border border-line p-0.5 text-sm">
           {TYPES.map((t) => (
             <Tabs.Trigger
               key={t.value}
               value={t.value}
-              className="rounded px-3 py-1 data-[state=active]:bg-sky-600 data-[state=active]:text-white"
+              className="rounded px-3 py-1.5 font-medium text-muted hover:text-fg data-[state=active]:bg-primary data-[state=active]:text-on-primary"
             >
               {t.label}
             </Tabs.Trigger>
@@ -43,7 +44,7 @@ export default function Filters({ filters, apps, onChange }) {
         aria-label="App"
         value={filters.app}
         onChange={(e) => onChange({ ...filters, app: e.target.value })}
-        className="rounded bg-slate-800 p-2 text-sm"
+        className={fieldClass}
       >
         <option value="">All apps</option>
         {apps.map((a) => (
@@ -59,7 +60,7 @@ export default function Filters({ filters, apps, onChange }) {
         placeholder="Search messages"
         value={text}
         onChange={(e) => setText(e.target.value)}
-        className="min-w-0 flex-1 rounded bg-slate-800 p-2 text-sm"
+        className={`${fieldClass} min-w-40 flex-1`}
       />
     </div>
   );

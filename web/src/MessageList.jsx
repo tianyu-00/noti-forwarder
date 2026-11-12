@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
 import { splitAroundCode } from './code.js';
+import { Button } from './ui.jsx';
 
 export const messageShape = PropTypes.shape({
   id: PropTypes.string.isRequired,
@@ -35,14 +36,10 @@ function CopyCodeButton({ code }) {
 
   return (
     <span className="inline-flex items-center gap-2">
-      <button
-        type="button"
-        onClick={copy}
-        className="rounded bg-sky-600 px-2 py-0.5 text-xs font-medium text-white hover:bg-sky-500"
-      >
+      <Button onClick={copy} className="px-3 py-1.5 text-xs">
         {state === 'copied' ? 'Copied' : 'Copy code'}
-      </button>
-      {state === 'failed' && <span className="text-xs text-amber-400">Could not copy. Select the code instead.</span>}
+      </Button>
+      {state === 'failed' && <span className="text-xs text-danger">Could not copy. Select the code instead.</span>}
     </span>
   );
 }
@@ -51,24 +48,29 @@ CopyCodeButton.propTypes = { code: PropTypes.string.isRequired };
 
 export default function MessageList({ messages, deviceNames }) {
   if (messages.length === 0) {
-    return <p className="p-6 text-slate-400">No messages yet.</p>;
+    return <p className="px-4 py-10 text-center text-sm text-muted">No messages yet.</p>;
   }
   return (
-    <ul className="divide-y divide-slate-800">
+    <ul className="divide-y divide-line border-t border-line">
       {messages.map((m) => (
         <li key={m.id}>
-          <article className="space-y-1 p-4">
-            <header className="flex flex-wrap items-baseline gap-x-2 text-xs text-slate-400">
-              <span className="font-medium text-slate-200">{deviceNames[m.deviceId] ?? 'Unknown phone'}</span>
+          <article className="space-y-2 px-4 py-4">
+            <div className="flex items-baseline justify-between gap-4">
+              {m.sender ? <p className="text-sm font-semibold text-fg">{m.sender}</p> : <span />}
+              <time dateTime={m.receivedAt} className="shrink-0 text-xs text-muted">
+                {new Date(m.receivedAt).toLocaleString()}
+              </time>
+            </div>
+            <p className="flex flex-wrap gap-x-1.5 text-xs text-muted">
+              <span>{deviceNames[m.deviceId] ?? 'Unknown phone'}</span>
+              <span aria-hidden="true">·</span>
               <span>{m.type === 'sms' ? 'SMS' : m.app}</span>
-              <time dateTime={m.receivedAt}>{new Date(m.receivedAt).toLocaleString()}</time>
-            </header>
-            {m.sender && <p className="text-sm font-semibold text-slate-100">{m.sender}</p>}
+            </p>
             {/* Plain text only: message content is untrusted. The code is a slice of that text. */}
-            <p className="whitespace-pre-wrap break-words text-sm text-slate-300">
+            <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-fg">
               {splitAroundCode(m.body, m.code).map((part, i) =>
                 part.isCode ? (
-                  <mark key={i} className="rounded bg-sky-500/20 px-1 font-mono text-base text-sky-200">
+                  <mark key={i} className="rounded bg-raised px-1.5 py-0.5 font-mono text-[0.95em] font-semibold text-fg ring-1 ring-line">
                     {part.text}
                   </mark>
                 ) : (

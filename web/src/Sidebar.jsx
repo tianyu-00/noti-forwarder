@@ -23,8 +23,8 @@ function Item({ active, onClick, children }) {
       onClick={onClick}
       aria-current={active ? 'page' : undefined}
       className={clsx(
-        'flex w-full flex-col rounded px-3 py-2 text-left text-sm hover:bg-slate-800',
-        active && 'bg-slate-800',
+        'flex shrink-0 flex-col gap-0.5 rounded-md border border-line px-3 py-2 text-left text-sm hover:bg-raised md:w-full md:border-transparent',
+        active && 'border-fg bg-raised md:border-transparent',
       )}
     >
       {children}
@@ -40,21 +40,21 @@ Item.propTypes = {
 
 export default function Sidebar({ devices, selected, unread, onSelect }) {
   return (
-    <nav aria-label="Phones" className="w-full space-y-1 p-2 md:w-64">
+    <nav aria-label="Phones" className="flex w-full gap-2 overflow-x-auto p-3 md:block md:w-64 md:space-y-0.5 md:overflow-visible">
       <Item active={selected === null} onClick={() => onSelect(null)}>
-        <span className="font-medium">All phones</span>
+        <span className="font-medium text-fg">All phones</span>
       </Item>
       {devices.map((d) => (
         <Item key={d.deviceId} active={selected === d.deviceId} onClick={() => onSelect(d.deviceId)}>
-          <span className="flex items-center justify-between gap-2 font-medium">
+          <span className="flex items-center justify-between gap-2 font-medium text-fg">
             {d.name}
             {unread[d.deviceId] > 0 && (
-              <span aria-label={`${unread[d.deviceId]} unread`} className="rounded-full bg-sky-600 px-2 text-xs text-white">
+              <span aria-label={`${unread[d.deviceId]} unread`} className="rounded-full bg-primary px-2 text-xs font-medium text-on-primary">
                 {unread[d.deviceId]}
               </span>
             )}
           </span>
-          <span className={clsx('text-xs', isOnline(d.lastSeen) && !d.revokedAt ? 'text-emerald-400' : 'text-slate-400')}>
+          <span className={clsx('text-xs', isOnline(d.lastSeen) && !d.revokedAt ? 'text-ok' : 'text-muted')}>
             {status(d)}
           </span>
         </Item>

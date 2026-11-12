@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
-import * as Dialog from '@radix-ui/react-dialog';
 import { QRCodeSVG } from 'qrcode.react';
 import { api } from './api.js';
 import { deviceShape } from './Sidebar.jsx';
+import { Button, Modal } from './ui.jsx';
 
 function formatRemaining(ms) {
   const total = Math.max(0, Math.ceil(ms / 1000));
@@ -81,7 +81,7 @@ function PairingPanel({ devices, onDevicesLoaded, onClose, timing }) {
 
   if (connected) {
     return (
-      <p role="status" className="text-emerald-400">
+      <p role="status" className="text-ok">
         ✓ {connected.name} connected.
       </p>
     );
@@ -89,25 +89,23 @@ function PairingPanel({ devices, onDevicesLoaded, onClose, timing }) {
   if (error) {
     return (
       <div className="space-y-3">
-        <p role="alert" className="text-red-400">
+        <p role="alert" className="text-danger">
           {error}
         </p>
-        <button type="button" onClick={newCode} className="rounded bg-slate-700 px-3 py-1">
+        <Button variant="secondary" onClick={newCode}>
           Try again
-        </button>
+        </Button>
       </div>
     );
   }
-  if (!pairing) return <p className="text-slate-400">Creating code…</p>;
+  if (!pairing) return <p className="text-sm text-muted">Creating code…</p>;
 
   const remaining = new Date(pairing.expiresAt).getTime() - now;
   if (expired) {
     return (
       <div className="space-y-3">
-        <p className="text-amber-400">This code has expired.</p>
-        <button type="button" onClick={newCode} className="rounded bg-sky-600 px-3 py-1">
-          New code
-        </button>
+        <p className="text-sm text-fg">This code has expired.</p>
+        <Button onClick={newCode}>New code</Button>
       </div>
     );
   }
@@ -115,19 +113,19 @@ function PairingPanel({ devices, onDevicesLoaded, onClose, timing }) {
   const { u: serverUrl } = JSON.parse(pairing.qrPayload);
   return (
     <div className="space-y-3">
-      <div className="inline-block rounded bg-white p-3">
+      <div className="inline-block rounded-lg border border-line bg-white p-3">
         <QRCodeSVG value={pairing.qrPayload} size={192} role="img" aria-label="Pairing QR code" />
       </div>
       <dl className="space-y-1 text-sm">
-        <dt className="text-slate-400">Server address</dt>
+        <dt className="text-muted">Server address</dt>
         <dd className="break-all font-mono">{serverUrl}</dd>
-        <dt className="text-slate-400">Security key</dt>
+        <dt className="pt-2 text-muted">Security key</dt>
         <dd className="break-all font-mono text-lg tracking-wide">{pairing.code}</dd>
       </dl>
-      <p role="status" className="text-sm text-sky-300">
+      <p role="status" className="text-sm text-muted">
         Waiting for the phone to scan…
       </p>
-      <p className="text-xs text-slate-400">Expires in {formatRemaining(remaining)}. Single use.</p>
+      <p className="text-xs text-faint">Expires in {formatRemaining(remaining)}. Single use.</p>
     </div>
   );
 }
@@ -145,24 +143,19 @@ export const DEFAULT_PAIRING_TIMING = { pollMs: 2000, closeMs: 2500 };
 
 export default function AddPhoneDialog({ open, onOpenChange, devices, onDevicesLoaded, timing }) {
   return (
-    <Dialog.Root open={open} onOpenChange={onOpenChange}>
-      <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-black/60" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 w-[90vw] max-w-md -translate-x-1/2 -translate-y-1/2 space-y-4 rounded-lg bg-slate-800 p-6 text-slate-100">
-          <Dialog.Title className="text-lg font-semibold">Add phone</Dialog.Title>
-          <Dialog.Description className="text-sm text-slate-400">
-            In the Notiforwarder app, scan this code or type the server address and security key.
-          </Dialog.Description>
-          <PairingPanel
-            devices={devices}
-            onDevicesLoaded={onDevicesLoaded}
-            onClose={() => onOpenChange(false)}
-            timing={{ ...DEFAULT_PAIRING_TIMING, ...timing }}
-          />
-          <Dialog.Close className="rounded bg-slate-700 px-3 py-1 text-sm">Close</Dialog.Close>
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
+    <Modal
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Add phone"
+      description="In the Notiforwarder app, scan this code or type the server address and security key."
+    >
+      <PairingPanel
+        devices={devices}
+        onDevicesLoaded={onDevicesLoaded}
+        onClose={() => onOpenChange(false)}
+        timing={{ ...DEFAULT_PAIRING_TIMING, ...timing }}
+      />
+    </Modal>
   );
 }
 

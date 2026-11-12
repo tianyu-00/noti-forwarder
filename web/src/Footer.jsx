@@ -11,7 +11,7 @@ export default function Footer() {
   }, []);
 
   return (
-    <footer className="border-t border-slate-800 p-4 text-xs text-slate-500">
+    <footer className="border-t border-line p-4 text-xs text-faint">
       Web {__APP_VERSION__}
       {server && ` · Server ${server.version} (${server.commit})`}
     </footer>
