@@ -41,7 +41,25 @@ describe('GET /api/v1/messages', () => {
       body: 'newest',
       receivedAt: '2026-01-03T10:00:00.000Z',
       createdAt: expect.any(String),
+      code: null,
     });
+  });
+});
+
+describe('GET /api/v1/messages 2FA codes', () => {
+  it('adds the one-time code when a message contains one, and null when it does not', async () => {
+    const d = await ctx.addDevice();
+    await send(d.token, [
+      msg({ body: 'Your code is 482913', receivedAt: '2026-04-02T10:00:00Z' }),
+      msg({ body: 'Your parcel has shipped', receivedAt: '2026-04-01T10:00:00Z' }),
+    ]);
+
+    const res = await get(`?device=${d.deviceId}`);
+
+    expect(res.body.messages.map((m) => [m.body, m.code])).toEqual([
+      ['Your code is 482913', '482913'],
+      ['Your parcel has shipped', null],
+    ]);
   });
 });
 

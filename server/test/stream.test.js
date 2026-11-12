@@ -40,12 +40,12 @@ describe('GET /api/v1/stream', () => {
     const stream = await openStream(ctx.app, { cookie });
     await stream.next(); // connected
 
-    const m = msg({ body: 'live one' });
+    const m = msg({ body: 'live one, code 654321' });
     await send(d.token, [m]);
 
     const event = await stream.next();
     expect(event.event).toBe('message');
-    expect(event.data).toMatchObject({ id: m.id, deviceId: d.deviceId, body: 'live one', type: 'notification' });
+    expect(event.data).toMatchObject({ id: m.id, deviceId: d.deviceId, body: 'live one, code 654321', type: 'notification', code: '654321' });
 
     await send(d.token, [m]); // retry of the same id
     expect(await stream.quiet()).toBe(true);

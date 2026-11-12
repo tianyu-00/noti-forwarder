@@ -1,3 +1,5 @@
+import { extractCode } from './codes.js';
+
 export function messageToApi(row) {
   return {
     id: row.id,
@@ -8,6 +10,8 @@ export function messageToApi(row) {
     body: row.body,
     receivedAt: row.received_at.toISOString(),
     createdAt: row.created_at.toISOString(),
+    // Computed from the text each time, so it needs no stored column.
+    code: extractCode(row.body),
   };
 }
 
