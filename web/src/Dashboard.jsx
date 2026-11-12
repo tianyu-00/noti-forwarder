@@ -16,9 +16,12 @@ import { useStream } from './useStream.js';
 import { matchesView } from './matches.js';
 import { useE2eKey } from './keyStore.js';
 import { readMessage } from './readable.js';
+import { useNow } from './useNow.js';
 
 export default function Dashboard({ username, onLogout, pairingTiming }) {
   const [devices, setDevices] = useState([]);
+  const [silentAfterMinutes, setSilentAfterMinutes] = useState(0);
+  const now = useNow();
   const [messages, setMessages] = useState([]);
   const [selected, setSelected] = useState(null);
   const [filters, setFilters] = useState({ type: '', app: '', q: '' });
@@ -77,8 +80,17 @@ export default function Dashboard({ username, onLogout, pairingTiming }) {
     setSelected((current) => (current === deviceId ? null : current));
   }, []);
 
+  // A heartbeat or a message proves the phone is alive right now.
+  const markSeen = useCallback(
+    (deviceId, lastSeen) =>
+      setDevices((list) => list.map((x) => (x.deviceId === deviceId ? { ...x, lastSeen } : x))),
+    [],
+  );
+
   useStream({
+    device_seen: (d) => markSeen(d.deviceId, d.lastSeen),
     message: (m) => {
+      markSeen(m.deviceId, new Date().toISOString());
       if (matchesView(m, view.current)) {
         setMessages((list) => (list.some((x) => x.id === m.id) ? list : [m, ...list]));
         setApps((known) => (known.includes(m.app) ? known : [...known, m.app].sort()));
@@ -99,7 +111,10 @@ export default function Dashboard({ username, onLogout, pairingTiming }) {
 
   useEffect(() => {
     api('/devices')
-      .then((d) => setDevices(d.devices))
+      .then((d) => {
+        setDevices(d.devices);
+        setSilentAfterMinutes(d.silentAfterMinutes ?? 0);
+      })
       .catch(() => setLoadError('Could not load phones.'));
   }, []);
 
@@ -216,7 +231,14 @@ export default function Dashboard({ username, onLogout, pairingTiming }) {
       </header>
       <div className="md:flex">
         <div className="md:border-r md:border-line">
-          <Sidebar devices={devices} selected={selected} unread={unread} onSelect={select} />
+          <Sidebar
+            devices={devices}
+            selected={selected}
+            unread={unread}
+            onSelect={select}
+            silentAfterMinutes={silentAfterMinutes}
+            now={now}
+          />
           <div className="px-3 pb-3">
             <Button onClick={() => setAddOpen(true)} className="w-full">
               Add phone

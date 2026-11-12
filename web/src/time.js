@@ -1,4 +1,5 @@
-export const ONLINE_WINDOW_MS = 2 * 60 * 1000;
+// Phones check in every ~15 minutes even when idle, so "online" means seen within a little more.
+export const ONLINE_WINDOW_MS = 20 * 60 * 1000;
 
 export function isOnline(lastSeen, now = Date.now()) {
   return Boolean(lastSeen) && now - new Date(lastSeen).getTime() < ONLINE_WINDOW_MS;
@@ -12,4 +13,13 @@ export function timeAgo(iso, now = Date.now()) {
   const hours = Math.floor(minutes / 60);
   if (hours < 24) return `${hours} h ago`;
   return `${Math.floor(hours / 24)} d ago`;
+}
+
+/** How long a phone has been silent, for the "Quiet for 3 h" label. */
+export function formatQuiet(ms) {
+  const minutes = Math.floor(ms / 60000);
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 48) return `${hours} h`;
+  return `${Math.floor(hours / 24)} d`;
 }
