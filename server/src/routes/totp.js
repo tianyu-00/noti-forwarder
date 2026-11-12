@@ -2,6 +2,7 @@ import { Router } from 'express';
 import express from 'express';
 import { z } from 'zod';
 import { audit } from '../audit.js';
+import { plainSecretBox } from '../auth/secret-box.js';
 import { verifyPassword } from '../auth/password.js';
 import { requireCsrf } from '../auth/sessions.js';
 import { verifySecondFactor } from '../auth/second-factor.js';
@@ -12,7 +13,7 @@ const disableSchema = z.object({ password: z.string().min(1).max(500), code: z.s
 
 const USER_COLUMNS = 'id, username, password_hash, totp_secret, totp_enabled_at, totp_last_step';
 
-export function totpRouter({ db, requireViewer, limiter, now }) {
+export function totpRouter({ db, requireViewer, limiter, now, secretBox = plainSecretBox }) {
   const router = Router();
   const guard = [limiter, requireViewer, requireCsrf, express.json({ limit: '10kb' })];
 
@@ -27,7 +28,7 @@ export function totpRouter({ db, requireViewer, limiter, now }) {
       const user = await currentUser(req);
       if (user.totp_enabled_at) return res.status(409).json({ error: 'already_enabled' });
       const secret = newTotpSecret();
-      await db.query('UPDATE users SET totp_secret = $2, totp_last_step = NULL WHERE id = $1', [user.id, secret]);
+      await db.query('UPDATE users SET totp_secret = $2, totp_last_step = NULL WHERE id = $1', [user.id, secretBox.seal(secret)]);
       res.json({ secret, otpauthUri: otpauthUri(secret, user.username) });
     } catch (err) {
       next(err);
@@ -42,7 +43,7 @@ export function totpRouter({ db, requireViewer, limiter, now }) {
       if (!parsed.success) return res.status(400).json({ error: 'invalid_payload' });
       const user = await currentUser(req);
       if (!user.totp_secret || user.totp_enabled_at) return res.status(400).json({ error: 'no_pending_setup' });
-      const check = checkTotp(user.totp_secret, parsed.data.code.trim(), { now: now(), lastStep: null });
+      const check = checkTotp(secretBox.open(user.totp_secret), parsed.data.code.trim(), { now: now(), lastStep: null });
       if (!check.ok) return res.status(400).json({ error: 'invalid_code' });
 
       const backupCodes = generateBackupCodes();
@@ -71,7 +72,7 @@ export function totpRouter({ db, requireViewer, limiter, now }) {
       const user = await currentUser(req);
       if (!user.totp_enabled_at) return res.status(400).json({ error: 'not_enabled' });
       const passwordOk = await verifyPassword(user.password_hash, parsed.data.password);
-      const codeOk = passwordOk && (await verifySecondFactor(db, user, parsed.data.code, now()));
+      const codeOk = passwordOk && (await verifySecondFactor(db, user, parsed.data.code, now(), secretBox));
       if (!passwordOk || !codeOk) return res.status(403).json({ error: 'invalid_credentials' });
 
       await db.query(

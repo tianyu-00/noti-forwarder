@@ -6,6 +6,7 @@ import { hashPassword, verifyPassword } from '../auth/password.js';
 import { hashToken } from '../auth/tokens.js';
 import { createSession, deleteSession, requireCsrf, SESSION_COOKIE, SESSION_TTL_MS } from '../auth/sessions.js';
 import { rateLimit } from '../rate-limit.js';
+import { plainSecretBox } from '../auth/secret-box.js';
 import { verifySecondFactor } from '../auth/second-factor.js';
 import { totpRouter } from './totp.js';
 
@@ -32,10 +33,11 @@ export function authRouter({
   cookieSecure = true,
   loginRateLimit = { limit: 20, windowMs: 15 * 60 * 1000 },
   now = Date.now,
+  secretBox = plainSecretBox,
 }) {
   const router = Router();
   const perIp = rateLimit({ ...loginRateLimit, key: (req) => req.ip });
-  router.use(totpRouter({ db, requireViewer, limiter: perIp, now }));
+  router.use(totpRouter({ db, requireViewer, limiter: perIp, now, secretBox }));
 
   router.post('/auth/login', perIp, express.json({ limit: '10kb' }), async (req, res, next) => {
     try {
@@ -58,7 +60,7 @@ export function authRouter({
       if (ok && user.totp_enabled_at) {
         // Only after a correct password, so a wrong password never reveals that 2FA is on.
         if (code === undefined || code === '') return res.status(401).json({ error: 'totp_required' });
-        ok = await verifySecondFactor(db, user, code, now());
+        ok = await verifySecondFactor(db, user, code, now(), secretBox);
       }
       if (!user || !ok) {
         if (user) {

@@ -113,6 +113,12 @@ cd ~/github/noti-forwarder/deploy
 docker compose exec server node src/reset-totp.js admin
 ```
 
+To also encrypt the authenticator secret inside the database, set `SECRET_KEY` (32 or more characters, for example from `openssl rand -base64 32`) in `.env` before or after turning two-step login on. A stolen database backup then does not contain the secret. Keep the key safe and do not change it: while a secret is stored, the server refuses to start with a missing or different key. If you lose the key, run the reset command above and set up two-step login again.
+
+## Changing the password
+
+**Settings**, then **Change password**. It asks for the current password and signs out every other browser. (`ADMIN_PASSWORD` in the environment only matters the first time the server starts.)
+
 ## Keeping and deleting messages
 
 - **Settings** (top right of the dashboard) sets how long messages are kept: forever (the default) or delete everything older than N days. Saving a limit deletes the older messages at once and the server repeats it every hour. This cannot be undone, so the dashboard asks first.

@@ -2,6 +2,8 @@ import { fileURLToPath } from 'node:url';
 import pg from 'pg';
 import { createApp } from './app.js';
 import { cookieSecureFor } from './cookie-secure.js';
+import { createSecretBox, plainSecretBox } from './auth/secret-box.js';
+import { assertSecretsReadable, sealExistingSecrets } from './auth/secrets-at-rest.js';
 import { loadBuildInfo } from './config.js';
 import { runMigrations } from './db/migrate.js';
 import { ensureAdminUser } from './auth/users.js';
@@ -41,6 +43,27 @@ for (let attempt = 1; ; attempt++) {
   }
 }
 
+// Optional: SECRET_KEY encrypts the two-step login secret in the database. Without it the
+// secret is stored as plain text (protect your database backups).
+let secretBox = plainSecretBox;
+if (process.env.SECRET_KEY) {
+  try {
+    secretBox = createSecretBox(process.env.SECRET_KEY);
+  } catch (err) {
+    console.error(err.message);
+    process.exit(1);
+  }
+}
+try {
+  await assertSecretsReadable(db, secretBox);
+} catch (err) {
+  console.error(err.message);
+  process.exit(1);
+}
+const sealedNow = await sealExistingSecrets(db, secretBox);
+if (sealedNow) console.log(`encrypted ${sealedNow} stored two-step secret(s)`);
+if (secretBox === plainSecretBox) console.log('SECRET_KEY not set: the two-step secret is stored unencrypted');
+
 // First start only: create the single dashboard user from the environment.
 if (process.env.ADMIN_USERNAME && process.env.ADMIN_PASSWORD) {
   const created = await ensureAdminUser(db, {
@@ -67,7 +90,7 @@ console.log(notifier ? 'ntfy push enabled' : 'ntfy push off (set NTFY_TOPIC to t
 
 const cookieSecure = cookieSecureFor(publicUrl);
 if (!cookieSecure) console.log('PUBLIC_URL is http://: sessions work without HTTPS, but traffic is not encrypted');
-const app = createApp({ ...loadBuildInfo(process.env), db, publicUrl, trustProxy, notifier, cookieSecure });
+const app = createApp({ ...loadBuildInfo(process.env), db, publicUrl, trustProxy, notifier, cookieSecure, secretBox });
 
 startRetentionJob(db);
 

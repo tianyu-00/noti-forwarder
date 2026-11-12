@@ -5,7 +5,7 @@
 #   PUBLIC_URL      https://notifications.example.com   (your tunnel address, no trailing slash)
 #   ADMIN_PASSWORD  at least 12 characters
 # Everything else has a default. Optional: ADMIN_USERNAME (admin), VERSION (latest),
-# WEB_BIND (3000), TRUST_PROXY (2), GHCR_OWNER (tianyu-00).
+# WEB_BIND (3000), TRUST_PROXY (2), GHCR_OWNER (tianyu-00), SECRET_KEY (off).
 #
 # Point your tunnel's service (type HTTP) at  http://<this machine's address>:3000
 services:
@@ -32,6 +32,8 @@ services:
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:?set ADMIN_PASSWORD}
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
       TRUST_PROXY: ${TRUST_PROXY:-2}
+      # Optional: encrypts the two-step login secret in the database (at least 32 characters).
+      SECRET_KEY: ${SECRET_KEY:-}
       # Optional push alerts through ntfy; leave unset to keep them off.
       NTFY_TOPIC: ${NTFY_TOPIC:-}
       NTFY_URL: ${NTFY_URL:-}
