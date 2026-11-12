@@ -14,6 +14,8 @@ const pairSchema = z.object({
   name: z.string().min(1).max(100),
   model: z.string().max(100).optional(),
   appVersion: z.string().max(50).optional(),
+  // Stable per-phone id (Android's ANDROID_ID). Optional so older app versions still pair.
+  hardwareId: z.string().min(1).max(100).optional(),
 });
 
 export function pairingRouter({
@@ -48,7 +50,7 @@ export function pairingRouter({
   router.post('/pair', perIp, express.json({ limit: '10kb' }), async (req, res, next) => {
     const parsed = pairSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: 'invalid_payload' });
-    const { code, name, model, appVersion } = parsed.data;
+    const { code, name, model, appVersion, hardwareId } = parsed.data;
 
     const client = await db.connect();
     try {
@@ -65,20 +67,29 @@ export function pairingRouter({
         return res.status(400).json({ error: 'invalid_code' });
       }
 
-      const deviceId = randomUUID();
       const token = randomBytes(32).toString('base64url');
-      await client.query(
-        `INSERT INTO devices (device_id, name, model, app_version, token_hash)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [deviceId, name, model ?? null, appVersion ?? null, hashToken(token)],
+      // One statement decides "new phone" or "same phone again", so two simultaneous
+      // pairings of one phone cannot create two rows. A returning phone keeps its id,
+      // name and messages, gets a new token (the old one stops working) and is un-revoked.
+      const upserted = await client.query(
+        `INSERT INTO devices (device_id, name, model, app_version, token_hash, hardware_id)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         ON CONFLICT (hardware_id) WHERE hardware_id IS NOT NULL
+         DO UPDATE SET token_hash = EXCLUDED.token_hash,
+                       model = COALESCE(EXCLUDED.model, devices.model),
+                       app_version = COALESCE(EXCLUDED.app_version, devices.app_version),
+                       revoked_at = NULL
+         RETURNING device_id, (xmax = 0) AS inserted`,
+        [randomUUID(), name, model ?? null, appVersion ?? null, hashToken(token), hardwareId ?? null],
       );
+      const { device_id: deviceId, inserted } = upserted.rows[0];
       await client.query('UPDATE pairing_codes SET device_id = $2 WHERE code_hash = $1', [
         hashCode(code),
         deviceId,
       ]);
       await client.query('COMMIT');
 
-      await audit(db, { event: 'pair', deviceId, ip: req.ip });
+      await audit(db, { event: inserted ? 'pair' : 'repair', deviceId, ip: req.ip });
       const created = await db.query(`SELECT ${DEVICE_COLUMNS} FROM devices WHERE device_id = $1`, [deviceId]);
       events.publish('device', deviceToApi(created.rows[0]));
       res.status(201).json({ deviceId, token });
