@@ -78,6 +78,27 @@ for (let i = 0; i < 50 && !streamText.includes('device_seen'); i++) await new Pr
 assert.ok(streamText.includes('event: device_seen') && streamText.includes(deviceId), 'heartbeat reaches the live stream');
 step('heartbeat accepted and announced live');
 
+// The phone opens its own connection: the dashboard sees it as connected right away.
+const phoneAbort = new AbortController();
+const phoneStream = await fetch(`${BASE}/api/v1/device-stream`, {
+  headers: { Authorization: `Bearer ${token}` },
+  signal: phoneAbort.signal,
+});
+assert.equal(phoneStream.status, 200, 'the phone connection opens through nginx');
+let phoneText = '';
+const phoneReading = (async () => {
+  try {
+    for await (const chunk of phoneStream.body) phoneText += decoder.decode(chunk, { stream: true });
+  } catch {
+    // aborted at the end
+  }
+})();
+for (let i = 0; i < 50 && !streamText.includes('"connected":true'); i++) await new Promise((r) => setTimeout(r, 100));
+assert.ok(streamText.includes('event: device_presence') && streamText.includes('"connected":true'), 'dashboard sees the phone connect');
+const devices = await (await fetch(`${BASE}/api/v1/devices`, { headers: { cookie } })).json();
+assert.equal(devices.devices.find((d) => d.deviceId === deviceId).connected, true, 'the device list says connected');
+step('phone connection is open and the dashboard shows it connected');
+
 // Send a message like the phone does.
 const message = {
   id: randomUUID(),
@@ -158,9 +179,28 @@ step('encrypted message is stored unreadable and decrypts with the key');
 // Revoking cuts the phone off.
 const revoke = await fetch(`${BASE}/api/v1/devices/${deviceId}`, { method: 'DELETE', headers: session() });
 assert.equal(revoke.status, 204);
+for (let i = 0; i < 50 && !phoneText.includes('event: revoked'); i++) await new Promise((r) => setTimeout(r, 100));
+assert.ok(phoneText.includes('event: revoked'), 'the connected phone is told at once that it was revoked');
 assert.equal((await send()).status, 401, 'revoked phone is rejected');
-step('revoked phone is rejected');
+step('revoked phone is told at once and rejected');
+
+// A phone that unpairs itself tells the dashboard at once.
+const code2 = (await (await fetch(`${BASE}/api/v1/pairing-codes`, { method: 'POST', headers: session() })).json()).code;
+const second = await (
+  await fetch(`${BASE}/api/v1/pair`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code: code2, name: 'Second phone', model: 'test', appVersion: '0.0.0', hardwareId: randomUUID() }),
+  })
+).json();
+const unpair = await fetch(`${BASE}/api/v1/unpair`, { method: 'POST', headers: { Authorization: `Bearer ${second.token}` } });
+assert.equal(unpair.status, 204);
+for (let i = 0; i < 50 && !streamText.includes(`"deviceId":"${second.deviceId}"`) ; i++) await new Promise((r) => setTimeout(r, 100));
+assert.match(streamText, new RegExp(`"deviceId":"${second.deviceId}"[^}]*"revokedAt":"`), 'dashboard hears the phone unpaired');
+step('a phone that unpairs itself is shown as revoked at once');
 
 streamAbort.abort();
+phoneAbort.abort();
 await reading;
+await phoneReading;
 console.log('end-to-end test passed');

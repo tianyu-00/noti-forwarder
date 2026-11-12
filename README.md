@@ -141,6 +141,12 @@ Optional. With it on, the server only ever stores scrambled text, so even someon
 - **What changes:** search happens in the browser (over the messages loaded so far), the 2FA code is found after decrypting, and ntfy push alerts say "New message" without text.
 - **Keep the key safe.** If you lose it, the encrypted messages cannot be read by anyone, including you. Clearing the browser's site data forgets the key too.
 
+## Connection dot and instant revoke
+
+Each phone keeps one open connection to your server (the same kind of connection the dashboard uses for live updates, so nothing polls). While it is open the phone shows a soft pulsing **green dot** and "Online"; the moment it drops (phone off, network lost, app killed) the dot stops. That connection also works the other way: when you **revoke** a phone in the dashboard the server tells it straight away and the app shows "unpaired". When you tap **Unpair this phone** in the app, the app tells the server first, so the dashboard shows it as revoked at once. If the phone has no connection at that moment, it still unpairs itself, and the dashboard shows it as quiet until you revoke it there.
+
+If Android puts the phone into deep sleep and drops the connection, the 15-minute check-in described below is the fallback: a revoke then reaches the phone within about 15 minutes. Excluding the app from battery optimisation (the app asks for it) keeps the connection up.
+
 ## Silent-phone alerts
 
 Android sometimes kills the app, or a user turns off Notification access, and then messages silently stop. To catch that, each phone checks in about every 15 minutes even when it has nothing to send. A phone not heard from for `SILENT_AFTER_MINUTES` (default 120, `0` turns it off) shows **Quiet for 3 h** in red in the sidebar, and if ntfy push is on you get one alert when it goes quiet and one when it is back. Check the app is running, Notification access is still on, and the battery and auto-start settings for the app. A phone still running an older version of the app never checks in, so it shows as quiet once it has been idle for that long. Update the app on every phone.

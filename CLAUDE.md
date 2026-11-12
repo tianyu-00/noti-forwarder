@@ -125,6 +125,8 @@ Table `audit_log`: `id`, `event` (login, pair, revoke, ...), `actor`, `device_id
 - `GET /api/v1/settings` / `PUT /api/v1/settings` (dashboard session) : message retention in days or `null`. Saving deletes older messages at once; the server repeats the purge hourly.
 - `GET /api/v1/stream` : live updates (SSE/WebSocket) for viewers.
 - `GET /api/v1/devices` : list devices and last-seen, plus `silentAfterMinutes` (the quiet threshold, 0 = off).
+- `GET /api/v1/device-stream` (device token, SSE) : the phone's open connection. While it is open the phone is `connected` (in `GET /devices` and in `device_presence` events to dashboards); the server sends `revoked` down it. Presence is in memory (`server/src/presence.js`). One connection per phone; a new one replaces the old.
+- `POST /api/v1/unpair` (device token) : the phone unpairs itself; same effect as revoking it in the dashboard, shown there at once.
 - `POST /api/v1/heartbeat` (device token) : "this phone is alive", no body. Updates last-seen and app version, and open dashboards get a `device_seen` event. The phone sends it about every 15 minutes (WorkManager).
 - Later: `GET /api/v1/outbox` and `POST /api/v1/outbox` for queued SMS replies.
 
@@ -152,7 +154,7 @@ Table `audit_log`: `id`, `event` (login, pair, revoke, ...), `actor`, `device_id
 
 - Android tests: Robolectric needs `--add-exports=java.base/jdk.internal.access=ALL-UNNAMED` on JDK 21 (set in `app/build.gradle.kts`), and `robolectric.properties` uses a plain `Application` so WorkManager is not started in unit tests.
 - OkHttp 5 needs `compileSdk` 37; `targetSdk` is 37 as well.
-- The phone can only find out it was revoked when it next tries to send (a 401), not before.
+- A phone holds an open connection to the server (`GET /api/v1/device-stream`, kept by `DeviceStreamRunner`, reconnects with backoff). A revoke or unpair in the dashboard is pushed down it at once and the app screen switches to unpaired. If the connection is down (Android deep sleep, no network) the phone finds out at its next heartbeat (about 15 minutes) or message send (a 401). Pings every 25 s keep it alive through nginx (60 s read timeout) and Cloudflare (about 100 s idle).
 - With SMS turned off, notifications from the default SMS app are dropped too, because they contain the text of the message. SMS and its notification copy are de-duplicated on the phone by text (2 minute window); the SMS is kept because it has the real number.
 - Quick tunnels (`trycloudflare.com`) do not pass Server-Sent Events, so the dashboard's live stream does not work through one. Use a named tunnel.
 
