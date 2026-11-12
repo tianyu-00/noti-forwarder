@@ -155,4 +155,46 @@ class NotificationCaptureTest {
 
         assertEquals(listOf("com.bank"), queue.nextBatch(10).map { it.message.app })
     }
+
+    // What the service does with the notification afterwards: dismissing frees Android's
+    // 50-notifications-per-app slot, but only for ones that are safe in the queue.
+
+    @Test
+    fun `a forwarded notification is reported as queued`() {
+        assertEquals(CaptureOutcome.QUEUED, fullCapture().handle(raw()))
+        assertEquals(1, queue.nextBatch(10).size)
+    }
+
+    @Test
+    fun `a notification the user filtered out is reported as ignored, so it is never dismissed`() {
+        settings = CaptureSettings(blockedApps = setOf("com.bank"))
+        assertEquals(CaptureOutcome.IGNORED, fullCapture().handle(raw()))
+
+        settings = CaptureSettings(sendNotifications = false)
+        assertEquals(CaptureOutcome.IGNORED, fullCapture().handle(raw()))
+    }
+
+    @Test
+    fun `an ongoing notification is ignored`() {
+        assertEquals(CaptureOutcome.IGNORED, fullCapture().handle(raw(ongoing = true)))
+    }
+
+    @Test
+    fun `a notification repeating an SMS we already have is reported as a copy`() {
+        smsDedupe.recordSms("Your code is 123456")
+
+        assertEquals(CaptureOutcome.COPY_OF_SMS, fullCapture().handle(rawWithText(smsApp, "Your code is 123456")))
+        assertEquals(0, queue.nextBatch(10).size)
+    }
+
+    @Test
+    fun `dismissing happens only when switched on and the notification is safe in the queue or a copy`() {
+        val off = CaptureSettings(clearAfterForwarding = false)
+        val on = CaptureSettings(clearAfterForwarding = true)
+
+        assertFalse(off.shouldDismiss(CaptureOutcome.QUEUED))
+        assertTrue(on.shouldDismiss(CaptureOutcome.QUEUED))
+        assertTrue(on.shouldDismiss(CaptureOutcome.COPY_OF_SMS))
+        assertFalse(on.shouldDismiss(CaptureOutcome.IGNORED))
+    }
 }

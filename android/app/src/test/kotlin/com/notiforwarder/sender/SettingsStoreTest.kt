@@ -53,4 +53,17 @@ class SettingsStoreTest {
 
         assertFalse(off.withAppBlocked("com.game", blocked = false).isBlocked("com.game"))
     }
+
+    @Test
+    fun `notifications are left in the shade unless clearing is switched on`() {
+        assertFalse(CaptureSettings().clearAfterForwarding)
+    }
+
+    @Test
+    fun `the clear-after-forwarding choice survives a restart`() {
+        val name = "clear-${System.nanoTime()}"
+        PrefsSettingsStore(context, name).save(CaptureSettings(clearAfterForwarding = true))
+
+        assertTrue(PrefsSettingsStore(context, name).load().clearAfterForwarding)
+    }
 }

@@ -153,6 +153,7 @@ Table `audit_log`: `id`, `event` (login, pair, revoke, ...), `actor`, `device_id
 - With SMS turned off, notifications from the default SMS app are dropped too, because they contain the text of the message. SMS and its notification copy are de-duplicated on the phone by text (2 minute window); the SMS is kept because it has the real number.
 - Quick tunnels (`trycloudflare.com`) do not pass Server-Sent Events, so the dashboard's live stream does not work through one. Use a named tunnel.
 
+- Android lets one app have only 50 notifications at a time and silently drops new ones beyond that (logcat: "Package has already posted or enqueued 50 notifications"), so the listener never sees them. An idle phone whose apps pile up unread notifications stops forwarding. The phone setting "Clear notifications after forwarding" (off by default) dismisses a notification once it is safe in the queue (or is a copy of an SMS already forwarded); filtered-out and ongoing ones are never dismissed.
 - Notification access is a manual user grant in system settings.
 - OnePlus/Oppo kill background apps aggressively: use a foreground service, request battery-optimisation exemption, and document the auto-start settings per device.
 - Sideloaded APK, so Play Store SMS-permission policy does not apply.

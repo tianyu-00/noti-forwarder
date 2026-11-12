@@ -18,11 +18,16 @@ class NotificationForwarderService : NotificationListenerService() {
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         val app = application as NotiApp
         val raw = sbn.toRaw()
+        val key = sbn.key
         // Database work must stay off the main thread. The message is written to the queue
         // before any network is involved.
         executor.execute {
             // Never log message content: it can contain 2FA codes.
-            if (app.capture.onNotification(raw)) Log.d(TAG, "queued ${raw.packageName}")
+            val outcome = app.capture.handle(raw)
+            if (outcome == CaptureOutcome.QUEUED) Log.d(TAG, "queued ${raw.packageName}")
+            // Already safe in the queue (or a copy of an SMS), so dismissing loses nothing and
+            // frees the app's slot under Android's 50-notifications-per-app limit.
+            if (app.settingsStore.load().shouldDismiss(outcome)) cancelNotification(key)
         }
     }
 

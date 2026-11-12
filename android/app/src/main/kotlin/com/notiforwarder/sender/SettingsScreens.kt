@@ -33,6 +33,13 @@ import kotlinx.coroutines.withContext
 internal fun ForwardingSwitches(settings: CaptureSettings, onChange: (CaptureSettings) -> Unit) {
     SwitchRow("Send text messages (SMS)", settings.sendSms) { onChange(settings.copy(sendSms = it)) }
     SwitchRow("Send app notifications", settings.sendNotifications) { onChange(settings.copy(sendNotifications = it)) }
+    SwitchRow("Clear notifications after forwarding", settings.clearAfterForwarding) {
+        onChange(settings.copy(clearAfterForwarding = it))
+    }
+    Text(
+        "Dismisses each forwarded notification on this phone. Android drops new notifications " +
+            "once an app has 50 waiting, so turn this on for a phone you leave untouched.",
+    )
 }
 
 @Composable
