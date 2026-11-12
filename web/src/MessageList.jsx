@@ -15,10 +15,33 @@ export const messageShape = PropTypes.shape({
   code: PropTypes.string,
 });
 
+// Browsers only offer the clipboard API on HTTPS pages (and localhost). On plain http the old
+// way still works: put the text in a hidden field, select it and run the copy command.
+function copyWithTextField(text) {
+  const field = document.createElement('textarea');
+  field.value = text;
+  field.setAttribute('readonly', '');
+  field.style.position = 'fixed';
+  field.style.opacity = '0';
+  document.body.appendChild(field);
+  field.select();
+  try {
+    return document.execCommand('copy');
+  } finally {
+    field.remove();
+  }
+}
+
+async function copyText(text) {
+  if (window.isSecureContext !== false && navigator.clipboard) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+  if (!copyWithTextField(text)) throw new Error('copy refused');
+}
+
 function CopyCodeButton({ code }) {
   const [state, setState] = useState('idle'); // idle | copied | failed
-  // Browsers only allow clipboard access on HTTPS pages (and localhost).
-  const insecure = window.isSecureContext === false;
 
   // Go back to "Copy code" after a moment.
   useEffect(() => {
@@ -29,7 +52,7 @@ function CopyCodeButton({ code }) {
 
   async function copy() {
     try {
-      await navigator.clipboard.writeText(code);
+      await copyText(code);
       setState('copied');
     } catch {
       setState('failed');
@@ -38,10 +61,9 @@ function CopyCodeButton({ code }) {
 
   return (
     <span className="inline-flex items-center gap-2">
-      <Button onClick={copy} disabled={insecure} className="px-3 py-1.5 text-xs">
+      <Button onClick={copy} className="px-3 py-1.5 text-xs">
         {state === 'copied' ? 'Copied' : 'Copy code'}
       </Button>
-      {insecure && <span className="text-xs text-muted">Copying only works over HTTPS. Select the code instead.</span>}
       {state === 'failed' && <span className="text-xs text-danger">Could not copy. Select the code instead.</span>}
     </span>
   );

@@ -83,16 +83,40 @@ describe('2FA codes', () => {
     expect(await screen.findByText(/could not copy/i)).toBeInTheDocument();
   });
 
-  it('explains next to the button that copying only works over HTTPS, and disables it', async () => {
-    Object.defineProperty(window, 'isSecureContext', { value: false, configurable: true });
-    try {
-      await setup(message({ deviceId: 'a', body: 'Your code is 482913', code: '482913' }));
-
-      expect(screen.getByRole('button', { name: /copy code/i })).toBeDisabled();
-      expect(screen.getByText(/only works over https/i)).toBeInTheDocument();
-    } finally {
+  describe('on a page without HTTPS (no clipboard API)', () => {
+    let copied;
+    beforeEach(() => {
+      Object.defineProperty(window, 'isSecureContext', { value: false, configurable: true });
+      copied = [];
+    });
+    afterEach(() => {
       delete window.isSecureContext;
-    }
+      delete document.execCommand;
+    });
+
+    it('still copies the code, through a temporary text field', async () => {
+      document.execCommand = vi.fn(() => {
+        copied.push(document.querySelector('textarea')?.value);
+        return true;
+      });
+      const user = await setup(message({ deviceId: 'a', body: 'Your code is 482913', code: '482913' }));
+
+      await user.click(screen.getByRole('button', { name: /copy code/i }));
+
+      expect(document.execCommand).toHaveBeenCalledWith('copy');
+      expect(copied).toEqual(['482913']);
+      expect(await screen.findByRole('button', { name: /copied/i })).toBeInTheDocument();
+      expect(document.querySelector('textarea')).toBeNull(); // the temporary field is removed
+    });
+
+    it('says so when the browser refuses that too', async () => {
+      document.execCommand = vi.fn(() => false);
+      const user = await setup(message({ deviceId: 'a', body: 'Your code is 482913', code: '482913' }));
+
+      await user.click(screen.getByRole('button', { name: /copy code/i }));
+
+      expect(await screen.findByText(/could not copy/i)).toBeInTheDocument();
+    });
   });
 
   it('shows no copy button when a message has no code', async () => {
