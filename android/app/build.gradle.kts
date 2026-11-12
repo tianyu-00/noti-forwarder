@@ -5,12 +5,12 @@ plugins {
 
 android {
     namespace = "com.notiforwarder.sender"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.notiforwarder.sender"
         minSdk = 29 // Android 10: the OnePlus 7T Pro shipped with it
-        targetSdk = 36
+        targetSdk = 37
         versionCode = 1
         versionName = "0.1.0"
     }
@@ -23,5 +23,7 @@ android {
 
 dependencies {
     implementation(libs.kotlinx.serialization.json)
+    implementation(libs.okhttp)
     testImplementation(libs.junit)
+    testImplementation(libs.okhttp.mockwebserver)
 }
