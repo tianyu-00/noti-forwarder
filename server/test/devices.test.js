@@ -146,3 +146,44 @@ describe('DELETE /api/v1/devices/:id/permanent (erase)', () => {
     expect(rows).toEqual([{ actor: 'admin' }]);
   });
 });
+
+describe('DELETE /api/v1/devices/:id/messages (clear messages, phone stays)', () => {
+  const clear = (id, token = csrf) => agent.delete(`/api/v1/devices/${id}/messages`).set('X-CSRF-Token', token);
+
+  it('needs a session and a CSRF token', async () => {
+    const d = await ctx.addDevice();
+    expect((await request(ctx.app).delete(`/api/v1/devices/${d.deviceId}/messages`)).status).toBe(401);
+    expect((await agent.delete(`/api/v1/devices/${d.deviceId}/messages`)).status).toBe(403);
+  });
+
+  it('deletes an active phone\'s messages without revoking it, and leaves other phones alone', async () => {
+    const cleared = await ctx.addDevice();
+    const other = await ctx.addDevice();
+    await send(cleared.token, [msg({ body: 'first' }), msg({ body: 'second' })]);
+    await send(other.token, [msg()]);
+
+    const res = await clear(cleared.deviceId);
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ deleted: 2 });
+    const rows = await ctx.pool.query('SELECT device_id FROM messages WHERE device_id = ANY($1)', [
+      [cleared.deviceId, other.deviceId],
+    ]);
+    expect(rows.rows).toEqual([{ device_id: other.deviceId }]);
+    // Still paired and still sending.
+    const list = await agent.get('/api/v1/devices');
+    expect(list.body.devices.find((x) => x.deviceId === cleared.deviceId).revokedAt).toBeNull();
+    expect((await send(cleared.token, [msg()])).status).toBe(201);
+  });
+
+  it('works on a phone with no messages, 404s for an unknown phone and writes an audit entry', async () => {
+    const d = await ctx.addDevice();
+    expect((await clear(d.deviceId)).body).toEqual({ deleted: 0 });
+    expect((await clear('nope')).status).toBe(404);
+    const { rows } = await ctx.pool.query(
+      "SELECT actor FROM audit_log WHERE event = 'clear_messages' AND device_id = $1",
+      [d.deviceId],
+    );
+    expect(rows).toEqual([{ actor: 'admin' }]);
+  });
+});

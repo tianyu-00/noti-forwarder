@@ -60,6 +60,21 @@ export function devicesRouter({ db, requireViewer, events }) {
     }
   });
 
+  // Clearing removes a phone's messages but leaves the phone paired and sending, so it works
+  // without revoking. The audit log records the count, never any text.
+  router.delete('/devices/:id/messages', requireViewer, requireCsrf, async (req, res, next) => {
+    try {
+      const exists = await db.query('SELECT 1 FROM devices WHERE device_id = $1', [req.params.id]);
+      if (exists.rowCount === 0) return res.status(404).json({ error: 'not_found' });
+      const result = await db.query('DELETE FROM messages WHERE device_id = $1', [req.params.id]);
+      await audit(db, { event: 'clear_messages', actor: req.session.username, deviceId: req.params.id, ip: req.ip });
+      events.publish('messages_cleared', { deviceId: req.params.id });
+      res.json({ deleted: result.rowCount });
+    } catch (err) {
+      next(err);
+    }
+  });
+
   // Erasing removes a revoked phone and every message it sent. Irreversible, so the phone
   // must be revoked first (it can no longer be sending). The audit log keeps the record.
   router.delete('/devices/:id/permanent', requireViewer, requireCsrf, async (req, res, next) => {
