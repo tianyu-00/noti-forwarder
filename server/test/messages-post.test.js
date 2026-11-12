@@ -79,15 +79,28 @@ describe('POST /api/v1/messages storing', () => {
     expect(rowCount).toBe(1);
   });
 
-  it('drops a repeat with a new id but the same content in the same minute', async () => {
+  it('drops the same notification delivered twice: new id, same content, same phone timestamp', async () => {
     const { token, deviceId } = await ctx.addDevice();
 
-    await post(token, { messages: [msg({ body: 'sms copy' })] });
-    const res = await post(token, { messages: [msg({ body: 'sms copy', receivedAt: '2026-11-11T10:00:40Z' })] });
+    await post(token, { messages: [msg({ body: 'delivered twice' })] });
+    const res = await post(token, { messages: [msg({ body: 'delivered twice' })] }); // same default timestamp
 
     expect(res.body).toEqual({ stored: 0, duplicates: 1 });
     const { rowCount } = await ctx.pool.query('SELECT 1 FROM messages WHERE device_id=$1', [deviceId]);
     expect(rowCount).toBe(1);
+  });
+
+  it('keeps a repeat of the same text that arrives later, even within the same minute', async () => {
+    const { token, deviceId } = await ctx.addDevice();
+
+    await post(token, { messages: [msg({ body: 'Your code is 123456' })] });
+    const second = await post(token, {
+      messages: [msg({ body: 'Your code is 123456', receivedAt: '2026-11-11T10:00:40Z' })],
+    });
+
+    expect(second.body).toEqual({ stored: 1, duplicates: 0 });
+    const { rowCount } = await ctx.pool.query('SELECT 1 FROM messages WHERE device_id=$1', [deviceId]);
+    expect(rowCount).toBe(2);
   });
 });
 

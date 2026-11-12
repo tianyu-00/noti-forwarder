@@ -98,7 +98,7 @@ Table `messages`:
 - `body`
 - `received_at` (timestamptz, from the phone)
 - `created_at` (timestamptz, server)
-- `dedupe_hash` (hash of device + app + sender + body + minute bucket)
+- `dedupe_hash` (hash of device + app + sender + body + the phone's exact timestamp to the millisecond; so only the same notification delivered twice is dropped, and the same text arriving later is kept)
 
 Table `devices`: `device_id`, `name`, `model`, `app_version`, `token_hash`, `paired_at`, `last_seen`, `revoked_at`.
 
@@ -124,7 +124,7 @@ Table `audit_log`: `id`, `event` (login, pair, revoke, ...), `actor`, `device_id
 
 - Phones are untrusted clients: authenticate every request with a per-device API key, store only hashes server-side.
 - The phone app must never drop a message: write to the local queue first, delete only after the server confirms.
-- De-duplicate: the SMS receiver and the notification listener can both fire for one SMS. Drop repeats using `dedupe_hash`.
+- De-duplicate: the SMS receiver and the notification listener can both fire for one SMS. The phone drops the notification copy by matching text within 2 minutes (the SMS is kept). The server drops a message only if the same content arrives at the same phone timestamp (`dedupe_hash`). A repeat of the same text at a later moment is a new message and must be kept: an earlier minute-bucket rule lost real repeats such as a second code or missed call.
 - Treat all content as sensitive (2FA codes, personal messages). No public endpoints without auth, no message bodies in logs.
 - Never commit secrets. Use `.env` files with `.env.example` committed.
 - Keep the first version small. Get one phone sending one notification end to end before adding features.
