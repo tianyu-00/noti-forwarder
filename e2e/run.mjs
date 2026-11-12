@@ -1,7 +1,7 @@
 // End-to-end check against the real stack (nginx + server + Postgres), with no dependencies.
 // Walks the whole path: log in, pair a phone, send a message, see it arrive live and in the list.
 import assert from 'node:assert/strict';
-import { randomUUID } from 'node:crypto';
+import { createCipheriv, createDecipheriv, randomBytes, randomUUID } from 'node:crypto';
 
 const BASE = process.env.E2E_BASE_URL || 'http://127.0.0.1:3100';
 const ADMIN = { username: 'e2e-admin', password: 'e2e-test-password-123' };
@@ -108,6 +108,45 @@ step('message is in the list');
 // A retry is harmless.
 assert.deepEqual(await (await send()).json(), { stored: 0, duplicates: 1 });
 step('a retry is not stored twice');
+
+// End-to-end encryption: the phone encrypts, the server stores scrambled text it cannot read,
+// and only the holder of the key gets the text back. Same byte format as the phone and dashboard.
+const e2eKey = randomBytes(32);
+const seal = (field, text) => {
+  const nonce = randomBytes(12);
+  const cipher = createCipheriv('aes-256-gcm', e2eKey, nonce);
+  cipher.setAAD(Buffer.from(`nf-e2e-v1:${field}`));
+  const body = Buffer.concat([cipher.update(text, 'utf8'), cipher.final()]);
+  return `e2e:v1:${Buffer.concat([nonce, body, cipher.getAuthTag()]).toString('base64url')}`;
+};
+const open = (field, blob) => {
+  const raw = Buffer.from(blob.slice('e2e:v1:'.length), 'base64url');
+  const decipher = createDecipheriv('aes-256-gcm', e2eKey, raw.subarray(0, 12));
+  decipher.setAAD(Buffer.from(`nf-e2e-v1:${field}`));
+  decipher.setAuthTag(raw.subarray(raw.length - 16));
+  return Buffer.concat([decipher.update(raw.subarray(12, raw.length - 16)), decipher.final()]).toString('utf8');
+};
+const secret = {
+  id: randomUUID(),
+  type: 'sms',
+  app: 'sms',
+  sender: seal('sender', 'Secret Bank'),
+  body: seal('body', 'Your verification code is 661122. Keep it safe.'),
+  receivedAt: new Date().toISOString(),
+};
+const sendSecret = await fetch(`${BASE}/api/v1/messages`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+  body: JSON.stringify({ messages: [secret] }),
+});
+assert.equal(sendSecret.status, 201, 'encrypted message is accepted');
+const rawList = await (await fetch(`${BASE}/api/v1/messages`, { headers: { cookie } })).text();
+assert.ok(!rawList.includes('661122') && !rawList.includes('Secret Bank'), 'the server returns no readable text');
+const storedSecret = JSON.parse(rawList).messages.find((m) => m.id === secret.id);
+assert.equal(storedSecret.code, null, 'the server finds no code in encrypted text');
+assert.equal(open('body', storedSecret.body), 'Your verification code is 661122. Keep it safe.');
+assert.equal(open('sender', storedSecret.sender), 'Secret Bank');
+step('encrypted message is stored unreadable and decrypts with the key');
 
 // Revoking cuts the phone off.
 const revoke = await fetch(`${BASE}/api/v1/devices/${deviceId}`, { method: 'DELETE', headers: session() });

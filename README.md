@@ -130,6 +130,17 @@ docker compose exec server node src/reset-totp.js admin
 
 To also encrypt the authenticator secret inside the database, set `SECRET_KEY` (32 or more characters, for example from `openssl rand -base64 32`) in `.env` before or after turning two-step login on. A stolen database backup then does not contain the secret. Keep the key safe and do not change it: while a secret is stored, the server refuses to start with a missing or different key. If you lose the key, run the reset command above and set up two-step login again.
 
+## End-to-end encryption
+
+Optional. With it on, the server only ever stores scrambled text, so even someone with your database or a backup of it cannot read your messages or 2FA codes. In the dashboard open **Settings**, then **End-to-end encryption**, and choose *Create key*. The key is made in your browser and stays there; it is never sent to the server.
+
+- **New phones:** *Add phone* now puts the key in the QR code (and shows it for typing by hand). A phone paired this way encrypts the sender and text before sending. The app shows "End-to-end encrypted" on its connection card.
+- **Phones paired before:** they keep sending readable text until you unpair them and pair again.
+- **Another browser:** open Settings there, paste the key into *Already have a key from another browser?* (use *Show key* to read it on the first one).
+- **What the server can still see:** which app, whether it is an SMS, and when. Not the sender or the text.
+- **What changes:** search happens in the browser (over the messages loaded so far), the 2FA code is found after decrypting, and ntfy push alerts say "New message" without text.
+- **Keep the key safe.** If you lose it, the encrypted messages cannot be read by anyone, including you. Clearing the browser's site data forgets the key too.
+
 ## Changing the password
 
 **Settings**, then **Change password**. It asks for the current password and signs out every other browser. (`ADMIN_PASSWORD` in the environment only matters the first time the server starts.)
