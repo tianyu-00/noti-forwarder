@@ -1,0 +1,63 @@
+package com.notiforwarder.sender
+
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.withContext
+
+sealed interface UiState {
+    data class Unpaired(val error: String? = null) : UiState
+    data object Pairing : UiState
+    data class Paired(val serverUrl: String, val deviceId: String) : UiState
+}
+
+/** Holds the pairing screen's state. Plain Kotlin so it is testable on the JVM. */
+class PairingController(
+    private val store: TokenStore,
+    private val flow: PairingFlow,
+    private val device: DeviceInfo,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+) {
+    private val _state = MutableStateFlow<UiState>(stateFromStore())
+    val state: StateFlow<UiState> = _state
+
+    suspend fun pairFromQr(text: String) = pair(PairingInput.fromQr(text))
+
+    suspend fun pairManual(address: String, key: String) = pair(PairingInput.fromManual(address, key))
+
+    fun unpair() {
+        store.clear()
+        _state.value = UiState.Unpaired()
+    }
+
+    /** Re-reads storage, e.g. after the sender cleared it because the server revoked this phone. */
+    fun refresh() {
+        val credentials = store.load()
+        when {
+            credentials != null -> _state.value = UiState.Paired(credentials.serverUrl, credentials.deviceId)
+            _state.value is UiState.Paired ->
+                _state.value = UiState.Unpaired("This phone was removed from the server. Pair it again.")
+        }
+    }
+
+    private suspend fun pair(input: PairingResult) {
+        if (input is PairingResult.Invalid) {
+            _state.value = UiState.Unpaired(input.reason)
+            return
+        }
+        val target = (input as PairingResult.Ok).target
+        _state.value = UiState.Pairing
+        val outcome = withContext(ioDispatcher) { flow.pair(target, device) }
+        _state.value = when (outcome) {
+            is PairOutcome.Paired -> UiState.Paired(target.serverUrl, outcome.deviceId)
+            PairOutcome.InvalidCode -> UiState.Unpaired("That key is invalid or expired. Create a new one on the dashboard.")
+            PairOutcome.RateLimited -> UiState.Unpaired("Too many attempts. Wait a few minutes and try again.")
+            is PairOutcome.Unreachable -> UiState.Unpaired("Could not reach the server. Check the address and your connection.")
+            is PairOutcome.ServerError -> UiState.Unpaired("The server returned an error (${outcome.status}).")
+        }
+    }
+
+    private fun stateFromStore(): UiState =
+        store.load()?.let { UiState.Paired(it.serverUrl, it.deviceId) } ?: UiState.Unpaired()
+}
