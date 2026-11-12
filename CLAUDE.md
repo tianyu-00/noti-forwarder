@@ -124,7 +124,8 @@ Table `audit_log`: `id`, `event` (login, pair, revoke, ...), `actor`, `device_id
 - `DELETE /api/v1/devices/:id/permanent` (dashboard session) : erase a revoked phone and all its messages (409 if not revoked yet).
 - `GET /api/v1/settings` / `PUT /api/v1/settings` (dashboard session) : message retention in days or `null`. Saving deletes older messages at once; the server repeats the purge hourly.
 - `GET /api/v1/stream` : live updates (SSE/WebSocket) for viewers.
-- `GET /api/v1/devices` : list devices and last-seen.
+- `GET /api/v1/devices` : list devices and last-seen, plus `silentAfterMinutes` (the quiet threshold, 0 = off).
+- `POST /api/v1/heartbeat` (device token) : "this phone is alive", no body. Updates last-seen and app version, and open dashboards get a `device_seen` event. The phone sends it about every 15 minutes (WorkManager).
 - Later: `GET /api/v1/outbox` and `POST /api/v1/outbox` for queued SMS replies.
 
 ## Key design rules

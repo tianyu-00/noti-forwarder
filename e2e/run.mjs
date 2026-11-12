@@ -71,6 +71,13 @@ assert.equal(pairRes.status, 201, 'phone pairs');
 const { token, deviceId } = await pairRes.json();
 step('phone paired');
 
+// The phone checks in without a message; open dashboards hear about it.
+const beat = await fetch(`${BASE}/api/v1/heartbeat`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
+assert.equal(beat.status, 204, 'heartbeat is accepted');
+for (let i = 0; i < 50 && !streamText.includes('device_seen'); i++) await new Promise((r) => setTimeout(r, 100));
+assert.ok(streamText.includes('event: device_seen') && streamText.includes(deviceId), 'heartbeat reaches the live stream');
+step('heartbeat accepted and announced live');
+
 // Send a message like the phone does.
 const message = {
   id: randomUUID(),

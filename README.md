@@ -141,6 +141,10 @@ Optional. With it on, the server only ever stores scrambled text, so even someon
 - **What changes:** search happens in the browser (over the messages loaded so far), the 2FA code is found after decrypting, and ntfy push alerts say "New message" without text.
 - **Keep the key safe.** If you lose it, the encrypted messages cannot be read by anyone, including you. Clearing the browser's site data forgets the key too.
 
+## Silent-phone alerts
+
+Android sometimes kills the app, or a user turns off Notification access, and then messages silently stop. To catch that, each phone checks in about every 15 minutes even when it has nothing to send. A phone not heard from for `SILENT_AFTER_MINUTES` (default 120, `0` turns it off) shows **Quiet for 3 h** in red in the sidebar, and if ntfy push is on you get one alert when it goes quiet and one when it is back. Check the app is running, Notification access is still on, and the battery and auto-start settings for the app. A phone still running an older version of the app never checks in, so it shows as quiet once it has been idle for that long. Update the app on every phone.
+
 ## Changing the password
 
 **Account**, then **Change password**. It asks for the current password and signs out every other browser. (`ADMIN_PASSWORD` in the environment only matters the first time the server starts.)

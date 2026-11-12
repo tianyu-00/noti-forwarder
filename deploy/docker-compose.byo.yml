@@ -34,6 +34,8 @@ services:
       TRUST_PROXY: ${TRUST_PROXY:-2}
       # Optional: encrypts the two-step login secret in the database (at least 32 characters).
       SECRET_KEY: ${SECRET_KEY:-}
+      # Minutes without contact before a phone counts as quiet (0 = off). Phones check in every ~15.
+      SILENT_AFTER_MINUTES: ${SILENT_AFTER_MINUTES:-}
       # Optional push alerts through ntfy; leave unset to keep them off.
       NTFY_TOPIC: ${NTFY_TOPIC:-}
       NTFY_URL: ${NTFY_URL:-}
