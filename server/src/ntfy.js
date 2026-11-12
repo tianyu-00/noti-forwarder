@@ -121,7 +121,7 @@ export function ntfyFromEnv(env, deps = {}) {
     throw new Error('NTFY_TYPES must be a comma list of "sms" and/or "notification"');
   }
 
-  const includeBodyRaw = env.NTFY_INCLUDE_BODY ?? 'true';
+  const includeBodyRaw = env.NTFY_INCLUDE_BODY || 'true'; // blank counts as not set
   if (!['true', 'false'].includes(includeBodyRaw)) throw new Error('NTFY_INCLUDE_BODY must be "true" or "false"');
 
   return createNtfyNotifier({

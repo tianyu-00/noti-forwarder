@@ -4,6 +4,7 @@ import { createApp } from './app.js';
 import { loadBuildInfo } from './config.js';
 import { runMigrations } from './db/migrate.js';
 import { ensureAdminUser } from './auth/users.js';
+import { ntfyFromEnv } from './ntfy.js';
 
 const port = Number(process.env.PORT) || 3000;
 
@@ -51,7 +52,18 @@ if (process.env.ADMIN_USERNAME && process.env.ADMIN_PASSWORD) {
 // Cloudflare tunnel + proxy). Leave unset if clients connect directly.
 const trustProxy = process.env.TRUST_PROXY ? Number(process.env.TRUST_PROXY) : undefined;
 
-const app = createApp({ ...loadBuildInfo(process.env), db, publicUrl, trustProxy });
+// Push alerts via ntfy are optional. A wrong setting stops the server at start, so a typo
+// cannot silently turn alerts off (or send private text somewhere unintended).
+let notifier = null;
+try {
+  notifier = ntfyFromEnv(process.env);
+} catch (err) {
+  console.error(`ntfy settings: ${err.message}`);
+  process.exit(1);
+}
+console.log(notifier ? 'ntfy push enabled' : 'ntfy push off (set NTFY_TOPIC to turn it on)');
+
+const app = createApp({ ...loadBuildInfo(process.env), db, publicUrl, trustProxy, notifier });
 
 app.listen(port, () => {
   console.log(`server listening on :${port}`);

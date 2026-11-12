@@ -206,6 +206,29 @@ describe('ntfyFromEnv', () => {
     expect(() => ntfyFromEnv({ ...base, NTFY_URL: 'not a url' })).toThrow(/NTFY_URL/);
   });
 
+  it('treats blank settings, as found in a .env file, as not set', async () => {
+    const calls = [];
+    const notifier = ntfyFromEnv(
+      {
+        NTFY_URL: '',
+        NTFY_TOPIC: TOPIC,
+        NTFY_TOKEN: '',
+        NTFY_MODE: '',
+        NTFY_TYPES: '',
+        NTFY_APPS_BLOCK: '',
+        NTFY_INCLUDE_BODY: '',
+      },
+      { fetchImpl: async (u, i) => (calls.push({ url: u, headers: i.headers, json: JSON.parse(i.body) }), { ok: true, status: 200 }) },
+    );
+
+    await notifier.notify([message(), message({ type: 'sms', app: 'sms' })], 'Phone');
+
+    expect(calls).toHaveLength(2);
+    expect(calls[0].url).toBe('https://ntfy.sh');
+    expect(calls[0].json.message).toBe('Your balance is low');
+    expect(calls[0].headers.Authorization).toBeUndefined();
+  });
+
   it('reads the filters from the environment, tolerating spaces', async () => {
     const calls = [];
     const notifier = ntfyFromEnv(
