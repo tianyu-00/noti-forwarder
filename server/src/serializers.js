@@ -1,4 +1,5 @@
 import { extractCode } from './codes.js';
+import { isEncrypted } from './e2e.js';
 
 export function messageToApi(row) {
   return {
@@ -11,7 +12,8 @@ export function messageToApi(row) {
     receivedAt: row.received_at.toISOString(),
     createdAt: row.created_at.toISOString(),
     // Computed from the text each time, so it needs no stored column.
-    code: extractCode(row.body),
+    // Encrypted text cannot be read here; the dashboard finds the code after decrypting.
+    code: isEncrypted(row.body) ? null : extractCode(row.body),
   };
 }
 

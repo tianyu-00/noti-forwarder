@@ -34,6 +34,19 @@ function setup(options = {}, { status = 200, throws = null } = {}) {
   return { notifier, calls, logs };
 }
 
+describe('push for end-to-end encrypted messages', () => {
+  it('never sends text, even when the body is allowed', async () => {
+    const { notifier, calls } = setup({ includeBody: true });
+
+    await notifier.notify([message({ app: 'com.bank', sender: 'e2e:v1:abc', body: 'e2e:v1:def' })], 'Kitchen phone');
+
+    const sent = JSON.stringify(calls[0].json);
+    expect(sent).not.toContain('e2e:v1');
+    expect(calls[0].json.message).toBe('New message');
+    expect(calls[0].json.title).toContain('Kitchen phone');
+  });
+});
+
 describe('createNtfyNotifier', () => {
   it('publishes JSON to the base URL and keeps Chinese text and emoji intact', async () => {
     const { notifier, calls } = setup();

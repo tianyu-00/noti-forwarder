@@ -183,3 +183,22 @@ describe('POST /api/v1/messages before authentication', () => {
     await local.pool.end();
   });
 });
+
+describe('POST /api/v1/messages end-to-end encrypted text', () => {
+  const blob = (chars) => `e2e:v1:${'A'.repeat(chars - 7)}`;
+
+  it('accepts encrypted sender and body that are longer than the plain-text limits', async () => {
+    const { token } = await ctx.addDevice();
+    const res = await post(token, { messages: [msg({ sender: blob(1200), body: blob(26000) })] });
+
+    expect(res.status).toBe(201);
+  });
+
+  it('still refuses plain text over the limits, and encrypted text beyond a sane size', async () => {
+    const { token } = await ctx.addDevice();
+
+    expect((await post(token, { messages: [msg({ body: 'x'.repeat(26000) })] })).status).toBe(400);
+    expect((await post(token, { messages: [msg({ sender: 'x'.repeat(1200) })] })).status).toBe(400);
+    expect((await post(token, { messages: [msg({ body: blob(40000) })] })).status).toBe(400);
+  });
+});

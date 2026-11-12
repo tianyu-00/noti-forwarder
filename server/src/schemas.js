@@ -1,11 +1,25 @@
 import { z } from 'zod';
+import { isEncrypted } from './e2e.js';
+
+// Encrypted text is longer than the text it hides (nonce, tag, base64), so it gets more room.
+const SENDER_PLAIN_MAX = 500;
+const SENDER_ENCRYPTED_MAX = 1500;
+const BODY_PLAIN_MAX = 20000;
+const BODY_ENCRYPTED_MAX = 30000;
 
 const messageSchema = z.object({
   id: z.string().uuid(),
   type: z.enum(['sms', 'notification']),
   app: z.string().min(1).max(255),
-  sender: z.string().max(500).default(''),
-  body: z.string().max(20000),
+  sender: z
+    .string()
+    .max(SENDER_ENCRYPTED_MAX)
+    .refine((v) => isEncrypted(v) || v.length <= SENDER_PLAIN_MAX)
+    .default(''),
+  body: z
+    .string()
+    .max(BODY_ENCRYPTED_MAX)
+    .refine((v) => isEncrypted(v) || v.length <= BODY_PLAIN_MAX),
   receivedAt: z.string().datetime({ offset: true }),
 });
 

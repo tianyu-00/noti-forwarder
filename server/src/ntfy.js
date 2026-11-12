@@ -1,6 +1,8 @@
 // Push alerts to the main phone through ntfy (https://ntfy.sh, or your own ntfy server).
 // A push must never block or fail a stored message, and must never put message text in a log.
 
+import { isEncrypted } from './e2e.js';
+
 const MAX_PER_BATCH = 5; // a burst becomes five alerts plus one summary
 const MAX_TEXT = 1000;
 
@@ -10,7 +12,8 @@ function sourceLabel(m) {
 }
 
 function buildPush(m, deviceName, includeBody) {
-  if (!includeBody) {
+  // Encrypted text cannot be shown (the server has no key), so these pushes carry no text.
+  if (!includeBody || isEncrypted(m.body) || isEncrypted(m.sender)) {
     return { title: `${deviceName} · new message`, message: 'New message', priority: 3, tags: ['bell'] };
   }
   const text = m.body.length > MAX_TEXT ? `${m.body.slice(0, MAX_TEXT)}…` : m.body;

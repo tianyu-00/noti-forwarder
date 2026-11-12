@@ -149,3 +149,16 @@ describe('GET /api/v1/messages filters', () => {
     }
   });
 });
+
+describe('GET /api/v1/messages end-to-end encrypted messages', () => {
+  it('returns them untouched and never reports a code for them', async () => {
+    const d = await ctx.addDevice();
+    // Random-looking text that happens to hold a keyword and digits must not be read as a code.
+    const body = 'e2e:v1:code-482913-abc';
+    await send(d.token, [msg({ body, sender: 'e2e:v1:xyz', receivedAt: '2026-04-03T10:00:00Z' })]);
+
+    const res = await get(`?device=${d.deviceId}`);
+
+    expect(res.body.messages[0]).toMatchObject({ body, sender: 'e2e:v1:xyz', code: null });
+  });
+});
