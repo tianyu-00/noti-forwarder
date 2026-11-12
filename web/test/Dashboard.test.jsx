@@ -47,6 +47,69 @@ describe('message list', () => {
   });
 });
 
+describe('2FA codes', () => {
+  const setup = async (msg) => {
+    mockApi({ devices: [device({ deviceId: 'a' })], messages: [msg] });
+    const user = userEvent.setup();
+    render(<Dashboard username="admin" onLogout={() => {}} />);
+    await screen.findAllByRole('article');
+    return user;
+  };
+
+  it('highlights the code inside the message text', async () => {
+    await setup(message({ deviceId: 'a', body: 'Your code is 482913, do not share it', code: '482913' }));
+
+    const mark = screen.getByText('482913');
+    expect(mark.tagName).toBe('MARK');
+    expect(screen.getByRole('article')).toHaveTextContent('Your code is 482913, do not share it');
+  });
+
+  it('copies the code to the clipboard and says so', async () => {
+    const user = await setup(message({ deviceId: 'a', body: 'Code: 123 456', code: '123456' }));
+
+    await user.click(screen.getByRole('button', { name: /copy code/i }));
+
+    expect(await navigator.clipboard.readText()).toBe('123456'); // digits only, no space
+    expect(await screen.findByRole('button', { name: /copied/i })).toBeInTheDocument();
+  });
+
+  it('says when the browser would not let it copy', async () => {
+    const user = await setup(message({ deviceId: 'a', body: 'Your code is 482913', code: '482913' }));
+    vi.spyOn(navigator.clipboard, 'writeText').mockRejectedValue(new Error('denied'));
+
+    await user.click(screen.getByRole('button', { name: /copy code/i }));
+
+    expect(await screen.findByText(/could not copy/i)).toBeInTheDocument();
+  });
+
+  it('shows no copy button when a message has no code', async () => {
+    await setup(message({ deviceId: 'a', body: 'Your parcel has shipped', code: null }));
+
+    expect(screen.queryByRole('button', { name: /copy code/i })).not.toBeInTheDocument();
+    expect(document.querySelector('mark')).toBeNull();
+  });
+
+  it('keeps hostile text harmless while highlighting the code', async () => {
+    const evil = '<img src=x onerror="alert(1)"> code 123456 <b>bold</b>';
+    await setup(message({ deviceId: 'a', body: evil, code: '123456' }));
+
+    expect(document.querySelector('img')).toBeNull();
+    expect(document.querySelector('b')).toBeNull();
+    expect(screen.getByText('123456').tagName).toBe('MARK');
+    expect(screen.getByRole('article')).toHaveTextContent(evil);
+  });
+
+  it('highlights a code that arrives live too', async () => {
+    mockApi({ devices: [device({ deviceId: 'a' })], messages: [message({ deviceId: 'a', body: 'older' })] });
+    render(<Dashboard username="admin" onLogout={() => {}} />);
+    await screen.findAllByRole('article');
+
+    act(() => FakeEventSource.current.emit('message', message({ deviceId: 'a', body: 'Use 771155 to sign in', code: '771155' })));
+
+    expect((await screen.findByText('771155')).tagName).toBe('MARK');
+  });
+});
+
 describe('sidebar', () => {
   const minutesAgo = (m) => new Date(Date.now() - m * 60000).toISOString();
 
@@ -62,6 +125,8 @@ describe('sidebar', () => {
     render(<Dashboard username="admin" onLogout={() => {}} />);
 
     const nav = await screen.findByRole('navigation', { name: /phones/i });
+    // The sidebar exists straight away, empty; wait for the phones themselves to load.
+    await within(nav).findByRole('button', { name: /kitchen phone/i });
     expect(within(within(nav).getByRole('button', { name: /kitchen phone/i })).getByText(/online/i)).toBeInTheDocument();
     expect(within(within(nav).getByRole('button', { name: /spare phone/i })).getByText(/last seen/i)).toBeInTheDocument();
     expect(within(within(nav).getByRole('button', { name: /old phone/i })).getByText(/revoked/i)).toBeInTheDocument();

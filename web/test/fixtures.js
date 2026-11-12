@@ -28,6 +28,7 @@ export function message(overrides = {}) {
     body: `Body ${counter}`,
     receivedAt: '2026-11-11T10:00:00.000Z',
     createdAt: '2026-11-11T10:00:01.000Z',
+    code: null,
     ...overrides,
   };
 }
