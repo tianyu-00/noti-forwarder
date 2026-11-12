@@ -490,3 +490,74 @@ describe('manage a phone', () => {
     expect(deletes).toBe(0);
   });
 });
+
+describe('add phone: scan feedback', () => {
+  const inMinutes = (m) => new Date(Date.now() + m * 60000).toISOString();
+  const timing = { pollMs: 40, closeMs: 120 };
+  const pairing = {
+    code: 'ABCD-EFGH-IJKL-MNOP-QRST-UVWX-YZ23',
+    expiresAt: inMinutes(10),
+    qrPayload: JSON.stringify({ u: 'https://nf.example.com', c: 'ABCD-EFGH-IJKL-MNOP-QRST-UVWX-YZ23' }),
+  };
+
+  // The phone list a new pairing adds to; the stream is deliberately silent here.
+  function setup() {
+    const kitchen = device({ deviceId: 'a', name: 'Kitchen phone' });
+    let devices = [kitchen];
+    mockApi({ devices });
+    server.use(
+      http.get('/api/v1/devices', () => HttpResponse.json({ devices })),
+      http.post('/api/v1/pairing-codes', () => HttpResponse.json(pairing, { status: 201 })),
+    );
+    render(<Dashboard username="admin" onLogout={() => {}} pairingTiming={timing} />);
+    return {
+      pairNewPhone: () => {
+        devices = [device({ deviceId: 'new', name: 'Fresh phone', lastSeen: null }), kitchen];
+      },
+    };
+  }
+
+  it('says it is waiting for the phone while the QR code is shown', async () => {
+    setup();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: /add phone/i }));
+
+    expect(await within(await screen.findByRole('dialog')).findByText(/waiting for the phone/i)).toBeInTheDocument();
+  });
+
+  it('notices the new phone by itself, confirms it and closes the dialog', async () => {
+    const { pairNewPhone } = setup();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: /add phone/i }));
+    const dialog = await screen.findByRole('dialog');
+    await within(dialog).findByRole('img', { name: /pairing qr code/i });
+
+    pairNewPhone(); // the phone scans; no stream event arrives
+
+    expect(await within(dialog).findByText(/fresh phone connected/i)).toBeInTheDocument();
+    expect(within(dialog).queryByRole('img', { name: /pairing qr code/i })).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(await screen.findByRole('button', { name: /fresh phone/i })).toBeInTheDocument();
+  });
+
+  it('stops checking once the dialog is closed', async () => {
+    setup();
+    let polls = 0;
+    server.use(
+      http.get('/api/v1/devices', () => {
+        polls += 1;
+        return HttpResponse.json({ devices: [] });
+      }),
+    );
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: /add phone/i }));
+    const dialog = await screen.findByRole('dialog');
+    await within(dialog).findByText(/waiting for the phone/i);
+    await user.click(within(dialog).getByRole('button', { name: /close/i }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+
+    const after = polls;
+    await new Promise((r) => setTimeout(r, 200));
+    expect(polls).toBe(after);
+  });
+});

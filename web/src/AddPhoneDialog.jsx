@@ -10,7 +10,7 @@ function formatRemaining(ms) {
   return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
 }
 
-function PairingPanel({ devices }) {
+function PairingPanel({ devices, onDevicesLoaded, onClose, timing }) {
   // Phones known when the dialog opened: any other phone appearing means pairing worked.
   const [knownIds] = useState(() => new Set(devices.map((d) => d.deviceId)));
   const [attempt, setAttempt] = useState(0);
@@ -46,8 +46,39 @@ function PairingPanel({ devices }) {
   }
 
   const connected = devices.find((d) => !knownIds.has(d.deviceId));
+  const expired = pairing ? new Date(pairing.expiresAt).getTime() - now <= 0 : false;
+  const waiting = Boolean(pairing) && !expired && !connected;
+
+  // Check the phone list while waiting, so success shows even if the live stream is blocked.
+  useEffect(() => {
+    if (!waiting) return undefined;
+    let stale = false;
+    const timer = setInterval(() => {
+      api('/devices')
+        .then((d) => {
+          if (!stale) onDevicesLoaded(d.devices);
+        })
+        .catch(() => {}); // a missed check is retried on the next tick
+    }, timing.pollMs);
+    return () => {
+      stale = true;
+      clearInterval(timer);
+    };
+  }, [waiting, onDevicesLoaded, timing.pollMs]);
+
+  // Leave the confirmation on screen briefly, then close.
+  useEffect(() => {
+    if (!connected) return undefined;
+    const timer = setTimeout(onClose, timing.closeMs);
+    return () => clearTimeout(timer);
+  }, [connected, onClose, timing.closeMs]);
+
   if (connected) {
-    return <p className="text-emerald-400">{connected.name} connected.</p>;
+    return (
+      <p role="status" className="text-emerald-400">
+        ✓ {connected.name} connected.
+      </p>
+    );
   }
   if (error) {
     return (
@@ -64,7 +95,7 @@ function PairingPanel({ devices }) {
   if (!pairing) return <p className="text-slate-400">Creating code…</p>;
 
   const remaining = new Date(pairing.expiresAt).getTime() - now;
-  if (remaining <= 0) {
+  if (expired) {
     return (
       <div className="space-y-3">
         <p className="text-amber-400">This code has expired.</p>
@@ -87,14 +118,26 @@ function PairingPanel({ devices }) {
         <dt className="text-slate-400">Security key</dt>
         <dd className="break-all font-mono text-lg tracking-wide">{pairing.code}</dd>
       </dl>
+      <p role="status" className="text-sm text-sky-300">
+        Waiting for the phone to scan…
+      </p>
       <p className="text-xs text-slate-400">Expires in {formatRemaining(remaining)}. Single use.</p>
     </div>
   );
 }
 
-PairingPanel.propTypes = { devices: PropTypes.arrayOf(deviceShape).isRequired };
+const timingShape = PropTypes.shape({ pollMs: PropTypes.number, closeMs: PropTypes.number });
 
-export default function AddPhoneDialog({ open, onOpenChange, devices }) {
+PairingPanel.propTypes = {
+  devices: PropTypes.arrayOf(deviceShape).isRequired,
+  onDevicesLoaded: PropTypes.func.isRequired,
+  onClose: PropTypes.func.isRequired,
+  timing: timingShape.isRequired,
+};
+
+export const DEFAULT_PAIRING_TIMING = { pollMs: 2000, closeMs: 2500 };
+
+export default function AddPhoneDialog({ open, onOpenChange, devices, onDevicesLoaded, timing }) {
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
@@ -104,7 +147,12 @@ export default function AddPhoneDialog({ open, onOpenChange, devices }) {
           <Dialog.Description className="text-sm text-slate-400">
             In the Notiforwarder app, scan this code or type the server address and security key.
           </Dialog.Description>
-          <PairingPanel devices={devices} />
+          <PairingPanel
+            devices={devices}
+            onDevicesLoaded={onDevicesLoaded}
+            onClose={() => onOpenChange(false)}
+            timing={{ ...DEFAULT_PAIRING_TIMING, ...timing }}
+          />
           <Dialog.Close className="rounded bg-slate-700 px-3 py-1 text-sm">Close</Dialog.Close>
         </Dialog.Content>
       </Dialog.Portal>
@@ -116,4 +164,6 @@ AddPhoneDialog.propTypes = {
   open: PropTypes.bool.isRequired,
   onOpenChange: PropTypes.func.isRequired,
   devices: PropTypes.arrayOf(deviceShape).isRequired,
+  onDevicesLoaded: PropTypes.func.isRequired,
+  timing: timingShape,
 };

@@ -10,7 +10,7 @@ import Filters from './Filters.jsx';
 import { useStream } from './useStream.js';
 import { matchesView } from './matches.js';
 
-export default function Dashboard({ username, onLogout }) {
+export default function Dashboard({ username, onLogout, pairingTiming }) {
   const [devices, setDevices] = useState([]);
   const [messages, setMessages] = useState([]);
   const [selected, setSelected] = useState(null);
@@ -172,7 +172,13 @@ export default function Dashboard({ username, onLogout }) {
           }
         />
       )}
-      <AddPhoneDialog open={addOpen} onOpenChange={setAddOpen} devices={devices} />
+      <AddPhoneDialog
+        open={addOpen}
+        onOpenChange={setAddOpen}
+        devices={devices}
+        onDevicesLoaded={setDevices}
+        timing={pairingTiming}
+      />
       <Footer />
     </div>
   );
@@ -181,4 +187,6 @@ export default function Dashboard({ username, onLogout }) {
 Dashboard.propTypes = {
   username: PropTypes.string.isRequired,
   onLogout: PropTypes.func,
+  // Seam for tests: how often to check for the new phone and how long to show the confirmation.
+  pairingTiming: PropTypes.shape({ pollMs: PropTypes.number, closeMs: PropTypes.number }),
 };
