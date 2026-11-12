@@ -5,6 +5,8 @@ import { audit } from '../audit.js';
 import { hashPassword, verifyPassword } from '../auth/password.js';
 import { createSession, deleteSession, requireCsrf, SESSION_COOKIE, SESSION_TTL_MS } from '../auth/sessions.js';
 import { rateLimit } from '../rate-limit.js';
+import { verifySecondFactor } from '../auth/second-factor.js';
+import { totpRouter } from './totp.js';
 
 const MAX_FAILURES = 5;
 const LOCK_MINUTES = 15;
@@ -12,6 +14,7 @@ const LOCK_MINUTES = 15;
 const loginSchema = z.object({
   username: z.string().min(1).max(100),
   password: z.string().min(1).max(500),
+  code: z.string().max(30).optional(),
 });
 
 // Verified against when the user does not exist, so timing does not reveal it.
@@ -22,18 +25,20 @@ export function authRouter({
   requireViewer,
   cookieSecure = true,
   loginRateLimit = { limit: 20, windowMs: 15 * 60 * 1000 },
+  now = Date.now,
 }) {
   const router = Router();
   const perIp = rateLimit({ ...loginRateLimit, key: (req) => req.ip });
+  router.use(totpRouter({ db, requireViewer, limiter: perIp, now }));
 
   router.post('/auth/login', perIp, express.json({ limit: '10kb' }), async (req, res, next) => {
     try {
       const parsed = loginSchema.safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ error: 'invalid_payload' });
-      const { username, password } = parsed.data;
+      const { username, password, code } = parsed.data;
 
       const { rows } = await db.query(
-        'SELECT id, password_hash, locked_until FROM users WHERE username = $1',
+        'SELECT id, password_hash, locked_until, totp_secret, totp_enabled_at, totp_last_step FROM users WHERE username = $1',
         [username],
       );
       const user = rows[0];
@@ -43,7 +48,12 @@ export function authRouter({
         return res.status(429).json({ error: 'locked' });
       }
 
-      const ok = await verifyPassword(user ? user.password_hash : dummyHash, password);
+      let ok = await verifyPassword(user ? user.password_hash : dummyHash, password);
+      if (ok && user.totp_enabled_at) {
+        // Only after a correct password, so a wrong password never reveals that 2FA is on.
+        if (code === undefined || code === '') return res.status(401).json({ error: 'totp_required' });
+        ok = await verifySecondFactor(db, user, code, now());
+      }
       if (!user || !ok) {
         if (user) {
           await db.query(
@@ -77,8 +87,17 @@ export function authRouter({
     }
   });
 
-  router.get('/auth/me', requireViewer, (req, res) => {
-    res.json({ username: req.session.username, csrfToken: req.session.csrfToken });
+  router.get('/auth/me', requireViewer, async (req, res, next) => {
+    try {
+      const { rows } = await db.query('SELECT totp_enabled_at FROM users WHERE username = $1', [req.session.username]);
+      res.json({
+        username: req.session.username,
+        csrfToken: req.session.csrfToken,
+        totpEnabled: Boolean(rows[0]?.totp_enabled_at),
+      });
+    } catch (err) {
+      next(err);
+    }
   });
 
   router.post('/auth/logout', requireViewer, requireCsrf, async (req, res, next) => {

@@ -68,7 +68,7 @@ describe('sessions', () => {
     const { body } = await login(agent);
     const me = await agent.get('/api/v1/auth/me');
     expect(me.status).toBe(200);
-    expect(me.body).toEqual({ username: 'admin', csrfToken: body.csrfToken });
+    expect(me.body).toEqual({ username: 'admin', csrfToken: body.csrfToken, totpEnabled: false });
   });
 
   it('logout needs the CSRF token, then ends the session', async () => {

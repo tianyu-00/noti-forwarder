@@ -20,6 +20,7 @@ export function createApp({
   preAuthRateLimit,
   notifier,
   loginRateLimit,
+  now,
   cookieSecure,
   trustProxy,
   publicUrl,
@@ -37,7 +38,7 @@ export function createApp({
   if (db) {
     const viewer = requireViewer ?? requireSession({ db });
     const events = createEventHub();
-    app.use('/api/v1', authRouter({ db, requireViewer: viewer, cookieSecure, loginRateLimit }));
+    app.use('/api/v1', authRouter({ db, requireViewer: viewer, cookieSecure, loginRateLimit, now }));
     app.use('/api/v1', pairingRouter({ db, requireViewer: viewer, events, publicUrl, pairRateLimit }));
     app.use('/api/v1', devicesRouter({ db, requireViewer: viewer, events }));
     app.use('/api/v1', settingsRouter({ db, requireViewer: viewer }));
