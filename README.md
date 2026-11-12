@@ -99,6 +99,7 @@ docker compose exec server node src/reset-totp.js admin
 ## Keeping and deleting messages
 
 - **Settings** (top right of the dashboard) sets how long messages are kept: forever (the default) or delete everything older than N days. Saving a limit deletes the older messages at once and the server repeats it every hour. This cannot be undone, so the dashboard asks first.
+- **Clear a phone's messages**: select the phone, choose *Manage phone*, then *Clear messages*. Its messages are deleted; the phone stays paired and keeps sending. No revoke needed.
 - **Erase a phone**: revoke it first, then open it and choose *Erase this phone and its messages*. The phone entry and all its messages are removed.
 
 ## Push alerts with ntfy

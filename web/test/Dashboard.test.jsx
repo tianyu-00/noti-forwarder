@@ -918,6 +918,87 @@ describe('settings: two-step login', () => {
   });
 });
 
+describe('clearing a phone\'s messages', () => {
+  const setup = async (messages) => {
+    mockApi({ devices: [device({ deviceId: 'a', name: 'Kitchen phone' }), device({ deviceId: 'b', name: 'Spare phone' })], messages });
+    const user = userEvent.setup();
+    render(<Dashboard username="admin" onLogout={() => {}} />);
+    await user.click(await screen.findByRole('button', { name: /kitchen phone/i }));
+    await user.click(await screen.findByRole('button', { name: /manage phone/i }));
+    return { user, dialog: await screen.findByRole('dialog', { name: /kitchen phone/i }) };
+  };
+  const both = [
+    message({ deviceId: 'a', body: 'from the kitchen' }),
+    message({ deviceId: 'b', body: 'from the spare' }),
+  ];
+
+  it('is offered for a phone that is still active, without revoking it', async () => {
+    const { dialog } = await setup(both);
+    expect(within(dialog).getByRole('button', { name: /clear messages/i })).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: /revoke this phone/i })).toBeInTheDocument();
+  });
+
+  it('asks first, then deletes the messages and keeps the phone', async () => {
+    let cleared = 0;
+    server.use(
+      http.delete('/api/v1/devices/a/messages', () => {
+        cleared += 1;
+        return HttpResponse.json({ deleted: 1 });
+      }),
+    );
+    const { user, dialog } = await setup([message({ deviceId: 'a', body: 'from the kitchen' })]);
+
+    await user.click(within(dialog).getByRole('button', { name: /clear messages/i }));
+    expect(cleared).toBe(0);
+    expect(within(dialog).getByText(/phone stays paired/i)).toBeInTheDocument();
+    await user.click(within(dialog).getByRole('button', { name: /yes, clear/i }));
+
+    await waitFor(() => expect(cleared).toBe(1));
+    await waitFor(() => expect(screen.queryByText('from the kitchen')).not.toBeInTheDocument());
+    expect(screen.getByRole('button', { name: /kitchen phone/i })).toBeInTheDocument();
+    expect(screen.queryByText('Revoked')).not.toBeInTheDocument();
+  });
+
+  it('keeps the messages when the confirmation is cancelled', async () => {
+    let cleared = 0;
+    server.use(
+      http.delete('/api/v1/devices/a/messages', () => {
+        cleared += 1;
+        return HttpResponse.json({ deleted: 1 });
+      }),
+    );
+    const { user, dialog } = await setup([message({ deviceId: 'a', body: 'from the kitchen' })]);
+
+    await user.click(within(dialog).getByRole('button', { name: /clear messages/i }));
+    await user.click(within(dialog).getByRole('button', { name: /cancel/i }));
+
+    expect(cleared).toBe(0);
+    expect(within(dialog).getByRole('button', { name: /clear messages/i })).toBeInTheDocument();
+  });
+
+  it('shows an error and keeps the messages when clearing fails', async () => {
+    server.use(http.delete('/api/v1/devices/a/messages', () => HttpResponse.json({ error: 'x' }, { status: 500 })));
+    const { user, dialog } = await setup([message({ deviceId: 'a', body: 'from the kitchen' })]);
+
+    await user.click(within(dialog).getByRole('button', { name: /clear messages/i }));
+    await user.click(within(dialog).getByRole('button', { name: /yes, clear/i }));
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(/could not clear/i);
+    expect(screen.getByText('from the kitchen')).toBeInTheDocument();
+  });
+
+  it('drops a phone\'s messages when another dashboard clears them', async () => {
+    mockApi({ devices: [device({ deviceId: 'a' }), device({ deviceId: 'b' })], messages: both });
+    render(<Dashboard username="admin" onLogout={() => {}} />);
+    await screen.findByText('from the kitchen');
+
+    act(() => FakeEventSource.current.emit('messages_cleared', { deviceId: 'a' }));
+
+    await waitFor(() => expect(screen.queryByText('from the kitchen')).not.toBeInTheDocument());
+    expect(screen.getByText('from the spare')).toBeInTheDocument();
+  });
+});
+
 describe('add phone: scan feedback', () => {
   const inMinutes = (m) => new Date(Date.now() + m * 60000).toISOString();
   const timing = { pollMs: 40, closeMs: 120 };

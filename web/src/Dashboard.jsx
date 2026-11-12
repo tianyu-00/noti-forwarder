@@ -43,6 +43,12 @@ export default function Dashboard({ username, onLogout, pairingTiming }) {
     setUnread((u) => (deviceId ? { ...u, [deviceId]: 0 } : {}));
   }, []);
 
+  // A phone's messages were cleared (here or on another dashboard): the phone itself stays.
+  const clearMessagesOf = useCallback((deviceId) => {
+    setMessages((list) => list.filter((m) => m.deviceId !== deviceId));
+    setUnread((u) => ({ ...u, [deviceId]: 0 }));
+  }, []);
+
   // A phone was erased (here or on another dashboard): drop it and its messages from view.
   const removeDevice = useCallback((deviceId) => {
     setDevices((list) => list.filter((x) => x.deviceId !== deviceId));
@@ -65,6 +71,7 @@ export default function Dashboard({ username, onLogout, pairingTiming }) {
       }
     },
     device_deleted: (d) => removeDevice(d.deviceId),
+    messages_cleared: (d) => clearMessagesOf(d.deviceId),
     device: (d) =>
       setDevices((list) =>
         list.some((x) => x.deviceId === d.deviceId)
@@ -225,6 +232,7 @@ export default function Dashboard({ username, onLogout, pairingTiming }) {
           onOpenChange={setManageOpen}
           onRenamed={(d) => setDevices((list) => list.map((x) => (x.deviceId === d.deviceId ? d : x)))}
           onErased={removeDevice}
+          onCleared={clearMessagesOf}
           onRevoked={(id) =>
             setDevices((list) =>
               list.map((x) => (x.deviceId === id ? { ...x, revokedAt: new Date().toISOString() } : x)),

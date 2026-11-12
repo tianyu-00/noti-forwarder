@@ -119,6 +119,7 @@ Table `audit_log`: `id`, `event` (login, pair, revoke, ...), `actor`, `device_id
 - `DELETE /api/v1/devices/:id` / `PATCH /api/v1/devices/:id` (dashboard session) : revoke / rename a phone.
 - `POST /api/v1/messages` : batch of messages from a phone. Bearer token per device. Idempotent on `id`.
 - `GET /api/v1/messages?device=&type=&q=&before=` : paginated, newest first.
+- `DELETE /api/v1/devices/:id/messages` (dashboard session) : delete one phone's messages; the phone stays paired and keeps sending (no revoke needed).
 - `DELETE /api/v1/devices/:id/permanent` (dashboard session) : erase a revoked phone and all its messages (409 if not revoked yet).
 - `GET /api/v1/settings` / `PUT /api/v1/settings` (dashboard session) : message retention in days or `null`. Saving deletes older messages at once; the server repeats the purge hourly.
 - `GET /api/v1/stream` : live updates (SSE/WebSocket) for viewers.

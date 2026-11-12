@@ -27,11 +27,12 @@ Confirm.propTypes = {
   onCancel: PropTypes.func.isRequired,
 };
 
-function Panel({ device, onRenamed, onRevoked, onErased, onDone }) {
+function Panel({ device, onRenamed, onRevoked, onErased, onCleared, onDone }) {
   const [name, setName] = useState(device.name);
   const [error, setError] = useState(null);
   const [confirming, setConfirming] = useState(false);
   const [confirmingErase, setConfirmingErase] = useState(false);
+  const [confirmingClear, setConfirmingClear] = useState(false);
 
   async function rename(e) {
     e.preventDefault();
@@ -52,6 +53,18 @@ function Panel({ device, onRenamed, onRevoked, onErased, onDone }) {
       onDone();
     } catch {
       setError('Could not revoke the phone.');
+    }
+  }
+
+  async function clearMessages() {
+    setError(null);
+    try {
+      await api(`/devices/${device.deviceId}/messages`, { method: 'DELETE' });
+      onCleared(device.deviceId);
+      onDone();
+    } catch {
+      setConfirmingClear(false);
+      setError('Could not clear the messages.');
     }
   }
 
@@ -81,6 +94,18 @@ function Panel({ device, onRenamed, onRevoked, onErased, onDone }) {
           {error}
         </p>
       )}
+
+      <div className="space-y-3 border-t border-line pt-5">
+        {confirmingClear ? (
+          <Confirm yes="Yes, clear" onYes={clearMessages} onCancel={() => setConfirmingClear(false)}>
+            Delete every message from {device.name}? The phone stays paired and keeps sending. This cannot be undone.
+          </Confirm>
+        ) : (
+          <Button variant="secondary" onClick={() => setConfirmingClear(true)}>
+            Clear messages
+          </Button>
+        )}
+      </div>
 
       <div className="space-y-3 border-t border-line pt-5">
         {device.revokedAt ? (
@@ -115,10 +140,11 @@ Panel.propTypes = {
   onRenamed: PropTypes.func.isRequired,
   onRevoked: PropTypes.func.isRequired,
   onErased: PropTypes.func.isRequired,
+  onCleared: PropTypes.func.isRequired,
   onDone: PropTypes.func.isRequired,
 };
 
-export default function ManagePhoneDialog({ device, open, onOpenChange, onRenamed, onRevoked, onErased }) {
+export default function ManagePhoneDialog({ device, open, onOpenChange, onRenamed, onRevoked, onErased, onCleared }) {
   return (
     <Modal
       open={open}
@@ -134,6 +160,7 @@ export default function ManagePhoneDialog({ device, open, onOpenChange, onRename
         onRenamed={onRenamed}
         onRevoked={onRevoked}
         onErased={onErased}
+        onCleared={onCleared}
         onDone={() => onOpenChange(false)}
       />
     </Modal>
@@ -147,4 +174,5 @@ ManagePhoneDialog.propTypes = {
   onRenamed: PropTypes.func.isRequired,
   onRevoked: PropTypes.func.isRequired,
   onErased: PropTypes.func.isRequired,
+  onCleared: PropTypes.func.isRequired,
 };
