@@ -1,5 +1,7 @@
 # Deploy
 
+Day-to-day commands (start, stop, restart, logs, update, backup) are in the [main README](../README.md#running-it-day-to-day).
+
 CI builds the server image and publishes it to GHCR
 (`ghcr.io/<owner>/notiforwarder-server`), only when you push to the `publish` branch. Deploying is manual.
 
@@ -21,7 +23,7 @@ Cloudflare presents the HTTPS certificate, so nothing needs opening on your rout
    - Service type **HTTP**.
    - URL `web:80` if you run the bundled cloudflared container, or `localhost:3000` if cloudflared runs on the host.
 3. Put the token in `.env` as `TUNNEL_TOKEN`, set `PUBLIC_URL=https://notifications.example.com`, and keep `TRUST_PROXY=2` (cloudflared, then the web container).
-4. Start everything: `docker compose --profile tunnel up -d`.
+4. Start everything: `docker compose up -d`. (`.env` has `COMPOSE_PROFILES=tunnel`, which includes the tunnel; without that line use `docker compose --profile tunnel up -d`.)
 
 Phones and the dashboard then both use `PUBLIC_URL`. The phone API paths (`/api/v1/pair`, `/api/v1/messages`) must stay reachable without a Cloudflare Access login, because the phone app can't complete one.
 
