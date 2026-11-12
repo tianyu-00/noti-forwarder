@@ -1,0 +1,30 @@
+# The dashboard (web) and the server only, for a machine that already runs its own PostgreSQL
+# and its own cloudflared. Use it instead of docker-compose.yml (see .env.byo.example, which
+# sets COMPOSE_FILE so plain `docker compose up -d` picks this file).
+services:
+  # Single entry point: serves the dashboard and proxies /api to the server. Point cloudflared at it:
+  #   cloudflared on the host:               http://localhost:3000
+  #   cloudflared in another container:      http://notiforwarder-web:80  (join the network, see below)
+  web:
+    image: ghcr.io/${GHCR_OWNER}/notiforwarder-web:${VERSION}
+    container_name: notiforwarder-web
+    restart: unless-stopped
+    depends_on:
+      - server
+    ports:
+      # Loopback only, so the only way in is through your tunnel. Change WEB_BIND with care.
+      - "${WEB_BIND:-127.0.0.1:3000}:80"
+
+  server:
+    image: ghcr.io/${GHCR_OWNER}/notiforwarder-server:${VERSION}
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      PUBLIC_URL: ${PUBLIC_URL}
+      ADMIN_USERNAME: ${ADMIN_USERNAME}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      TRUST_PROXY: ${TRUST_PROXY:-}
+    # Lets DATABASE_URL use host.docker.internal when PostgreSQL runs on the Docker host itself.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

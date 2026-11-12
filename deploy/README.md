@@ -46,6 +46,27 @@ If you reuse the hostname the old machine served (so the phones keep the same ad
 
 Update later with `docker compose pull && docker compose up -d` after changing `VERSION`, and back up with the `pg_dump` command in the main README.
 
+## Using your own PostgreSQL and cloudflared
+
+For a machine that already runs both. `docker-compose.byo.yml` starts only the dashboard (`web`) and the `server`; it has no database and no tunnel of its own. Use it instead of `docker-compose.yml`.
+
+**1. The database** (PostgreSQL 13 or newer, no extensions). Create a user that owns its own database, so the server can create its tables:
+```sql
+CREATE ROLE notiforwarder LOGIN PASSWORD 'a-long-random-password';
+CREATE DATABASE notiforwarder OWNER notiforwarder;
+```
+The server creates and updates its tables itself on start. If PostgreSQL runs on the same machine as Docker, it must accept connections from Docker's network: listen on more than `localhost` (`listen_addresses`), and allow the Docker address range in `pg_hba.conf`, e.g. `host notiforwarder notiforwarder 172.16.0.0/12 scram-sha-256`, then reload. If it runs elsewhere, use its address. Back it up with your own tooling, e.g. `pg_dump -U notiforwarder notiforwarder > backup.sql`.
+
+**2. Files.** Copy `docker-compose.byo.yml` and `.env.byo.example` (as `.env`) to the machine, plus `docker-compose.byo-network.yml` if you need step 3b. Set `DATABASE_URL`, `PUBLIC_URL`, the admin login and `VERSION`. `COMPOSE_FILE` in that `.env` makes plain `docker compose up -d`, `pull` and `logs` use this file. Passwords with special characters must be URL-encoded in `DATABASE_URL`. A database that requires TLS needs `?sslmode=require` on the URL; this has not been tried against one.
+
+**3. Pointing your cloudflared at it.** The dashboard container listens on `127.0.0.1:3000` of the machine. In the Cloudflare public hostname, use service type **HTTP** and:
+- a. cloudflared runs on the machine itself: `localhost:3000`.
+- b. cloudflared runs as a container on its own Docker network: set `COMPOSE_FILE=docker-compose.byo.yml:docker-compose.byo-network.yml` and `CLOUDFLARED_NETWORK=<that network's name>` in `.env` (`docker network ls`). The dashboard container is then reachable from the tunnel as `notiforwarder-web:80`.
+
+Keep `TRUST_PROXY=2` (your cloudflared, then the dashboard container). If another proxy sits in front, count it too.
+
+**4. Start and check:** `docker compose up -d`, then `docker compose ps`, `curl localhost:3000/api/v1/health`, and `docker compose logs server` should show `applied migrations` and `created admin user`. Sign in at `PUBLIC_URL`, choose **Add phone**, and pair. Updating later is `docker compose pull && docker compose up -d`.
+
 ## Public access with a Cloudflare tunnel
 Cloudflare presents the HTTPS certificate, so nothing needs opening on your router and there is no certificate to renew. The domain must use Cloudflare DNS.
 
