@@ -114,6 +114,7 @@ class MainActivity : ComponentActivity() {
         smsAllowed = ContextCompat.checkSelfPermission(this, Manifest.permission.RECEIVE_SMS) ==
             PackageManager.PERMISSION_GRANTED
         app.controller.refresh() // picks up a revocation seen in the background
+        app.deviceStream.wake() // opening the app is a good moment to retry a connection that is waiting
         if (app.store.load() != null) {
             // Android 12+ only allows starting a foreground service from a visible app like this.
             ContextCompat.startForegroundService(this, Intent(this, KeepAliveService::class.java))

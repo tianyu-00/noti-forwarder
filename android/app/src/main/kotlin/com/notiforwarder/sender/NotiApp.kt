@@ -91,6 +91,8 @@ class NotiApp : Application() {
         super.onCreate()
         scheduler.flushSoon() // an app start sends anything left in the queue
         if (store.load() != null) deviceStream.start() // reconnect after a restart of the app
+        // The moment Android has a network again, reconnect instead of waiting out a retry timer.
+        NetworkWatcher(this) { deviceStream.wake() }.start()
         HeartbeatWorker.schedule(this) // checks in every ~15 minutes while the phone has a network
     }
 }
