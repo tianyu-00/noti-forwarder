@@ -8,10 +8,19 @@ import android.provider.Settings
 class NotiApp : Application() {
     val store: TokenStore by lazy { EncryptedTokenStore(this) }
     val parser by lazy { NotificationParser(ownPackage = packageName) }
+    private val database by lazy { AppDatabase.open(this) }
+    val queue by lazy { MessageQueue(database.queueDao()) }
+    val sendStatus: SendStatus by lazy { PrefsSendStatus(this) }
+    val scheduler: FlushScheduler by lazy { WorkManagerFlushScheduler(this) }
+
     // The service runs without a screen, so a revocation must reach the UI state from here.
-    val sender by lazy {
+    private val sender by lazy {
         MessageSender(store, appVersion = BuildConfig.VERSION_NAME, onRevoked = { controller.refresh() })
     }
+    val flushRunner by lazy { FlushRunner(Flusher(queue, sender, sendStatus)::flush, scheduler) }
+    val capture by lazy { NotificationCapture(parser, queue, scheduler) }
+    val statusReader by lazy { StatusReader(queue, sendStatus) }
+
     val controller by lazy {
         PairingController(
             store = store,
@@ -23,6 +32,13 @@ class NotiApp : Application() {
                 // Per app and signing key; survives reinstalling, resets on a factory reset.
                 hardwareId = Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID),
             ),
+            // Messages queued while unpaired (or revoked) go out as soon as pairing works.
+            onPaired = { scheduler.flushSoon() },
         )
+    }
+
+    override fun onCreate() {
+        super.onCreate()
+        scheduler.flushSoon() // an app start sends anything left in the queue
     }
 }
