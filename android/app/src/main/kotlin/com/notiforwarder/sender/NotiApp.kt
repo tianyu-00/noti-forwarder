@@ -32,7 +32,7 @@ class NotiApp : Application() {
     }
     val deviceStream: DeviceStreamRunner by lazy {
         DeviceStreamRunner(
-            connect = streamClient::run,
+            connect = { onConnected -> streamClient.run(onConnected) },
             store = store,
             onRevoked = { controller.refresh() },
             cancel = streamClient::cancel,

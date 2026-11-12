@@ -23,7 +23,7 @@ class DeviceStreamRunnerTest {
         var runs = 0
         var waits = 0
         return DeviceStreamRunner(
-            connect = { queue.removeAt(0).also { runs++ } },
+            connect = { _ -> queue.removeAt(0).also { runs++ } },
             store = store,
             onRevoked = { revoked++ },
             // Fixed delays, so the test can see them: 2 s, 4 s, 8 s ... capped at 60 s.
@@ -114,7 +114,7 @@ class DeviceStreamRunnerTest {
     fun `a real wake ends a long wait at once`() {
         var runs = 0
         val runner = DeviceStreamRunner(
-            connect = { if (runs++ == 0) StreamEnd.Dropped(wasConnected = false) else StreamEnd.Revoked },
+            connect = { _ -> if (runs++ == 0) StreamEnd.Dropped(wasConnected = false) else StreamEnd.Revoked },
             store = store,
             onRevoked = { revoked++ },
             backoff = Backoff(baseMillis = 20_000, maxMillis = 20_000, jitter = 0.0),
@@ -135,7 +135,7 @@ class DeviceStreamRunnerTest {
     fun `a wake while it is not waiting does nothing`() {
         var runs = 0
         val runner = DeviceStreamRunner(
-            connect = { if (runs++ == 0) StreamEnd.Dropped(wasConnected = false) else StreamEnd.Revoked },
+            connect = { _ -> if (runs++ == 0) StreamEnd.Dropped(wasConnected = false) else StreamEnd.Revoked },
             store = store,
             onRevoked = { revoked++ },
             backoff = Backoff(baseMillis = 500, maxMillis = 500, jitter = 0.0),
@@ -147,5 +147,57 @@ class DeviceStreamRunnerTest {
 
         val elapsedMs = (System.nanoTime() - started) / 1_000_000
         assertTrue("retried after only $elapsedMs ms, the 500 ms wait was skipped", elapsedMs >= 400)
+    }
+
+    @Test
+    fun `reports whether it is connected, reconnecting or stopped`() {
+        val seen = mutableListOf<ConnectionState>()
+        lateinit var runner: DeviceStreamRunner
+        var runs = 0
+        runner = DeviceStreamRunner(
+            connect = { onConnected ->
+                seen += runner.state.value // just before connecting
+                if (runs++ == 0) {
+                    onConnected()
+                    seen += runner.state.value // the server accepted
+                    StreamEnd.Dropped(wasConnected = true)
+                } else {
+                    StreamEnd.Revoked
+                }
+            },
+            store = store,
+            backoff = Backoff(baseMillis = 2_000, maxMillis = 60_000, jitter = 0.0),
+            wait = { ms ->
+                seen += runner.state.value // while waiting to retry
+                clock += ms // a real wait takes time
+                false
+            },
+            now = { clock },
+        )
+        assertEquals(ConnectionState.Stopped, runner.state.value)
+
+        runner.run()
+
+        assertEquals(
+            listOf(
+                ConnectionState.Connecting,
+                ConnectionState.Connected,
+                ConnectionState.Reconnecting,
+                ConnectionState.Connecting,
+            ),
+            seen,
+        )
+        assertEquals(ConnectionState.Stopped, runner.state.value)
+    }
+
+    @Test
+    fun `is stopped when the phone is not paired and after stop is called`() {
+        val unpaired = DeviceStreamRunner(connect = { _ -> StreamEnd.NotPaired }, store = store)
+        unpaired.run()
+        assertEquals(ConnectionState.Stopped, unpaired.state.value)
+
+        val stopped = DeviceStreamRunner(connect = { _ -> StreamEnd.Dropped(wasConnected = false) }, store = store, isStopped = { true })
+        stopped.run()
+        assertEquals(ConnectionState.Stopped, stopped.state.value)
     }
 }

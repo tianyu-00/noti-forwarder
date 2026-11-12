@@ -31,6 +31,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -185,6 +186,16 @@ private fun MainScreen(
             is UiState.Paired -> Section("Connection") {
                 Text("Paired", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.tertiary)
                 Text(s.serverUrl, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                val connection by app.deviceStream.state.collectAsState()
+                val connectionLabel = describeConnection(connection)
+                Text(
+                    connectionLabel.text,
+                    color = if (connectionLabel.good) {
+                        MaterialTheme.colorScheme.tertiary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                )
                 Text(
                     if (s.encrypted) "End-to-end encrypted" else "Not end-to-end encrypted",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,

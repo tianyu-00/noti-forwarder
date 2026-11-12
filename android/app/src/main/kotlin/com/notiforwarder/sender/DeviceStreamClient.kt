@@ -39,7 +39,8 @@ class DeviceStreamClient(
 ) {
     @Volatile private var call: Call? = null
 
-    fun run(): StreamEnd {
+    /** [onConnected] is called once the server accepts the connection (not for a refusal). */
+    fun run(onConnected: () -> Unit = {}): StreamEnd {
         val credentials = store.load() ?: return StreamEnd.NotPaired
         val request = Request.Builder()
             .url("${credentials.serverUrl}/api/v1/device-stream")
@@ -55,6 +56,7 @@ class DeviceStreamClient(
                     response.code == 401 -> StreamEnd.Revoked
                     !response.isSuccessful -> StreamEnd.Dropped(wasConnected = false)
                     else -> {
+                        onConnected()
                         val timer = startBeating()
                         try {
                             readEvents(response.body.source())

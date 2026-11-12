@@ -1,6 +1,8 @@
 package com.notiforwarder.sender
 
 import java.util.concurrent.Semaphore
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import java.util.concurrent.TimeUnit
 
 /**
@@ -11,7 +13,8 @@ import java.util.concurrent.TimeUnit
  * [start] and [stop] only manage its thread.
  */
 class DeviceStreamRunner(
-    private val connect: () -> StreamEnd,
+    /** Opens the connection and blocks until it ends. Calls the callback once the server accepted it. */
+    private val connect: (onConnected: () -> Unit) -> StreamEnd,
     private val store: TokenStore,
     /** Called after the credentials are cleared because the server revoked this phone. */
     private val onRevoked: () -> Unit = {},
@@ -27,6 +30,10 @@ class DeviceStreamRunner(
     @Volatile private var waiting = false
     private val gate = Semaphore(0)
     private var thread: Thread? = null
+    private val _state = MutableStateFlow(ConnectionState.Stopped)
+
+    /** For the connection card on the main screen. */
+    val state: StateFlow<ConnectionState> = _state
 
     private val doWait: (Long) -> Boolean = wait ?: { millis ->
         gate.drainPermits() // a wake that arrived while nobody was waiting must not count
@@ -55,7 +62,8 @@ class DeviceStreamRunner(
                     if (stopped()) return
                 }
                 lastAttemptAt = now()
-                when (val end = connect()) {
+                _state.value = ConnectionState.Connecting
+                when (val end = connect { _state.value = ConnectionState.Connected }) {
                     StreamEnd.NotPaired -> return
                     StreamEnd.Revoked -> {
                         store.clear()
@@ -65,6 +73,7 @@ class DeviceStreamRunner(
                     is StreamEnd.Dropped -> {
                         if (stopped()) return
                         attempt = if (end.wasConnected) 1 else attempt + 1
+                        _state.value = ConnectionState.Reconnecting
                         val woken = doWait(backoff.delayMillis(attempt))
                         // The network just came back, so the server is worth trying fresh.
                         if (woken) attempt = 0
@@ -73,6 +82,8 @@ class DeviceStreamRunner(
             }
         } catch (e: InterruptedException) {
             // stop() interrupted a wait
+        } finally {
+            _state.value = ConnectionState.Stopped
         }
     }
 

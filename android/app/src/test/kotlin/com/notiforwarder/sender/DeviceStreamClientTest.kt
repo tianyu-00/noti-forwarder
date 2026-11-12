@@ -115,4 +115,18 @@ class DeviceStreamClientTest {
 
         assertEquals(0, beats)
     }
+
+    @Test
+    fun `says it is connected only once the server accepted the connection`() {
+        stream(": connected\n\nevent: revoked\ndata: {}\n\n")
+        var connected = 0
+        client().run(onConnected = { connected++ })
+        assertEquals(1, connected)
+
+        server.enqueue(MockResponse.Builder().code(401).build())
+        client().run(onConnected = { connected++ })
+        server.enqueue(MockResponse.Builder().code(503).build())
+        client().run(onConnected = { connected++ })
+        assertEquals(1, connected)
+    }
 }
