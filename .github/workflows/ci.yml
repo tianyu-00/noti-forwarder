@@ -109,7 +109,7 @@ jobs:
           flavor: latest=false
           tags: |
             type=sha,format=short
-            type=raw,value=publish
+            type=raw,value=latest
       - uses: docker/build-push-action@v6
         with:
           context: ${{ matrix.component }}

@@ -9,7 +9,7 @@ CI builds the server image and publishes it to GHCR
 
 ## On the Ubuntu server
 1. Copy `docker-compose.yml` and `.env.example` (as `.env`) into a folder.
-2. Set `VERSION` in `.env` to an explicit tag (a short commit SHA, or `publish` for the newest build).
+2. Set `VERSION` in `.env` to an explicit tag (a short commit SHA, or `latest` for the newest build).
 3. If the GHCR package is private: `docker login ghcr.io` with a token that has `read:packages`.
 4. `docker compose pull && docker compose up -d`
 
@@ -45,7 +45,7 @@ If you reuse a hostname another machine served, stop that machine's stack first 
    Then `docker compose up -d` (or your manager's deploy button). A missing value stops it with a message saying which.
 3. **Tunnel.** In Cloudflare, point your hostname at **HTTP** `http://<this machine's address>:3000`. Open your address, sign in as `admin`, and choose **Add phone**.
 
-Defaults you can change: `ADMIN_USERNAME` (admin), `VERSION` (publish; use a `sha-xxxxxxx` tag to pin), `WEB_BIND` (3000, open to your network; `127.0.0.1:3000` means this machine only), `TRUST_PROXY` (2), `GHCR_OWNER` (tianyu-00).
+Defaults you can change: `ADMIN_USERNAME` (admin), `VERSION` (latest; use a `sha-xxxxxxx` tag to pin), `WEB_BIND` (3000, open to your network; `127.0.0.1:3000` means this machine only), `TRUST_PROXY` (2), `GHCR_OWNER` (tianyu-00).
 
 Check it worked: `docker compose logs server` shows `created admin user`.
 
