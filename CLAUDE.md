@@ -145,6 +145,7 @@ Table `audit_log`: `id`, `event` (login, pair, revoke, ...), `actor`, `device_id
 - Android tests: Robolectric needs `--add-exports=java.base/jdk.internal.access=ALL-UNNAMED` on JDK 21 (set in `app/build.gradle.kts`), and `robolectric.properties` uses a plain `Application` so WorkManager is not started in unit tests.
 - OkHttp 5 needs `compileSdk` 37; `targetSdk` is 37 as well.
 - The phone can only find out it was revoked when it next tries to send (a 401), not before.
+- With SMS turned off, notifications from the default SMS app are dropped too, because they contain the text of the message. SMS and its notification copy are de-duplicated on the phone by text (2 minute window); the SMS is kept because it has the real number.
 - Quick tunnels (`trycloudflare.com`) do not pass Server-Sent Events, so the dashboard's live stream does not work through one. Use a named tunnel.
 
 - Notification access is a manual user grant in system settings.
@@ -186,14 +187,14 @@ Current setup (decided during Milestone 0; the earlier plan for release-please, 
 
 ## Milestones
 
-Status as of the last update: 0, 1, 1b, 2, 3 and 5 are done. 3's reboot survival and the OnePlus battery/auto-start settings still need a manual check on the phone. 4, 6 and 7 are not started.
+Status as of the last update: 0, 1, 1b, 2, 3, 4 and 5 are done. 3's reboot survival and the OnePlus battery/auto-start settings still need a manual check on the phone. 6 and 7 are not started.
 
 0. Pipeline first: CI runs lint and tests, then builds and publishes images from the `publish` branch, compose file, `/health` showing the version. (done; release-please and SSH deploy dropped)
 1. Server: Express + Postgres, `POST /messages`, `GET /messages`, Docker Compose. (done)
    1b. Auth and pairing: web login, pairing code + QR, `/pair` endpoint, device tokens, revoke. (done)
 2. Android: pair with the server (QR/key), then notification listener that POSTs one notification to the server. (done; re-pairing the same phone reuses its entry via `hardware_id`)
 3. Reliability: Room queue, retry with backoff, foreground service, survives reboot. (done: queue, backoff, WorkManager, foreground keep-alive service and boot receiver; verified offline then online on a real phone, reboot not yet verified)
-4. SMS capture + de-duplication, plus phone settings: SMS/notification toggles and the app blacklist.
+4. SMS capture + de-duplication, plus phone settings: SMS/notification toggles and the app blacklist. (done and verified on a real phone: texts arrive once, the toggles and blocked apps work. Known gaps: a notification held 3s for SMS de-duplication is lost if Android kills the app in that window; the app has no launcher icon yet)
 5. React dashboard (Tailwind + Radix UI) with live updates, search, per-device filter. (done; unread counts are client-side only and reset on reload)
 6. ntfy push to the main phone; filters and 2FA code highlighting.
 7. SMS reply from the PC (outbox polled by the phone, sent via `SmsManager`).
