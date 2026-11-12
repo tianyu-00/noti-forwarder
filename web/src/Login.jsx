@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import PropTypes from 'prop-types';
 
-export default function Login({ onSubmit, error }) {
+export default function Login({ onSubmit, error, needsCode = false }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [code, setCode] = useState('');
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-900 p-4">
@@ -11,7 +12,7 @@ export default function Login({ onSubmit, error }) {
         className="w-full max-w-sm space-y-4 rounded-lg bg-slate-800 p-6 text-slate-100"
         onSubmit={(e) => {
           e.preventDefault();
-          onSubmit({ username, password });
+          onSubmit(needsCode ? { username, password, code: code.trim() } : { username, password });
         }}
       >
         <h1 className="text-xl font-semibold">Sign in</h1>
@@ -39,6 +40,19 @@ export default function Login({ onSubmit, error }) {
             autoComplete="current-password"
           />
         </label>
+        {needsCode && (
+          <label className="block text-sm">
+            Authenticator or backup code
+            <input
+              className="mt-1 w-full rounded bg-slate-700 p-2 tracking-widest"
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              autoComplete="one-time-code"
+              inputMode="text"
+              autoFocus
+            />
+          </label>
+        )}
         <button type="submit" className="w-full rounded bg-sky-600 p-2 font-medium hover:bg-sky-500">
           Sign in
         </button>
@@ -50,4 +64,5 @@ export default function Login({ onSubmit, error }) {
 Login.propTypes = {
   onSubmit: PropTypes.func.isRequired,
   error: PropTypes.string,
+  needsCode: PropTypes.bool,
 };

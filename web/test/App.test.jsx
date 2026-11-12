@@ -67,3 +67,72 @@ describe('login', () => {
     expect(screen.queryByRole('heading', { name: /sign in/i })).not.toBeInTheDocument();
   });
 });
+
+describe('login with two-factor on', () => {
+  const loggedOut = () => http.get('/api/v1/auth/me', () => HttpResponse.json({ error: 'unauthorized' }, { status: 401 }));
+  const submit = async (user, label) => {
+    await user.click(screen.getByRole('button', { name: label }));
+  };
+
+  async function reachCodeStep(user) {
+    await user.type(await screen.findByLabelText(/username/i), 'admin');
+    await user.type(screen.getByLabelText(/password/i), 'right password');
+    await submit(user, /sign in/i);
+    return screen.findByLabelText(/authenticator or backup code/i);
+  }
+
+  it('asks for the code when the server wants one, then signs in with it', async () => {
+    const bodies = [];
+    server.use(
+      loggedOut(),
+      http.post('/api/v1/auth/login', async ({ request }) => {
+        const body = await request.json();
+        bodies.push(body);
+        return body.code
+          ? HttpResponse.json({ username: 'admin', csrfToken: 'csrf-1' })
+          : HttpResponse.json({ error: 'totp_required' }, { status: 401 });
+      }),
+    );
+    const user = userEvent.setup();
+    render(<App />);
+
+    const codeField = await reachCodeStep(user);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument(); // not an error, just the next step
+    await user.type(codeField, '482913');
+    await submit(user, /sign in/i);
+
+    expect(await screen.findByText(/signed in as admin/i)).toBeInTheDocument();
+    expect(bodies).toEqual([
+      { username: 'admin', password: 'right password' },
+      { username: 'admin', password: 'right password', code: '482913' },
+    ]);
+  });
+
+  it('says the code was not accepted and stays on the code step', async () => {
+    server.use(
+      loggedOut(),
+      http.post('/api/v1/auth/login', async ({ request }) => {
+        const body = await request.json();
+        return HttpResponse.json(
+          { error: body.code ? 'invalid_credentials' : 'totp_required' },
+          { status: 401 },
+        );
+      }),
+    );
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.type(await reachCodeStep(user), '000000');
+    await submit(user, /sign in/i);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/code was not accepted/i);
+    expect(screen.getByLabelText(/authenticator or backup code/i)).toBeInTheDocument();
+  });
+
+  it('does not show the code field for an ordinary login', async () => {
+    server.use(loggedOut());
+    render(<App />);
+    await screen.findByRole('heading', { name: /sign in/i });
+    expect(screen.queryByLabelText(/authenticator or backup code/i)).not.toBeInTheDocument();
+  });
+});

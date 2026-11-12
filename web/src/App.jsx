@@ -11,6 +11,7 @@ const LOGIN_ERRORS = {
 export default function App() {
   const [session, setSession] = useState({ status: 'loading' });
   const [loginError, setLoginError] = useState(null);
+  const [needsCode, setNeedsCode] = useState(false); // the server asked for the 2FA code
 
   useEffect(() => {
     api('/auth/me')
@@ -28,12 +29,18 @@ export default function App() {
       setCsrfToken(me.csrfToken);
       setSession({ status: 'in', username: me.username });
     } catch (err) {
-      setLoginError(LOGIN_ERRORS[err.status] ?? LOGIN_ERRORS.default);
+      if (err.body?.error === 'totp_required') {
+        setNeedsCode(true); // the next step, not an error
+      } else if (needsCode && err.status === 401) {
+        setLoginError('That code was not accepted.');
+      } else {
+        setLoginError(LOGIN_ERRORS[err.status] ?? LOGIN_ERRORS.default);
+      }
     }
   }
 
   if (session.status === 'loading') return null;
-  if (session.status === 'out') return <Login onSubmit={login} error={loginError} />;
+  if (session.status === 'out') return <Login onSubmit={login} error={loginError} needsCode={needsCode} />;
   return (
     <Dashboard
       username={session.username}
