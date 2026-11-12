@@ -1,6 +1,9 @@
 package com.notiforwarder.sender
 
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -22,7 +25,11 @@ class PairingController(
     private val onPaired: () -> Unit = {},
     /** Called when the phone becomes unpaired, e.g. to remove the "running" notice. */
     private val onUnpaired: () -> Unit = {},
+    /** Tells the server this phone unpaired itself. Best effort; the phone unpairs either way. */
+    private val unpairOnServer: (Credentials) -> Unit = {},
 ) {
+    private val scope = CoroutineScope(SupervisorJob() + ioDispatcher)
+
     private val _state = MutableStateFlow<UiState>(stateFromStore())
     val state: StateFlow<UiState> = _state
 
@@ -32,9 +39,12 @@ class PairingController(
         pair(PairingInput.fromManual(address, key, encryptionKey))
 
     fun unpair() {
+        val old = store.load()
         store.clear()
         _state.value = UiState.Unpaired()
         onUnpaired()
+        // After the screen has changed, so a slow or missing network never holds up the button.
+        if (old != null) scope.launch { runCatching { unpairOnServer(old) } }
     }
 
     /** Re-reads storage, e.g. after the sender cleared it because the server revoked this phone. */

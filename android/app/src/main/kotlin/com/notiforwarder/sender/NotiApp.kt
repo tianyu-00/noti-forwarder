@@ -24,6 +24,17 @@ class NotiApp : Application() {
     val heartbeat by lazy {
         HeartbeatSender(store, appVersion = BuildConfig.VERSION_NAME, onRevoked = { controller.refresh() })
     }
+    // The phone's open connection to the server: it shows as connected on the dashboard, and a
+    // revoke made there arrives here at once. Reconnects by itself after a drop.
+    private val streamClient by lazy { DeviceStreamClient(store, appVersion = BuildConfig.VERSION_NAME) }
+    val deviceStream: DeviceStreamRunner by lazy {
+        DeviceStreamRunner(
+            connect = streamClient::run,
+            store = store,
+            onRevoked = { controller.refresh() },
+            cancel = streamClient::cancel,
+        )
+    }
     val flushRunner by lazy { FlushRunner(Flusher(queue, sender, sendStatus)::flush, scheduler) }
     val statusReader by lazy { StatusReader(queue, sendStatus) }
 
@@ -47,7 +58,7 @@ class NotiApp : Application() {
         )
     }
 
-    val controller by lazy {
+    val controller: PairingController by lazy {
         PairingController(
             store = store,
             flow = PairingFlow(store, PairingClient()),
@@ -59,15 +70,24 @@ class NotiApp : Application() {
                 hardwareId = Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID),
             ),
             // Messages queued while unpaired (or revoked) go out as soon as pairing works.
-            onPaired = { scheduler.flushSoon() },
+            onPaired = {
+                scheduler.flushSoon()
+                deviceStream.start()
+            },
             // No point keeping a "running" notice on screen for a phone that is not paired.
-            onUnpaired = { stopService(Intent(this, KeepAliveService::class.java)) },
+            onUnpaired = {
+                stopService(Intent(this, KeepAliveService::class.java))
+                deviceStream.stop()
+            },
+            // Best effort: the dashboard shows this phone as unpaired at once instead of slowly "quiet".
+            unpairOnServer = { UnpairClient().unpair(it) },
         )
     }
 
     override fun onCreate() {
         super.onCreate()
         scheduler.flushSoon() // an app start sends anything left in the queue
+        if (store.load() != null) deviceStream.start() // reconnect after a restart of the app
         HeartbeatWorker.schedule(this) // checks in every ~15 minutes while the phone has a network
     }
 }

@@ -199,4 +199,32 @@ class PairingControllerTest {
 
         assertEquals(UiState.Paired("https://nf.example.com", "dev-1", encrypted = true), h.controller.state.value)
     }
+
+    @Test
+    fun `unpairing updates the screen at once and tells the server with the old credentials`() {
+        val told = mutableListOf<Credentials>()
+        val store = InMemoryTokenStore(saved)
+        val flow = PairingFlow(store) { _, _ -> error("unused") }
+        val controller = PairingController(store, flow, device, Dispatchers.Unconfined, unpairOnServer = { told += it })
+
+        controller.unpair()
+
+        assertEquals(UiState.Unpaired(), controller.state.value)
+        assertEquals(null, store.load())
+        assertEquals(listOf(saved), told)
+    }
+
+    @Test
+    fun `unpairing still works when the server cannot be told`() {
+        val store = InMemoryTokenStore(saved)
+        val flow = PairingFlow(store) { _, _ -> error("unused") }
+        val controller = PairingController(
+            store, flow, device, Dispatchers.Unconfined, unpairOnServer = { error("no network") },
+        )
+
+        controller.unpair()
+
+        assertEquals(UiState.Unpaired(), controller.state.value)
+        assertEquals(null, store.load())
+    }
 }

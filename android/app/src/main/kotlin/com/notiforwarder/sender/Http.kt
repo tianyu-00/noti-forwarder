@@ -29,3 +29,11 @@ internal fun defaultHttpClient(): OkHttpClient =
         .followSslRedirects(false)
         .addInterceptor(localNetworkOnlyForCleartext)
         .build()
+
+/**
+ * For the phone's long-lived connection: no overall time limit, but a read timeout longer than
+ * the server's 25-second ping, so a connection that has silently died is dropped and replaced
+ * within about a minute.
+ */
+internal fun streamHttpClient(): OkHttpClient =
+    defaultHttpClient().newBuilder().callTimeout(0, TimeUnit.MILLISECONDS).readTimeout(70, TimeUnit.SECONDS).build()
