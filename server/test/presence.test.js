@@ -10,7 +10,9 @@ function fakeConnection() {
 
 function setup() {
   const changes = [];
-  return { presence: createPresence({ onChange: (id, connected) => changes.push([id, connected]) }), changes };
+  const clock = { t: 1_000_000 };
+  const presence = createPresence({ onChange: (id, connected) => changes.push([id, connected]), now: () => clock.t });
+  return { presence, changes, clock };
 }
 
 describe('presence', () => {
@@ -60,5 +62,42 @@ describe('presence', () => {
 
     expect(() => presence.revoke('nobody')).not.toThrow();
     expect(changes).toEqual([]);
+  });
+
+  it('drops a connection that has not been heard from, because a vanished phone never says goodbye', () => {
+    const { presence, changes, clock } = setup();
+    const silent = fakeConnection();
+    const chatty = fakeConnection();
+    presence.connect('silent', silent);
+    presence.connect('chatty', chatty);
+
+    clock.t += 40_000;
+    presence.touch('chatty'); // it checked in
+    clock.t += 30_000; // silent: 70 s of nothing, chatty: 30 s
+
+    expect(presence.dropStale(60_000)).toEqual(['silent']);
+
+    expect(silent.closed).toBe(1);
+    expect(chatty.closed).toBe(0);
+    expect(presence.isConnected('silent')).toBe(false);
+    expect(presence.isConnected('chatty')).toBe(true);
+    expect(changes).toEqual([['silent', true], ['chatty', true], ['silent', false]]);
+  });
+
+  it('counts the moment of connecting as the first sign of life', () => {
+    const { presence, clock } = setup();
+    presence.connect('a', fakeConnection());
+
+    clock.t += 59_000;
+    expect(presence.dropStale(60_000)).toEqual([]);
+    clock.t += 2_000;
+    expect(presence.dropStale(60_000)).toEqual(['a']);
+  });
+
+  it('ignores a check-in from a phone that is not connected', () => {
+    const { presence } = setup();
+
+    expect(() => presence.touch('nobody')).not.toThrow();
+    expect(presence.isConnected('nobody')).toBe(false);
   });
 });

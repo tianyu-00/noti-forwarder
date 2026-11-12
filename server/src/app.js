@@ -30,6 +30,10 @@ export function createApp({
   pairRateLimit,
   secretBox,
   silentAfterMinutes = 0,
+  // A phone that loses its network never closes its connection, so it must check in (the app
+  // does, every 25 s). Silent for this long means gone. The sweep runs often to notice it quickly.
+  presenceTimeoutMs = 60000,
+  presenceSweepMs = 10000,
 }) {
   const app = express();
   if (trustProxy !== undefined) app.set('trust proxy', trustProxy);
@@ -55,12 +59,13 @@ export function createApp({
       },
     });
     app.locals.presence = presence; // the silent-phone monitor reads it
+    setInterval(() => presence.dropStale(presenceTimeoutMs), presenceSweepMs).unref();
     app.use('/api/v1', authRouter({ db, requireViewer: viewer, cookieSecure, loginRateLimit, now, secretBox }));
     app.use('/api/v1', pairingRouter({ db, requireViewer: viewer, events, publicUrl, pairRateLimit }));
     app.use('/api/v1', devicesRouter({ db, requireViewer: viewer, events, presence, silentAfterMinutes }));
     app.use('/api/v1', settingsRouter({ db, requireViewer: viewer }));
     app.use('/api/v1', messagesRouter({ db, requireViewer: viewer, events, notifier, messageRateLimit, preAuthRateLimit }));
-    app.use('/api/v1', heartbeatRouter({ db, events, preAuthRateLimit }));
+    app.use('/api/v1', heartbeatRouter({ db, events, presence, preAuthRateLimit }));
     app.use('/api/v1', deviceStreamRouter({ db, events, presence, preAuthRateLimit }));
     app.use('/api/v1', streamRouter({ requireViewer: viewer, events }));
   }
