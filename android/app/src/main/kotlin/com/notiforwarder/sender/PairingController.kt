@@ -18,6 +18,8 @@ class PairingController(
     private val flow: PairingFlow,
     private val device: DeviceInfo,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    /** Called after a successful pairing, e.g. to send messages queued while unpaired. */
+    private val onPaired: () -> Unit = {},
 ) {
     private val _state = MutableStateFlow<UiState>(stateFromStore())
     val state: StateFlow<UiState> = _state
@@ -50,7 +52,10 @@ class PairingController(
         _state.value = UiState.Pairing
         val outcome = withContext(ioDispatcher) { flow.pair(target, device) }
         _state.value = when (outcome) {
-            is PairOutcome.Paired -> UiState.Paired(target.serverUrl, outcome.deviceId)
+            is PairOutcome.Paired -> {
+                onPaired()
+                UiState.Paired(target.serverUrl, outcome.deviceId)
+            }
             PairOutcome.InvalidCode -> UiState.Unpaired("That key is invalid or expired. Create a new one on the dashboard.")
             PairOutcome.RateLimited -> UiState.Unpaired("Too many attempts. Wait a few minutes and try again.")
             is PairOutcome.Unreachable -> UiState.Unpaired("Could not reach the server. Check the address and your connection.")

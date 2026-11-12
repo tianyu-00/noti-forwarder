@@ -61,6 +61,33 @@ class PairingControllerTest {
     }
 
     @Test
+    fun `asks for a flush after pairing, so messages queued while unpaired go out`() {
+        var flushes = 0
+        val store = InMemoryTokenStore()
+        val flow = PairingFlow(store) { target, _ ->
+            store.save(Credentials(target.serverUrl, "dev-3", "tok-3"))
+            PairOutcome.Paired("dev-3", "tok-3")
+        }
+        val controller = PairingController(store, flow, device, Dispatchers.Unconfined, onPaired = { flushes++ })
+
+        runBlocking { controller.pairManual("nf.example.com", code) }
+
+        assertEquals(1, flushes)
+    }
+
+    @Test
+    fun `does not ask for a flush when pairing fails`() {
+        var flushes = 0
+        val store = InMemoryTokenStore()
+        val flow = PairingFlow(store) { _, _ -> PairOutcome.InvalidCode }
+        val controller = PairingController(store, flow, device, Dispatchers.Unconfined, onPaired = { flushes++ })
+
+        runBlocking { controller.pairManual("nf.example.com", code) }
+
+        assertEquals(0, flushes)
+    }
+
+    @Test
     fun `pairs from a scanned QR code`() {
         val h = Harness(InMemoryTokenStore()) { PairOutcome.Paired("dev-2", "tok-2") }
 
