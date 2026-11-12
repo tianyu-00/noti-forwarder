@@ -859,7 +859,7 @@ describe('settings: message retention', () => {
   });
 });
 
-describe('settings: two-step login', () => {
+describe('account: two-step login', () => {
   const setup = async ({ totpEnabled }) => {
     server.use(
       http.get('/api/v1/settings', () => HttpResponse.json({ retentionDays: null })),
@@ -868,8 +868,8 @@ describe('settings: two-step login', () => {
     mockApi({ devices: [device({ deviceId: 'a' })] });
     const user = userEvent.setup();
     render(<Dashboard username="admin" onLogout={() => {}} />);
-    await user.click(await screen.findByRole('button', { name: /settings/i }));
-    return { user, dialog: await screen.findByRole('dialog', { name: /settings/i }) };
+    await user.click(await screen.findByRole('button', { name: /account/i }));
+    return { user, dialog: await screen.findByRole('dialog', { name: /account/i }) };
   };
 
   it('says whether two-step login is on or off', async () => {
@@ -1150,26 +1150,45 @@ describe('add phone: scan feedback', () => {
   });
 });
 
-describe('settings: clear all messages', () => {
-  const setup = async () => {
-    server.use(
-      http.get('/api/v1/settings', () => HttpResponse.json({ retentionDays: null })),
-      http.get('/api/v1/auth/me', () => HttpResponse.json({ username: 'admin', csrfToken: 'c', totpEnabled: false })),
-    );
-    mockApi({ devices: [device({ deviceId: 'a' })], messages: [message({ deviceId: 'a', body: 'keep me maybe' })] });
+describe('clear all messages (All phones page)', () => {
+  const setup = async ({ selectPhone = false } = {}) => {
+    mockApi({
+      devices: [device({ deviceId: 'a', name: 'Kitchen' })],
+      messages: [message({ deviceId: 'a', body: 'keep me maybe' })],
+    });
     const user = userEvent.setup();
     render(<Dashboard username="admin" onLogout={() => {}} />);
     await screen.findByText('keep me maybe');
-    await user.click(await screen.findByRole('button', { name: /settings/i }));
-    return { user, dialog: await screen.findByRole('dialog', { name: /settings/i }) };
+    if (selectPhone) await user.click(await screen.findByRole('button', { name: /kitchen/i }));
+    return user;
   };
+  const openDialog = async (user) => {
+    await user.click(await screen.findByRole('button', { name: /clear all messages/i }));
+    return screen.findByRole('dialog', { name: /clear all messages/i });
+  };
+
+  it('has the button on the All phones page, and not inside Settings', async () => {
+    const user = await setup();
+    expect(screen.getByRole('button', { name: /clear all messages/i })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /^settings$/i }));
+    const settings = await screen.findByRole('dialog', { name: /settings/i });
+    expect(within(settings).queryByRole('button', { name: /clear all messages/i })).not.toBeInTheDocument();
+  });
+
+  it('is not shown when a single phone is open (that page has Manage phone)', async () => {
+    await setup({ selectPhone: true });
+
+    expect(screen.queryByRole('button', { name: /clear all messages/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /manage phone/i })).toBeInTheDocument();
+  });
 
   it('asks before clearing, and cancelling sends nothing', async () => {
     let called = false;
     server.use(http.delete('/api/v1/messages', () => { called = true; return HttpResponse.json({ deleted: 1 }); }));
-    const { user, dialog } = await setup();
+    const user = await setup();
 
-    await user.click(await within(dialog).findByRole('button', { name: /clear all messages/i }));
+    const dialog = await openDialog(user);
     expect(within(dialog).getByText(/delete the messages of every phone/i)).toBeInTheDocument();
     await user.click(within(dialog).getByRole('button', { name: /cancel/i }));
 
@@ -1177,22 +1196,22 @@ describe('settings: clear all messages', () => {
     expect(screen.getByText('keep me maybe')).toBeInTheDocument();
   });
 
-  it('deletes everything once confirmed, empties the list and says how many were deleted', async () => {
+  it('deletes everything once confirmed, closes and empties the list', async () => {
     server.use(http.delete('/api/v1/messages', () => HttpResponse.json({ deleted: 7 })));
-    const { user, dialog } = await setup();
+    const user = await setup();
 
-    await user.click(await within(dialog).findByRole('button', { name: /clear all messages/i }));
+    const dialog = await openDialog(user);
     await user.click(within(dialog).getByRole('button', { name: /yes, clear/i }));
 
-    expect(await within(dialog).findByText(/deleted 7 messages/i)).toBeInTheDocument();
-    expect(screen.queryByText('keep me maybe')).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText('keep me maybe')).not.toBeInTheDocument());
+    expect(screen.queryByRole('dialog', { name: /clear all messages/i })).not.toBeInTheDocument();
   });
 
   it('shows an error and keeps the list when the server refuses', async () => {
     server.use(http.delete('/api/v1/messages', () => HttpResponse.json({ error: 'x' }, { status: 500 })));
-    const { user, dialog } = await setup();
+    const user = await setup();
 
-    await user.click(await within(dialog).findByRole('button', { name: /clear all messages/i }));
+    const dialog = await openDialog(user);
     await user.click(within(dialog).getByRole('button', { name: /yes, clear/i }));
 
     expect(await within(dialog).findByText(/could not clear the messages/i)).toBeInTheDocument();
@@ -1200,17 +1219,39 @@ describe('settings: clear all messages', () => {
   });
 
   it('empties the list when another dashboard clears everything', async () => {
-    mockApi({ devices: [device({ deviceId: 'a' })], messages: [message({ deviceId: 'a', body: 'gone soon' })] });
-    render(<Dashboard username="admin" onLogout={() => {}} />);
-    await screen.findByText('gone soon');
+    await setup();
 
     act(() => FakeEventSource.current.emit('messages_cleared_all', {}));
 
-    await waitFor(() => expect(screen.queryByText('gone soon')).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByText('keep me maybe')).not.toBeInTheDocument());
   });
 });
 
-describe('settings: change password', () => {
+describe('account dialog', () => {
+  it('holds password and two-step login, and Settings no longer does', async () => {
+    server.use(
+      http.get('/api/v1/settings', () => HttpResponse.json({ retentionDays: null })),
+      http.get('/api/v1/auth/me', () => HttpResponse.json({ username: 'admin', csrfToken: 'c', totpEnabled: false })),
+    );
+    mockApi({ devices: [device({ deviceId: 'a' })] });
+    const user = userEvent.setup();
+    render(<Dashboard username="admin" onLogout={() => {}} />);
+
+    await user.click(await screen.findByRole('button', { name: /^account$/i }));
+    const account = await screen.findByRole('dialog', { name: /account/i });
+    expect(within(account).getByRole('region', { name: /change password/i })).toBeInTheDocument();
+    expect(await within(account).findByRole('region', { name: /two-step login/i })).toBeInTheDocument();
+    await user.keyboard('{Escape}');
+
+    await user.click(screen.getByRole('button', { name: /^settings$/i }));
+    const settings = await screen.findByRole('dialog', { name: /settings/i });
+    expect(within(settings).queryByRole('region', { name: /change password/i })).not.toBeInTheDocument();
+    expect(within(settings).queryByRole('region', { name: /two-step login/i })).not.toBeInTheDocument();
+    expect(within(settings).getByRole('region', { name: /end-to-end encryption/i })).toBeInTheDocument();
+  });
+});
+
+describe('account: change password', () => {
   const setup = async () => {
     server.use(
       http.get('/api/v1/settings', () => HttpResponse.json({ retentionDays: null })),
@@ -1219,8 +1260,8 @@ describe('settings: change password', () => {
     mockApi({ devices: [device({ deviceId: 'a' })] });
     const user = userEvent.setup();
     render(<Dashboard username="admin" onLogout={() => {}} />);
-    await user.click(await screen.findByRole('button', { name: /settings/i }));
-    const dialog = await screen.findByRole('dialog', { name: /settings/i });
+    await user.click(await screen.findByRole('button', { name: /account/i }));
+    const dialog = await screen.findByRole('dialog', { name: /account/i });
     const fill = async (current, next, again = next) => {
       await user.type(await within(dialog).findByLabelText(/current password/i), current);
       await user.type(within(dialog).getByLabelText(/^new password/i), next);

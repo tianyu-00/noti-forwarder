@@ -6,6 +6,8 @@ import Footer from './Footer.jsx';
 import AddPhoneDialog from './AddPhoneDialog.jsx';
 import ManagePhoneDialog from './ManagePhoneDialog.jsx';
 import SettingsDialog from './SettingsDialog.jsx';
+import AccountDialog from './AccountDialog.jsx';
+import ClearAllDialog from './ClearAllDialog.jsx';
 import Sidebar from './Sidebar.jsx';
 import Filters from './Filters.jsx';
 import ThemeToggle from './ThemeToggle.jsx';
@@ -30,6 +32,8 @@ export default function Dashboard({ username, onLogout, pairingTiming }) {
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [olderFailed, setOlderFailed] = useState(false); // stop auto-loading until the user retries
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
+  const [clearAllOpen, setClearAllOpen] = useState(false);
   const [reloadKey, setReloadKey] = useState(0); // bump to load the message list again
 
   const endRef = useRef(null); // sits below the last message; scrolling near it loads more
@@ -199,6 +203,9 @@ export default function Dashboard({ username, onLogout, pairingTiming }) {
         <div className="flex items-center gap-1">
           <span className="hidden text-sm text-muted sm:inline">Signed in as {username}</span>
           <ThemeToggle />
+          <Button variant="ghost" onClick={() => setAccountOpen(true)}>
+            Account
+          </Button>
           <Button variant="ghost" onClick={() => setSettingsOpen(true)}>
             Settings
           </Button>
@@ -219,10 +226,16 @@ export default function Dashboard({ username, onLogout, pairingTiming }) {
         <main className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-2 px-4 py-4">
             <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
-            {selectedDevice && (
+            {selectedDevice ? (
               <Button variant="secondary" onClick={() => setManageOpen(true)}>
                 Manage phone
               </Button>
+            ) : (
+              !selected && (
+                <Button variant="secondary" onClick={() => setClearAllOpen(true)}>
+                  Clear all messages
+                </Button>
+              )
             )}
           </div>
           <Filters filters={filters} apps={apps} onChange={setFilters} />
@@ -265,8 +278,9 @@ export default function Dashboard({ username, onLogout, pairingTiming }) {
         open={settingsOpen}
         onOpenChange={setSettingsOpen}
         onPurged={() => setReloadKey((k) => k + 1)}
-        onClearedAll={clearAllMessages}
       />
+      <AccountDialog open={accountOpen} onOpenChange={setAccountOpen} />
+      <ClearAllDialog open={clearAllOpen} onOpenChange={setClearAllOpen} onCleared={clearAllMessages} />
       <AddPhoneDialog
         open={addOpen}
         onOpenChange={setAddOpen}

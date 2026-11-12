@@ -2,8 +2,6 @@ import { useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
 import { api } from './api.js';
 import EncryptionSection from './EncryptionSection.jsx';
-import PasswordSection from './PasswordSection.jsx';
-import SecuritySection from './SecuritySection.jsx';
 import { Button, Modal } from './ui.jsx';
 
 const MAX_DAYS = 3650;
@@ -123,65 +121,11 @@ function RetentionForm({ onPurged }) {
 
 RetentionForm.propTypes = { onPurged: PropTypes.func.isRequired };
 
-function ClearAllSection({ onClearedAll }) {
-  const [confirming, setConfirming] = useState(false);
-  const [error, setError] = useState(null);
-  const [result, setResult] = useState(null);
-
-  async function clearAll() {
-    setError(null);
-    setResult(null);
-    try {
-      const done = await api('/messages', { method: 'DELETE' });
-      setConfirming(false);
-      setResult(`Deleted ${done.deleted} messages.`);
-      onClearedAll();
-    } catch {
-      setConfirming(false);
-      setError('Could not clear the messages.');
-    }
-  }
-
-  return (
-    <section className="space-y-3 border-t border-line pt-5 text-sm" aria-label="Clear all messages">
-      <h3 className="text-sm font-semibold">Clear all messages</h3>
-      {error && (
-        <p role="alert" className="text-danger">
-          {error}
-        </p>
-      )}
-      {result && <p className="text-ok">{result}</p>}
-      {confirming ? (
-        <div className="space-y-3 rounded-lg border border-line bg-surface p-4">
-          <p>Delete the messages of every phone? The phones stay paired. This cannot be undone.</p>
-          <div className="flex gap-2">
-            <Button variant="danger" onClick={clearAll}>
-              Yes, clear
-            </Button>
-            <Button variant="secondary" onClick={() => setConfirming(false)}>
-              Cancel
-            </Button>
-          </div>
-        </div>
-      ) : (
-        <Button variant="secondary" onClick={() => setConfirming(true)}>
-          Clear all messages
-        </Button>
-      )}
-    </section>
-  );
-}
-
-ClearAllSection.propTypes = { onClearedAll: PropTypes.func.isRequired };
-
-export default function SettingsDialog({ open, onOpenChange, onPurged, onClearedAll }) {
+export default function SettingsDialog({ open, onOpenChange, onPurged }) {
   return (
     <Modal open={open} onOpenChange={onOpenChange} title="Settings" description="Message retention applies to every phone.">
       <RetentionForm onPurged={onPurged} />
       <EncryptionSection />
-      <PasswordSection />
-      <SecuritySection />
-      <ClearAllSection onClearedAll={onClearedAll} />
     </Modal>
   );
 }
@@ -190,5 +134,4 @@ SettingsDialog.propTypes = {
   open: PropTypes.bool.isRequired,
   onOpenChange: PropTypes.func.isRequired,
   onPurged: PropTypes.func.isRequired,
-  onClearedAll: PropTypes.func.isRequired,
 };

@@ -119,7 +119,7 @@ Moving to the first release-signed build means uninstalling the debug-signed app
 
 ## Two-step login
 
-Optional but recommended, because messages hold 2FA codes for your other accounts. In the dashboard open **Settings**, then **Two-step login**, and choose *Turn on*. Scan the QR code with an authenticator app (Google Authenticator, Authy, 1Password…), type the code it shows, and **save the 10 backup codes** (each works once, and they are shown only once). From then on the sign-in form asks for a code after your password.
+Optional but recommended, because messages hold 2FA codes for your other accounts. In the dashboard open **Account**, then **Two-step login**, and choose *Turn on*. Scan the QR code with an authenticator app (Google Authenticator, Authy, 1Password…), type the code it shows, and **save the 10 backup codes** (each works once, and they are shown only once). From then on the sign-in form asks for a code after your password.
 
 Lost your phone and the backup codes? Turn it off from the server:
 
@@ -143,10 +143,11 @@ Optional. With it on, the server only ever stores scrambled text, so even someon
 
 ## Changing the password
 
-**Settings**, then **Change password**. It asks for the current password and signs out every other browser. (`ADMIN_PASSWORD` in the environment only matters the first time the server starts.)
+**Account**, then **Change password**. It asks for the current password and signs out every other browser. (`ADMIN_PASSWORD` in the environment only matters the first time the server starts.)
 
 ## Keeping and deleting messages
 
+- **Clear all messages** is a button on the *All phones* page (to clear a single phone, open it and use *Manage phone*). It deletes every phone's messages at once and the phones stay paired.
 - **Settings** (top right of the dashboard) sets how long messages are kept: forever (the default) or delete everything older than N days. Saving a limit deletes the older messages at once and the server repeats it every hour. This cannot be undone, so the dashboard asks first.
 - **Clear a phone's messages**: select the phone, choose *Manage phone*, then *Clear messages*. Its messages are deleted; the phone stays paired and keeps sending. No revoke needed.
 - **Erase a phone**: revoke it first, then open it and choose *Erase this phone and its messages*. The phone entry and all its messages are removed.
