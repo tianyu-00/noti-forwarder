@@ -2,6 +2,7 @@ package com.notiforwarder.sender
 
 import android.app.Application
 import android.os.Build
+import android.provider.Settings
 
 /** Wires the pure classes together once per process. */
 class NotiApp : Application() {
@@ -19,6 +20,8 @@ class NotiApp : Application() {
                 name = "${Build.MANUFACTURER} ${Build.MODEL}".trim(),
                 model = Build.MODEL,
                 appVersion = BuildConfig.VERSION_NAME,
+                // Per app and signing key; survives reinstalling, resets on a factory reset.
+                hardwareId = Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID),
             ),
         )
     }

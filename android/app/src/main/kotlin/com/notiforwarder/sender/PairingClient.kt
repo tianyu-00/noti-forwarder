@@ -7,7 +7,13 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 
-data class DeviceInfo(val name: String, val model: String, val appVersion: String)
+data class DeviceInfo(
+    val name: String,
+    val model: String,
+    val appVersion: String,
+    /** Stable per-phone id, so pairing again reuses this phone's entry on the server. */
+    val hardwareId: String? = null,
+)
 
 sealed interface PairOutcome {
     data class Paired(val deviceId: String, val token: String) : PairOutcome
@@ -18,7 +24,13 @@ sealed interface PairOutcome {
 }
 
 @Serializable
-private data class PairRequest(val code: String, val name: String, val model: String, val appVersion: String)
+private data class PairRequest(
+    val code: String,
+    val name: String,
+    val model: String,
+    val appVersion: String,
+    val hardwareId: String? = null,
+)
 
 @Serializable
 private data class PairResponse(val deviceId: String, val token: String)
@@ -27,11 +39,14 @@ private data class PairResponse(val deviceId: String, val token: String)
 class PairingClient(
     private val http: OkHttpClient = defaultHttpClient(),
 ) {
-    private val json = Json { ignoreUnknownKeys = true }
+    private val json = Json {
+        ignoreUnknownKeys = true
+        explicitNulls = false // older servers get no hardwareId field at all
+    }
 
     fun pair(target: PairingTarget, device: DeviceInfo): PairOutcome {
         val body = json.encodeToString(
-            PairRequest(target.code, device.name, device.model, device.appVersion),
+            PairRequest(target.code, device.name, device.model, device.appVersion, device.hardwareId),
         ).toRequestBody(JSON_MEDIA_TYPE)
         val request = Request.Builder()
             .url("${target.serverUrl}/api/v1/pair")

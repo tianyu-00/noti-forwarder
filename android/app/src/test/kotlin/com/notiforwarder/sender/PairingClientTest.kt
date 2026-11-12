@@ -54,6 +54,26 @@ class PairingClientTest {
     }
 
     @Test
+    fun `sends the hardware id so the server can recognise this phone next time`() {
+        reply(201, """{"deviceId":"dev-1","token":"t"}""")
+
+        client.pair(target(), device.copy(hardwareId = "abc123"))
+
+        val body = Json.parseToJsonElement(server.takeRequest().body!!.utf8()).jsonObject
+        assertEquals("abc123", body["hardwareId"]!!.jsonPrimitive.content)
+    }
+
+    @Test
+    fun `leaves the hardware id out when there is none`() {
+        reply(201, """{"deviceId":"dev-1","token":"t"}""")
+
+        client.pair(target(), device)
+
+        val body = Json.parseToJsonElement(server.takeRequest().body!!.utf8()).jsonObject
+        assertTrue("hardwareId" !in body)
+    }
+
+    @Test
     fun `reports an invalid or expired code`() {
         reply(400, """{"error":"invalid_code"}""")
 
