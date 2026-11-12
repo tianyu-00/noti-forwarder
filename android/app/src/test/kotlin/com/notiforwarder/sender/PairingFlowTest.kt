@@ -39,4 +39,14 @@ class PairingFlowTest {
 
         assertEquals(existing, store.load())
     }
+
+    @Test
+    fun `keeps the encryption key with the credentials`() {
+        val store = InMemoryTokenStore()
+        val keyed = PairingTarget("https://nf.example.com", "KEY", "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8")
+
+        flow(store, PairOutcome.Paired("dev-1", "tok")).pair(keyed, device)
+
+        assertEquals(keyed.e2eKey, store.load()?.e2eKey)
+    }
 }

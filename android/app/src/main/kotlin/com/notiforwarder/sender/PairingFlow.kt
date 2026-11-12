@@ -10,7 +10,7 @@ class PairingFlow(
     fun pair(target: PairingTarget, device: DeviceInfo): PairOutcome {
         val outcome = pairWithServer(target, device)
         if (outcome is PairOutcome.Paired) {
-            store.save(Credentials(target.serverUrl, outcome.deviceId, outcome.token))
+            store.save(Credentials(target.serverUrl, outcome.deviceId, outcome.token, target.e2eKey))
         }
         return outcome
     }

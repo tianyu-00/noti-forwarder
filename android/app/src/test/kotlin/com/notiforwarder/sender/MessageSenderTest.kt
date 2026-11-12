@@ -140,4 +140,51 @@ class MessageSenderTest {
         assertTrue(sender.send(listOf(message)) is SendOutcome.Unreachable)
         assertNotNull(store.load())
     }
+
+    private val e2eKey = "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8"
+
+    @Test
+    fun `encrypts sender and text when the phone has an encryption key, leaving the rest readable`() {
+        store.save(store.load()!!.copy(e2eKey = e2eKey))
+        reply(201, """{"stored":1,"duplicates":0}""")
+
+        sender.send(listOf(message))
+
+        val raw = server.takeRequest().body!!.utf8()
+        val sent = Json.parseToJsonElement(raw).jsonObject["messages"]!!.jsonArray[0].jsonObject
+        assertEquals(message.id, sent["id"]!!.jsonPrimitive.content)
+        assertEquals("com.bank", sent["app"]!!.jsonPrimitive.content)
+        assertEquals("notification", sent["type"]!!.jsonPrimitive.content)
+        assertEquals("2025-11-11T10:00:05Z", sent["receivedAt"]!!.jsonPrimitive.content)
+        val cipher = E2eCipher(e2eKey)
+        assertEquals("Bank", cipher.decrypt("sender", sent["sender"]!!.jsonPrimitive.content))
+        assertEquals("Your code is 123456", cipher.decrypt("body", sent["body"]!!.jsonPrimitive.content))
+        assertTrue(!raw.contains("Your code is 123456") && !raw.contains("\"Bank\""))
+    }
+
+    @Test
+    fun `sends the same bytes again on a retry and keeps an empty sender empty`() {
+        store.save(store.load()!!.copy(e2eKey = e2eKey))
+        reply(500)
+        reply(201, """{"stored":1,"duplicates":0}""")
+        val noSender = message.copy(sender = "")
+
+        sender.send(listOf(noSender))
+        sender.send(listOf(noSender))
+
+        val first = server.takeRequest().body!!.utf8()
+        val second = server.takeRequest().body!!.utf8()
+        assertEquals(first, second)
+        val sent = Json.parseToJsonElement(first).jsonObject["messages"]!!.jsonArray[0].jsonObject
+        assertEquals("", sent["sender"]!!.jsonPrimitive.content)
+    }
+
+    @Test
+    fun `sends plain text when there is no encryption key`() {
+        reply(201, """{"stored":1,"duplicates":0}""")
+
+        sender.send(listOf(message))
+
+        assertTrue(server.takeRequest().body!!.utf8().contains("Your code is 123456"))
+    }
 }

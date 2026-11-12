@@ -181,4 +181,22 @@ class PairingControllerTest {
         val state = h.controller.state.value as UiState.Unpaired
         assertTrue(state.error!!.contains("removed", ignoreCase = true))
     }
+
+    @Test
+    fun `knows the phone is end-to-end encrypted when it was paired with a key`() {
+        val key = "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8"
+        val h = Harness(InMemoryTokenStore()) { PairOutcome.Paired("dev-3", "tok-3") }
+
+        runBlocking { h.controller.pairFromQr("""{"u":"https://nf.example.com","c":"$code","k":"$key"}""") }
+
+        assertEquals(UiState.Paired("https://nf.example.com", "dev-3", encrypted = true), h.controller.state.value)
+    }
+
+    @Test
+    fun `reports a stored key as encrypted after a restart`() {
+        val key = "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8"
+        val h = Harness(InMemoryTokenStore(Credentials("https://nf.example.com", "dev-1", "tok", key))) { error("unused") }
+
+        assertEquals(UiState.Paired("https://nf.example.com", "dev-1", encrypted = true), h.controller.state.value)
+    }
 }

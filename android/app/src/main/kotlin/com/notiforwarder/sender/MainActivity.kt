@@ -148,6 +148,7 @@ private fun MainScreen(
     val scope = rememberCoroutineScope()
     var address by remember { mutableStateOf("") }
     var key by remember { mutableStateOf("") }
+    var encryptionKey by remember { mutableStateOf("") }
     var queueStatus by remember { mutableStateOf<QueueStatus?>(null) }
     var now by remember { mutableStateOf(System.currentTimeMillis()) }
     val askNotifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
@@ -183,6 +184,10 @@ private fun MainScreen(
             is UiState.Paired -> Section("Connection") {
                 Text("Paired", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.tertiary)
                 Text(s.serverUrl, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    if (s.encrypted) "End-to-end encrypted" else "Not end-to-end encrypted",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
                 SecondaryButton(onClick = controller::unpair, modifier = Modifier.fillMaxWidth()) {
                     Text("Unpair this phone")
                 }
@@ -210,8 +215,15 @@ private fun MainScreen(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
+                OutlinedTextField(
+                    value = encryptionKey,
+                    onValueChange = { encryptionKey = it },
+                    label = { Text("Encryption key (optional)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
                 SecondaryButton(
-                    onClick = { scope.launch { controller.pairManual(address, key) } },
+                    onClick = { scope.launch { controller.pairManual(address, key, encryptionKey) } },
                     modifier = Modifier.fillMaxWidth(),
                 ) { Text("Pair") }
             }

@@ -19,13 +19,14 @@ class EncryptedTokenStore(context: Context) : TokenStore {
         val server = prefs.getString("serverUrl", null) ?: return null
         val deviceId = prefs.getString("deviceId", null) ?: return null
         val token = prefs.getString("token", null) ?: return null
-        return Credentials(server, deviceId, token)
+        return Credentials(server, deviceId, token, prefs.getString("e2eKey", null))
     }
 
     override fun save(credentials: Credentials) = prefs.edit {
         putString("serverUrl", credentials.serverUrl)
         putString("deviceId", credentials.deviceId)
         putString("token", credentials.token)
+        if (credentials.e2eKey != null) putString("e2eKey", credentials.e2eKey) else remove("e2eKey")
     }
 
     override fun clear() = prefs.edit { clear() }

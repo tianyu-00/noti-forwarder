@@ -79,4 +79,31 @@ class PairingInputTest {
             PairingInput.fromManual("nf.example.com", code),
         )
     }
+
+    private val e2eKey = "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8"
+
+    @Test
+    fun `reads the encryption key from the QR code`() {
+        val result = PairingInput.fromQr("""{"u":"https://nf.example.com","c":"$code","k":"$e2eKey"}""")
+
+        assertEquals(PairingResult.Ok(PairingTarget("https://nf.example.com", code, e2eKey)), result)
+    }
+
+    @Test
+    fun `refuses a QR code with an encryption key that is not valid`() {
+        assertInvalid(PairingInput.fromQr("""{"u":"https://nf.example.com","c":"$code","k":"short"}"""))
+    }
+
+    @Test
+    fun `manual entry takes an optional encryption key`() {
+        assertEquals(
+            PairingResult.Ok(PairingTarget("https://nf.example.com", code, e2eKey)),
+            PairingInput.fromManual("nf.example.com", code, "  $e2eKey "),
+        )
+        assertEquals(
+            PairingResult.Ok(PairingTarget("https://nf.example.com", code, null)),
+            PairingInput.fromManual("nf.example.com", code, "   "),
+        )
+        assertInvalid(PairingInput.fromManual("nf.example.com", code, "typo"))
+    }
 }

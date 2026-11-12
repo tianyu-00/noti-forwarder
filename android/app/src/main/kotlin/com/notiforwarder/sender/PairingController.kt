@@ -9,7 +9,7 @@ import kotlinx.coroutines.withContext
 sealed interface UiState {
     data class Unpaired(val error: String? = null) : UiState
     data object Pairing : UiState
-    data class Paired(val serverUrl: String, val deviceId: String) : UiState
+    data class Paired(val serverUrl: String, val deviceId: String, val encrypted: Boolean = false) : UiState
 }
 
 /** Holds the pairing screen's state. Plain Kotlin so it is testable on the JVM. */
@@ -28,7 +28,8 @@ class PairingController(
 
     suspend fun pairFromQr(text: String) = pair(PairingInput.fromQr(text))
 
-    suspend fun pairManual(address: String, key: String) = pair(PairingInput.fromManual(address, key))
+    suspend fun pairManual(address: String, key: String, encryptionKey: String = "") =
+        pair(PairingInput.fromManual(address, key, encryptionKey))
 
     fun unpair() {
         store.clear()
@@ -40,7 +41,7 @@ class PairingController(
     fun refresh() {
         val credentials = store.load()
         when {
-            credentials != null -> _state.value = UiState.Paired(credentials.serverUrl, credentials.deviceId)
+            credentials != null -> _state.value = paired(credentials)
             _state.value is UiState.Paired -> {
                 _state.value = UiState.Unpaired("This phone was removed from the server. Pair it again.")
                 onUnpaired()
@@ -59,7 +60,7 @@ class PairingController(
         _state.value = when (outcome) {
             is PairOutcome.Paired -> {
                 onPaired()
-                UiState.Paired(target.serverUrl, outcome.deviceId)
+                UiState.Paired(target.serverUrl, outcome.deviceId, encrypted = target.e2eKey != null)
             }
             PairOutcome.InvalidCode -> UiState.Unpaired("That key is invalid or expired. Create a new one on the dashboard.")
             PairOutcome.RateLimited -> UiState.Unpaired("Too many attempts. Wait a few minutes and try again.")
@@ -69,5 +70,8 @@ class PairingController(
     }
 
     private fun stateFromStore(): UiState =
-        store.load()?.let { UiState.Paired(it.serverUrl, it.deviceId) } ?: UiState.Unpaired()
+        store.load()?.let(::paired) ?: UiState.Unpaired()
+
+    private fun paired(credentials: Credentials) =
+        UiState.Paired(credentials.serverUrl, credentials.deviceId, encrypted = credentials.e2eKey != null)
 }

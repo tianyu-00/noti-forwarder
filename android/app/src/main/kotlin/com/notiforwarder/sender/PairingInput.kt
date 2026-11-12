@@ -5,7 +5,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 /** Where to pair and the single-use key to pair with. */
-data class PairingTarget(val serverUrl: String, val code: String)
+data class PairingTarget(val serverUrl: String, val code: String, val e2eKey: String? = null)
 
 sealed interface PairingResult {
     data class Ok(val target: PairingTarget) : PairingResult
@@ -13,7 +13,7 @@ sealed interface PairingResult {
 }
 
 @Serializable
-private data class QrPayload(val u: String, val c: String)
+private data class QrPayload(val u: String, val c: String, val k: String? = null)
 
 object PairingInput {
     private val json = Json { ignoreUnknownKeys = true }
@@ -25,18 +25,21 @@ object PairingInput {
         } catch (e: Exception) {
             return PairingResult.Invalid("This is not a Notiforwarder pairing code.")
         }
-        return build(payload.u, payload.c)
+        return build(payload.u, payload.c, payload.k.orEmpty())
     }
 
-    /** Validates the address and security key typed in by hand. */
-    fun fromManual(address: String, key: String): PairingResult = build(address, key)
+    /** Validates the address, security key and optional encryption key typed in by hand. */
+    fun fromManual(address: String, key: String, encryptionKey: String = ""): PairingResult =
+        build(address, key, encryptionKey)
 
-    private fun build(address: String, key: String): PairingResult {
+    private fun build(address: String, key: String, encryptionKey: String): PairingResult {
         val server = normalizeServer(address)
             ?: return PairingResult.Invalid("Enter an https:// server address (http:// is allowed only on your own network).")
         val code = key.trim()
         if (code.isEmpty()) return PairingResult.Invalid("Enter the security key.")
-        return PairingResult.Ok(PairingTarget(server, code))
+        val e2e = encryptionKey.trim().takeIf { it.isNotEmpty() }
+        if (e2e != null && !E2eCipher.isValidKey(e2e)) return PairingResult.Invalid("The encryption key is not valid.")
+        return PairingResult.Ok(PairingTarget(server, code, e2e))
     }
 
     /**

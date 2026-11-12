@@ -1,6 +1,7 @@
 package com.notiforwarder.sender
 
 import java.io.IOException
+import java.time.OffsetDateTime
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
@@ -37,13 +38,30 @@ class MessageSender(
 ) : BatchSender {
     private val json = Json { ignoreUnknownKeys = true }
 
+    /**
+     * With an encryption key, sender and text are encrypted just before they leave the phone (the
+     * queue keeps the plain text on the phone). The same message always gives the same bytes, so a
+     * retry is identical. App, type, id and time stay readable so the server can still filter.
+     */
+    private fun encryptIfKeyed(messages: List<Message>, key: String?): List<Message> {
+        if (key == null) return messages
+        val cipher = E2eCipher(key)
+        return messages.map { m ->
+            val at = OffsetDateTime.parse(m.receivedAt).toInstant().toEpochMilli()
+            m.copy(
+                sender = if (m.sender.isEmpty()) "" else cipher.encrypt("sender", m.sender, m.app, at),
+                body = cipher.encrypt("body", m.body, m.app, at),
+            )
+        }
+    }
+
     override fun send(messages: List<Message>): SendOutcome {
         val credentials = store.load() ?: return SendOutcome.NotPaired
         val request = Request.Builder()
             .url("${credentials.serverUrl}/api/v1/messages")
             .header("Authorization", "Bearer ${credentials.token}")
             .header("X-App-Version", appVersion)
-            .post(json.encodeToString(SendRequest(messages)).toRequestBody(JSON_MEDIA_TYPE))
+            .post(json.encodeToString(SendRequest(encryptIfKeyed(messages, credentials.e2eKey))).toRequestBody(JSON_MEDIA_TYPE))
             .build()
 
         return try {
