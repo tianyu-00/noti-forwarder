@@ -28,6 +28,8 @@ data class Message(
     val sender: String,
     val body: String,
     val receivedAt: String,
+    /** The app's real name ("Gmail"), added just before sending. Null (and left out) when unknown. */
+    val appLabel: String? = null,
 )
 
 class NotificationParser(

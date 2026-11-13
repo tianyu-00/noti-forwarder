@@ -8,6 +8,7 @@ import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -186,5 +187,57 @@ class MessageSenderTest {
         sender.send(listOf(message))
 
         assertTrue(server.takeRequest().body!!.utf8().contains("Your code is 123456"))
+    }
+
+    private fun sentFirst(): kotlinx.serialization.json.JsonObject {
+        val request = server.takeRequest()
+        return Json.parseToJsonElement(request.body!!.utf8()).jsonObject["messages"]!!.jsonArray.first().jsonObject
+    }
+
+    @Test
+    fun `sends the app's real name with a notification, next to the package name`() {
+        reply(201, """{"stored":1,"duplicates":0}""")
+        sender = MessageSender(store, appVersion = "0.1.0", appLabel = { if (it == "com.bank") "Northwind Bank" else null })
+
+        sender.send(listOf(message))
+
+        val sent = sentFirst()
+        assertEquals("com.bank", sent["app"]!!.jsonPrimitive.content)
+        assertEquals("Northwind Bank", sent["appLabel"]!!.jsonPrimitive.content)
+    }
+
+    @Test
+    fun `leaves the name out when the phone does not know the app`() {
+        reply(201, """{"stored":1,"duplicates":0}""")
+        sender = MessageSender(store, appVersion = "0.1.0", appLabel = { null })
+
+        sender.send(listOf(message))
+
+        assertFalse(sentFirst().containsKey("appLabel"))
+    }
+
+    @Test
+    fun `does not look up a name for a text message`() {
+        reply(201, """{"stored":1,"duplicates":0}""")
+        val asked = mutableListOf<String>()
+        sender = MessageSender(store, appVersion = "0.1.0", appLabel = { asked += it; "SMS app" })
+
+        sender.send(listOf(message.copy(type = "sms", app = "sms")))
+
+        assertTrue(asked.isEmpty())
+        assertFalse(sentFirst().containsKey("appLabel"))
+    }
+
+    @Test
+    fun `sends the name readable even when the text is encrypted`() {
+        store.save(Credentials(store.load()!!.serverUrl, "dev-1", "device-token", e2eKey = "A".repeat(43)))
+        reply(201, """{"stored":1,"duplicates":0}""")
+        sender = MessageSender(store, appVersion = "0.1.0", appLabel = { "Northwind Bank" })
+
+        sender.send(listOf(message))
+
+        val sent = sentFirst()
+        assertEquals("Northwind Bank", sent["appLabel"]!!.jsonPrimitive.content)
+        assertTrue(sent["body"]!!.jsonPrimitive.content.startsWith("e2e:v1:"))
     }
 }

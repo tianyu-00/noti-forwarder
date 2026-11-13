@@ -33,6 +33,8 @@ class MessageSender(
     private val store: TokenStore,
     private val appVersion: String,
     private val http: OkHttpClient = defaultHttpClient(),
+    /** The name the user knows an app by, from its package name; null when it cannot be found. */
+    private val appLabel: (String) -> String? = { null },
     /** Called after the credentials are cleared because the server revoked this phone. */
     private val onRevoked: () -> Unit = {},
 ) : BatchSender {
@@ -55,13 +57,22 @@ class MessageSender(
         }
     }
 
+    /**
+     * Notifications carry the real app name next to the package name (the server only sees
+     * "com.google.android.gm"). Looked up now, not when captured, so the queue is unchanged. It is
+     * not secret, so it stays readable when the text is encrypted.
+     */
+    private fun withAppLabels(messages: List<Message>): List<Message> = messages.map { m ->
+        if (m.type != "notification" || m.appLabel != null) m else m.copy(appLabel = appLabel(m.app))
+    }
+
     override fun send(messages: List<Message>): SendOutcome {
         val credentials = store.load() ?: return SendOutcome.NotPaired
         val request = Request.Builder()
             .url("${credentials.serverUrl}/api/v1/messages")
             .header("Authorization", "Bearer ${credentials.token}")
             .header("X-App-Version", appVersion)
-            .post(json.encodeToString(SendRequest(encryptIfKeyed(messages, credentials.e2eKey))).toRequestBody(JSON_MEDIA_TYPE))
+            .post(json.encodeToString(SendRequest(encryptIfKeyed(withAppLabels(messages), credentials.e2eKey))).toRequestBody(JSON_MEDIA_TYPE))
             .build()
 
         return try {

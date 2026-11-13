@@ -19,7 +19,12 @@ class NotiApp : Application() {
 
     // The service runs without a screen, so a revocation must reach the UI state from here.
     private val sender by lazy {
-        MessageSender(store, appVersion = BuildConfig.VERSION_NAME, onRevoked = { controller.refresh() })
+        MessageSender(
+            store,
+            appVersion = BuildConfig.VERSION_NAME,
+            onRevoked = { controller.refresh() },
+            appLabel = PackageLabels(packageManager)::labelFor,
+        )
     }
     val heartbeat by lazy {
         HeartbeatSender(store, appVersion = BuildConfig.VERSION_NAME, onRevoked = { controller.refresh() })
