@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import PropTypes from "prop-types";
+import clsx from "clsx";
 import { splitAroundCode } from "./code.js";
 import { Button } from "./ui.jsx";
 import Avatar from "./Avatar.jsx";
@@ -91,7 +92,15 @@ function dayLabel(iso) {
     : day.toLocaleDateString(undefined, dayFormat);
 }
 
+// Longer than this and a message is folded: an email notification can run to dozens of lines.
+const FOLD_LINES = 8;
+const FOLD_CHARS = 600;
+const isLong = (body) =>
+  body.length > FOLD_CHARS || body.split("\n").length > FOLD_LINES;
+
 function Bubble({ message: m }) {
+  const [expanded, setExpanded] = useState(false);
+  const foldable = !m.locked && isLong(m.body);
   return (
     <article className="max-w-[min(34rem,100%)] space-y-1.5 self-start">
       <div className="rounded-2xl rounded-tl-md border border-line bg-bg px-4 py-3">
@@ -107,7 +116,12 @@ function Bubble({ message: m }) {
               : "Could not decrypt this message. It was probably encrypted with a different key."}
           </p>
         ) : (
-          <p className="whitespace-pre-wrap wrap-break-word text-sm leading-relaxed text-fg">
+          <p
+            className={clsx(
+              "whitespace-pre-wrap wrap-break-word text-sm leading-relaxed text-fg",
+              foldable && !expanded && "line-clamp-8",
+            )}
+          >
             {splitAroundCode(m.body, m.code).map((part, i) =>
               part.isCode ? (
                 <mark
@@ -121,6 +135,16 @@ function Bubble({ message: m }) {
               ),
             )}
           </p>
+        )}
+        {foldable && (
+          <button
+            type="button"
+            aria-expanded={expanded}
+            onClick={() => setExpanded((v) => !v)}
+            className="mt-2 text-xs font-semibold text-accent hover:underline"
+          >
+            {expanded ? "Show less" : "Show more"}
+          </button>
         )}
       </div>
       <div className="flex items-center gap-3 px-1">

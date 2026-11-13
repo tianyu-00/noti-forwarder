@@ -282,3 +282,63 @@ describe("unread conversations", () => {
     ).toBeInTheDocument();
   });
 });
+
+describe("long messages", () => {
+  const longBody = Array.from({ length: 20 }, (_, i) => `line ${i + 1}`).join(
+    "\n",
+  );
+
+  function open(body) {
+    mockApi({
+      devices: phones,
+      messages: [
+        message({
+          deviceId: "a",
+          type: "sms",
+          app: "sms",
+          sender: "NORTHWIND",
+          body,
+        }),
+      ],
+    });
+    render(<Dashboard username="admin" onLogout={() => {}} />);
+    return screen.findByRole("region", { name: "NORTHWIND" });
+  }
+
+  it("folds a message with many lines behind a Show more button", async () => {
+    const thread = await open(longBody);
+
+    const button = within(thread).getByRole("button", { name: "Show more" });
+    expect(button).toHaveAttribute("aria-expanded", "false");
+    // Folded by the page, not cut: the whole text is still in it.
+    expect(thread).toHaveTextContent("line 20");
+  });
+
+  it("folds one very long line too", async () => {
+    const thread = await open("word ".repeat(200));
+
+    expect(
+      within(thread).getByRole("button", { name: "Show more" }),
+    ).toBeInTheDocument();
+  });
+
+  it("shows all of it on Show more, and folds it again on Show less", async () => {
+    const user = userEvent.setup();
+    const thread = await open(longBody);
+
+    await user.click(within(thread).getByRole("button", { name: "Show more" }));
+    const less = within(thread).getByRole("button", { name: "Show less" });
+    expect(less).toHaveAttribute("aria-expanded", "true");
+
+    await user.click(less);
+    expect(
+      within(thread).getByRole("button", { name: "Show more" }),
+    ).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("leaves a short message alone", async () => {
+    const thread = await open("Just a short text");
+
+    expect(within(thread).queryByRole("button", { name: /show/i })).toBeNull();
+  });
+});
