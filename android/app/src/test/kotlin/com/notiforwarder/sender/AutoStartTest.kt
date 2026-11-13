@@ -6,21 +6,24 @@ import org.junit.Test
 
 class AutoStartTest {
     @Test
+    fun `says what to turn on`() {
+        val help = autoStartHelp().lowercase()
+
+        assertTrue("turn on auto-launch" in help)
+        assertTrue("allow background activity" in help)
+    }
+
+    @Test
     fun `says the steps differ from phone to phone`() {
         assertTrue("differ" in autoStartHelp())
     }
 
     @Test
-    fun `points at what to look for in the app's settings`() {
+    fun `does not say where to find it, which varies and may not be in the app's settings`() {
         val help = autoStartHelp()
 
-        assertTrue("auto-launch" in help.lowercase())
-        assertTrue("background" in help.lowercase())
-    }
-
-    @Test
-    fun `does not name one maker's menus`() {
-        assertFalse("OnePlus" in autoStartHelp())
-        assertFalse("Battery usage" in autoStartHelp())
+        assertFalse("OnePlus" in help)
+        assertFalse("Battery usage" in help)
+        assertFalse("settings" in help.lowercase())
     }
 }
