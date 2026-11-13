@@ -181,6 +181,19 @@ const FAILURES = {
     "Allow the phone to send texts: turn on Replies in the Notiforwarder app.",
   expired: "The phone was offline too long, so it was not sent.",
   no_key: "The phone does not have the encryption key for this reply.",
+  practice:
+    "Practice mode: the phone checked it but did not send it, so nothing was delivered.",
+  choose_sim:
+    "The phone has two SIMs. Choose which one to use in the Notiforwarder app.",
+  sim_missing:
+    "The chosen SIM is not in the phone. Choose a SIM in the Notiforwarder app.",
+  sim_unknown:
+    "The phone could not check the SIM. Allow phone access in the Notiforwarder app.",
+  no_service: "The phone has no mobile signal.",
+  radio_off: "The phone's radio is off (airplane mode?).",
+  timeout: "The network did not confirm the text in time.",
+  bad_number: "That does not look like a phone number the phone can text.",
+  bad_message: "The phone could not read the reply.",
 };
 
 function replyStatus(reply) {

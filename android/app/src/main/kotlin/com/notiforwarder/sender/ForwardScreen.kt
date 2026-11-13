@@ -15,9 +15,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.clickable
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -41,6 +44,9 @@ internal fun ForwardScreen(
     settings: CaptureSettings,
     onChange: (CaptureSettings) -> Unit,
     onRepliesChange: (Boolean) -> Unit,
+    /** The SIMs in the phone, or null while the app may not list them. */
+    sims: List<SimOption>?,
+    onAllowSimAccess: () -> Unit,
 ) {
     val context = LocalContext.current
     var apps by remember { mutableStateOf<List<AppEntry>?>(null) }
@@ -79,6 +85,15 @@ internal fun ForwardScreen(
                         settings.allowReplies,
                         onRepliesChange,
                     )
+                    RowDivider()
+                    SimRow(settings.replySim, sims, onAllowSimAccess) { onChange(settings.copy(replySim = it)) }
+                    RowDivider()
+                    SwitchRow(
+                        "Practice mode",
+                        "Replies are received and checked, but never sent, so nothing is charged. The dashboard shows " +
+                            "them as practice. Turn this on to try replying safely.",
+                        settings.practiceReplies,
+                    ) { onChange(settings.copy(practiceReplies = it)) }
                 }
                 OutlinedTextField(
                     value = query,
@@ -180,6 +195,59 @@ private fun SwitchRow(title: String, detail: String, checked: Boolean, onChecked
             Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Switch(checked = checked, onCheckedChange = onCheckedChange)
+    }
+}
+
+/** Which SIM sends replies. Picking is needed with two SIMs: the phone never chooses one for you. */
+@Composable
+private fun SimRow(chosen: Int?, sims: List<SimOption>?, onAllowAccess: () -> Unit, onChoose: (Int) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    val current = sims?.firstOrNull { it.id == chosen }
+    val detail = when {
+        sims == null -> "Allow phone access so the app can list your SIMs."
+        chosen != null && current == null -> "The chosen SIM is not in the phone. Choose again."
+        current != null -> current.label
+        sims.size > 1 -> "Not chosen yet. Replies will not send until you choose."
+        else -> "The phone's only SIM"
+    }
+    Row(
+        modifier = Modifier.fillMaxWidth().clickable { if (sims == null) onAllowAccess() else open = true }.padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text("SIM for replies", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Text(
+            if (sims == null) "Allow" else "Choose",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.primary,
+        )
+    }
+    if (open && sims != null) {
+        AlertDialog(
+            onDismissRequest = { open = false },
+            title = { Text("SIM for replies") },
+            text = {
+                Column {
+                    sims.forEach { sim ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth().clickable {
+                                onChoose(sim.id)
+                                open = false
+                            }.padding(vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            RadioButton(selected = sim.id == chosen, onClick = null)
+                            Text(sim.label, modifier = Modifier.padding(start = 12.dp))
+                        }
+                    }
+                    if (sims.isEmpty()) Text("No SIM found in this phone.")
+                }
+            },
+            confirmButton = { TextButton(onClick = { open = false }) { Text("Close") } },
+        )
     }
 }
 

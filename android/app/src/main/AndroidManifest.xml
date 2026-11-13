@@ -11,6 +11,8 @@
     <uses-permission android:name="android.permission.RECEIVE_SMS" />
     <!-- Only used when the user turns on "Reply from the dashboard": sends the texts typed there. -->
     <uses-permission android:name="android.permission.SEND_SMS" />
+    <!-- Only to list the SIMs, so the user can choose which one sends replies. -->
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />

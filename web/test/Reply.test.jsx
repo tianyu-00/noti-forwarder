@@ -177,6 +177,25 @@ describe("replying to a text from the dashboard", () => {
       }),
     );
     await waitFor(() => expect(mine).toHaveTextContent(/offline too long/i));
+
+    const words = {
+      practice: /practice mode.*nothing was delivered/i,
+      choose_sim: /two sims.*choose which one/i,
+      sim_missing: /chosen sim is not in the phone/i,
+      sim_unknown: /could not check the sim/i,
+      no_service: /no mobile signal/i,
+    };
+    for (const [error, expected] of Object.entries(words)) {
+      act(() =>
+        FakeEventSource.current.emit("outbox", {
+          ...queued,
+          id,
+          status: "failed",
+          error,
+        }),
+      );
+      await waitFor(() => expect(mine).toHaveTextContent(expected));
+    }
   });
 
   it("shows replies that were queued earlier or from another dashboard", async () => {

@@ -31,6 +31,8 @@ class NotiApp : Application() {
     val heartbeat by lazy {
         HeartbeatSender(store, appVersion = BuildConfig.VERSION_NAME, onRevoked = { controller.refresh() })
     }
+    val simLookup by lazy { SimLookup(this) }
+
     // Replies typed on the dashboard. One thread, so two triggers (an announcement and a reconnect)
     // never send the same reply at once; the processor also guards against it.
     private val replyProcessor by lazy {
@@ -44,6 +46,7 @@ class NotiApp : Application() {
                     android.content.pm.PackageManager.PERMISSION_GRANTED
             },
             e2eKey = { store.load()?.e2eKey },
+            sims = simLookup::activeSims,
         )
     }
     private val replyThread = Executors.newSingleThreadExecutor { r -> Thread(r, "replies").apply { isDaemon = true } }

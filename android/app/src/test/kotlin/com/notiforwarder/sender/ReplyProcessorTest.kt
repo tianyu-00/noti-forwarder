@@ -20,11 +20,13 @@ private class FakeOutbox(var replies: List<OutboxReply> = emptyList()) : OutboxA
 
 private class FakeSms(var result: SmsResult = SmsResult.Sent) : SmsSender {
     val texts = mutableListOf<Pair<String, String>>()
+    val sims = mutableListOf<Int?>()
     var onSend: () -> Unit = {}
 
-    override fun send(to: String, text: String): SmsResult {
+    override fun send(to: String, text: String, subscriptionId: Int?): SmsResult {
         onSend()
         texts += to to text
+        sims += subscriptionId
         return result
     }
 }
@@ -45,6 +47,8 @@ class ReplyProcessorTest {
     private var settings = CaptureSettings(allowReplies = true)
     private var permitted = true
     private var credentials: Credentials? = Credentials("https://x", "dev-1", "t", e2eKey = null)
+    // The SIMs in the phone, or null when the app is not allowed to look.
+    private var sims: List<SimOption>? = listOf(SimOption(3, "SIM 1 · China Mobile"))
 
     private fun processor() = ReplyProcessor(
         outbox = outbox,
@@ -53,6 +57,7 @@ class ReplyProcessorTest {
         settings = { settings },
         canSendSms = { permitted },
         e2eKey = { credentials?.e2eKey },
+        sims = { sims },
     )
 
     private val reply = OutboxReply("r1", "+15551234567", "On my way")
@@ -256,5 +261,136 @@ class ReplyProcessorTest {
 
         assertTrue(sms.texts.isEmpty())
         assertTrue(outbox.reports.isEmpty())
+    }
+
+    // --- Practice mode: everything except the text going out ---
+
+    private val sealedTo = "e2e:v1:eRE2mGyk26zCvJ9DQDOdL9sPPYIvagaIBZLDakFS8dqePXfeDqejsw"
+    private val sealedBody = "e2e:v1:NZoxaKYmRRH5ShFxwuztOqsIncHN-Ou3_Hh9zsOv9TPQkn6bWoARZA"
+
+    @Test
+    fun `in practice mode nothing is ever sent, and the dashboard is told it was only practice`() {
+        settings = CaptureSettings(allowReplies = true, practiceReplies = true)
+        outbox.replies = listOf(reply)
+
+        processor().process()
+
+        assertTrue(sms.texts.isEmpty())
+        assertEquals(listOf(Triple("r1", false, "practice")), outbox.reports)
+    }
+
+    @Test
+    fun `practice mode wins over everything, even replies being off, a missing permission or a chosen SIM`() {
+        settings = CaptureSettings(allowReplies = false, practiceReplies = true, replySim = 3)
+        permitted = false
+        outbox.replies = listOf(reply)
+
+        processor().process()
+
+        assertTrue(sms.texts.isEmpty())
+        assertEquals(listOf(Triple("r1", false, "practice")), outbox.reports)
+    }
+
+    @Test
+    fun `practice mode still opens and checks the reply, so it proves the real path`() {
+        settings = CaptureSettings(practiceReplies = true)
+        credentials = credentials?.copy(e2eKey = key)
+        outbox.replies = listOf(
+            OutboxReply("good", sealedTo, sealedBody),
+            OutboxReply("number", "call me maybe", "hi"),
+            OutboxReply("scrambled", sealedTo, "e2e:v1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"),
+        )
+
+        processor().process()
+
+        assertTrue(sms.texts.isEmpty())
+        assertEquals(
+            listOf(Triple("good", false, "practice"), Triple("number", false, "bad_number"), Triple("scrambled", false, "bad_message")),
+            outbox.reports,
+        )
+    }
+
+    @Test
+    fun `an encrypted reply in practice mode on a phone without the key says so`() {
+        settings = CaptureSettings(practiceReplies = true)
+        outbox.replies = listOf(OutboxReply("r1", sealedTo, sealedBody))
+
+        processor().process()
+
+        assertEquals(listOf(Triple("r1", false, "no_key")), outbox.reports)
+    }
+
+    // --- Which SIM sends the text ---
+
+    @Test
+    fun `sends from the SIM the user chose`() {
+        sims = listOf(SimOption(3, "SIM 1 · China Mobile"), SimOption(5, "SIM 2 · Giffgaff"))
+        settings = CaptureSettings(allowReplies = true, replySim = 5)
+        outbox.replies = listOf(reply)
+
+        processor().process()
+
+        assertEquals(listOf<Int?>(5), sms.sims)
+        assertEquals(listOf(Triple("r1", true, null)), outbox.reports)
+    }
+
+    @Test
+    fun `a chosen SIM that is no longer in the phone is never swapped for another, the reply fails`() {
+        sims = listOf(SimOption(3, "SIM 1 · China Mobile"))
+        settings = CaptureSettings(allowReplies = true, replySim = 5)
+        outbox.replies = listOf(reply)
+
+        processor().process()
+
+        assertTrue(sms.texts.isEmpty())
+        assertEquals(listOf(Triple("r1", false, "sim_missing")), outbox.reports)
+    }
+
+    @Test
+    fun `a chosen SIM that cannot be checked fails, because guessing could send on the wrong SIM`() {
+        sims = null
+        settings = CaptureSettings(allowReplies = true, replySim = 5)
+        outbox.replies = listOf(reply)
+
+        processor().process()
+
+        assertTrue(sms.texts.isEmpty())
+        assertEquals(listOf(Triple("r1", false, "sim_unknown")), outbox.reports)
+    }
+
+    @Test
+    fun `with two SIMs and none chosen nothing is sent, because the phone will not pick one for the user`() {
+        sims = listOf(SimOption(3, "SIM 1"), SimOption(5, "SIM 2"))
+        settings = CaptureSettings(allowReplies = true, replySim = null)
+        outbox.replies = listOf(reply)
+
+        processor().process()
+
+        assertTrue(sms.texts.isEmpty())
+        assertEquals(listOf(Triple("r1", false, "choose_sim")), outbox.reports)
+    }
+
+    @Test
+    fun `with one SIM and none chosen it just uses that SIM's default`() {
+        sims = listOf(SimOption(3, "SIM 1"))
+        settings = CaptureSettings(allowReplies = true, replySim = null)
+        outbox.replies = listOf(reply)
+
+        processor().process()
+
+        assertEquals(listOf<Int?>(null), sms.sims)
+        assertEquals(listOf(Triple("r1", true, null)), outbox.reports)
+    }
+
+    @Test
+    fun `when the SIMs cannot be listed and none was chosen nothing is sent, because it could be the wrong SIM`() {
+        sims = null
+        settings = CaptureSettings(allowReplies = true, replySim = null)
+        outbox.replies = listOf(reply)
+
+        processor().process()
+
+        assertTrue(sms.texts.isEmpty())
+        assertEquals(listOf(Triple("r1", false, "sim_unknown")), outbox.reports)
     }
 }

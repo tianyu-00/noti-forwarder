@@ -171,6 +171,11 @@ private fun MainScreen(
             app.sendReplies()
         }
     }
+    // The SIMs, listed once the user allows phone access (Android hides them otherwise).
+    var sims by remember { mutableStateOf(app.simLookup.activeSims()) }
+    val askPhoneState = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        sims = app.simLookup.activeSims()
+    }
     val changeReplies = { on: Boolean ->
         val allowed = ContextCompat.checkSelfPermission(app, Manifest.permission.SEND_SMS) == PackageManager.PERMISSION_GRANTED
         when {
@@ -223,7 +228,13 @@ private fun MainScreen(
                             onOpenAutoStart = onOpenAutoStart,
                         )
                     }
-                    Tab.Forward -> ForwardScreen(settings = settings, onChange = changeSettings, onRepliesChange = changeReplies)
+                    Tab.Forward -> ForwardScreen(
+                    settings = settings,
+                    onChange = changeSettings,
+                    onRepliesChange = changeReplies,
+                    sims = sims,
+                    onAllowSimAccess = { askPhoneState.launch(Manifest.permission.READ_PHONE_STATE) },
+                )
                     Tab.Activity -> ActivityScreen(activity)
                     Tab.Settings -> SettingsScreen(
                         paired = paired,

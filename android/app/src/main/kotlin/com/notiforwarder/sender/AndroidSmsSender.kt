@@ -20,8 +20,11 @@ import java.util.concurrent.atomic.AtomicReference
  * Framework code, so it is checked on a real phone; the logic around it is unit tested.
  */
 class AndroidSmsSender(private val context: Context, private val timeoutMs: Long = 60_000) : SmsSender {
-    override fun send(to: String, text: String): SmsResult {
-        val manager = context.getSystemService(SmsManager::class.java) ?: return SmsResult.Failed("no_sms")
+    override fun send(to: String, text: String, subscriptionId: Int?): SmsResult {
+        val manager = (
+            if (subscriptionId != null) SmsManager.getSmsManagerForSubscriptionId(subscriptionId)
+            else context.getSystemService(SmsManager::class.java)
+        ) ?: return SmsResult.Failed("no_sms")
         val action = "${context.packageName}.SMS_SENT.${UUID.randomUUID()}"
         val failure = AtomicReference<String?>(null)
         val parts = manager.divideMessage(text)

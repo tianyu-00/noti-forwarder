@@ -64,6 +64,21 @@ class SettingsStoreTest {
     }
 
     @Test
+    fun `practice mode and the chosen SIM start empty and are kept`() {
+        assertFalse(CaptureSettings().practiceReplies)
+        assertEquals(null, CaptureSettings().replySim)
+        val name = "sim-${System.nanoTime()}"
+        PrefsSettingsStore(context, name).save(CaptureSettings(practiceReplies = true, replySim = 5))
+
+        val reloaded = PrefsSettingsStore(context, name).load()
+
+        assertTrue(reloaded.practiceReplies)
+        assertEquals(5, reloaded.replySim)
+        PrefsSettingsStore(context, name).save(reloaded.copy(replySim = null))
+        assertEquals(null, PrefsSettingsStore(context, name).load().replySim)
+    }
+
+    @Test
     fun `notifications are left in the shade unless clearing is switched on`() {
         assertFalse(CaptureSettings().clearAfterForwarding)
     }

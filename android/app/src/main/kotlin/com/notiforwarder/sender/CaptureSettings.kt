@@ -23,6 +23,17 @@ data class CaptureSettings(
      * needs the SMS permission and the texts may cost money.
      */
     val allowReplies: Boolean = false,
+    /**
+     * Practice mode: replies are received, opened and checked exactly as usual, but never sent. The
+     * dashboard is told "practice". For trying things out without paying for any texts.
+     */
+    val practiceReplies: Boolean = false,
+    /**
+     * The SIM (subscription id) that sends replies, or null for the phone's own default. With two
+     * SIMs a reply refuses to go until one is chosen, so it can never leave on the wrong (say
+     * roaming) one by accident.
+     */
+    val replySim: Int? = null,
 ) {
     fun shouldDismiss(outcome: CaptureOutcome) = clearAfterForwarding && outcome != CaptureOutcome.IGNORED
 
@@ -46,6 +57,8 @@ class PrefsSettingsStore(context: Context, name: String = "capture_settings") : 
         blockedApps = prefs.getStringSet(BLOCKED, emptySet())?.toSet().orEmpty(),
         clearAfterForwarding = prefs.getBoolean(CLEAR, false),
         allowReplies = prefs.getBoolean(REPLIES, false),
+        practiceReplies = prefs.getBoolean(PRACTICE, false),
+        replySim = prefs.getInt(REPLY_SIM, NO_SIM).takeIf { it != NO_SIM },
     )
 
     override fun save(settings: CaptureSettings) = prefs.edit {
@@ -54,6 +67,8 @@ class PrefsSettingsStore(context: Context, name: String = "capture_settings") : 
         putStringSet(BLOCKED, settings.blockedApps)
         putBoolean(CLEAR, settings.clearAfterForwarding)
         putBoolean(REPLIES, settings.allowReplies)
+        putBoolean(PRACTICE, settings.practiceReplies)
+        putInt(REPLY_SIM, settings.replySim ?: NO_SIM)
     }
 
     private companion object {
@@ -62,5 +77,8 @@ class PrefsSettingsStore(context: Context, name: String = "capture_settings") : 
         const val BLOCKED = "blockedApps"
         const val CLEAR = "clearAfterForwarding"
         const val REPLIES = "allowReplies"
+        const val PRACTICE = "practiceReplies"
+        const val REPLY_SIM = "replySim"
+        const val NO_SIM = -1
     }
 }

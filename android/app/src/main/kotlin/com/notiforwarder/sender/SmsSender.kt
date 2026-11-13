@@ -9,5 +9,9 @@ sealed interface SmsResult {
 
 /** Sends one text from this phone. A seam around Android's SmsManager, so the logic is tested without a radio. */
 interface SmsSender {
-    fun send(to: String, text: String): SmsResult
+    /** [subscriptionId] picks the SIM; null means the phone's default. */
+    fun send(to: String, text: String, subscriptionId: Int? = null): SmsResult
 }
+
+/** One SIM in the phone, as the user sees it ("SIM 1 · China Mobile"). */
+data class SimOption(val id: Int, val label: String)

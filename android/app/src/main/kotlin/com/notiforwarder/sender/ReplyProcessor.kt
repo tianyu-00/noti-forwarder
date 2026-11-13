@@ -13,6 +13,8 @@ class ReplyProcessor(
     private val canSendSms: () -> Boolean,
     /** The end-to-end key from pairing, or null when this phone was paired without one. */
     private val e2eKey: () -> String?,
+    /** The SIMs in the phone, or null when the app is not allowed to look (no phone permission). */
+    private val sims: () -> List<SimOption>? = { null },
 ) {
     @Synchronized
     fun process() {
@@ -33,24 +35,57 @@ class ReplyProcessor(
     }
 
     private fun attempt(reply: OutboxReply) {
-        if (!settings().allowReplies) return finish(reply.id, LedgerState.FAILED, "replies_off")
-        if (!canSendSms()) return finish(reply.id, LedgerState.FAILED, "no_permission")
+        val current = settings()
+        // Practice mode needs neither the switch nor the permission: it never sends, so it can run
+        // anywhere, and being on it overrides everything below.
+        if (!current.practiceReplies) {
+            if (!current.allowReplies) return finish(reply.id, LedgerState.FAILED, "replies_off")
+            if (!canSendSms()) return finish(reply.id, LedgerState.FAILED, "no_permission")
+        }
         val plain = when (val opened = open(reply)) {
             is Opened.Text -> opened
             is Opened.Refused -> return finish(reply.id, LedgerState.FAILED, opened.code)
         }
         if (!PHONE_NUMBER.matches(plain.to)) return finish(reply.id, LedgerState.FAILED, "bad_number")
         if (plain.body.isBlank()) return finish(reply.id, LedgerState.FAILED, "bad_message")
+        // Opened and checked as for real; this is the point where a real send would happen.
+        if (current.practiceReplies) return finish(reply.id, LedgerState.FAILED, "practice")
+
+        val sim = when (val chosen = chooseSim(current)) {
+            is SimChoice.Use -> chosen.subscriptionId
+            is SimChoice.Refuse -> return finish(reply.id, LedgerState.FAILED, chosen.code)
+        }
 
         ledger.put(reply.id, LedgerEntry(LedgerState.STARTED, error = null, reported = false))
         val result = try {
-            sms.send(plain.to, plain.body)
+            sms.send(plain.to, plain.body, sim)
         } catch (e: Exception) {
             SmsResult.Failed("generic")
         }
         when (result) {
             SmsResult.Sent -> finish(reply.id, LedgerState.SENT, null)
             is SmsResult.Failed -> finish(reply.id, LedgerState.FAILED, result.code)
+        }
+    }
+
+    private sealed interface SimChoice {
+        data class Use(val subscriptionId: Int?) : SimChoice
+        data class Refuse(val code: String) : SimChoice
+    }
+
+    // Which SIM sends. The SIMs must be checkable, a chosen SIM that is gone is never swapped for
+    // another, and with two SIMs and no choice the phone will not guess, because one may be roaming.
+    private fun chooseSim(current: CaptureSettings): SimChoice {
+        val installed = sims()
+        val chosen = current.replySim
+        return when {
+            // Without phone access the app cannot tell how many SIMs there are, so it cannot know
+            // that the default is safe to use.
+            installed == null -> SimChoice.Refuse("sim_unknown")
+            chosen != null ->
+                if (installed.none { it.id == chosen }) SimChoice.Refuse("sim_missing") else SimChoice.Use(chosen)
+            installed.size > 1 -> SimChoice.Refuse("choose_sim")
+            else -> SimChoice.Use(null)
         }
     }
 
