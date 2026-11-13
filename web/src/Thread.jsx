@@ -246,9 +246,13 @@ export default function Thread({ conversation, deviceName, onBack, actions }) {
             strokeLinecap="round"
             strokeLinejoin="round"
             aria-hidden="true"
+            className="overflow-visible"
           >
-            <path d="M22 2 11 13" />
-            <path d="M22 2 15 22l-4-9-9-4 20-7z" />
+            {/* The strokes weigh towards the top right, so nudge the plane down and left to look centred. */}
+            <g transform="translate(-1 1)">
+              <path d="M22 2 11 13" />
+              <path d="M22 2 15 22l-4-9-9-4 20-7z" />
+            </g>
           </svg>
         </button>
       </div>
