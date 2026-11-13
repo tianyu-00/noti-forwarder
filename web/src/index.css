@@ -1,58 +1,129 @@
 @import "tailwindcss";
 
 /*
- * Two themes, black and white. Everything uses these names (bg-bg, text-muted, border-line…)
- * so a screen never picks a colour of its own. data-theme is set before the first paint;
- * without it the system setting decides.
+ * Two themes, light and dark, the same green-accented design in both. Everything uses these
+ * names (bg-bg, text-muted, border-line…) so a screen never picks a colour of its own.
+ * data-theme is set before the first paint; without it the system setting decides.
+ * The phone rail stays dark in both themes. --av1…--av6 tint the avatars.
  */
 :root {
   color-scheme: light;
+  --page: #e9eeeb;
   --bg: #ffffff;
-  --surface: #fafafa;
-  --raised: #f4f4f5;
-  --line: #e4e4e7;
-  --fg: #09090b;
-  --muted: #52525b;
-  --faint: #a1a1aa;
-  --primary: #09090b;
-  --on-primary: #fafafa;
+  --surface: #f6f8f7;
+  --raised: #eef2ef;
+  --line: #e3eae6;
+  --fg: #14211b;
+  --muted: #5d6f65;
+  --faint: #8a9a91;
+  --primary: #14211b;
+  --on-primary: #ffffff;
+  --accent: #12805c;
+  --on-accent: #ffffff;
+  --accent-soft: #d8f3e4;
+  --accent-ink: #0d5c41;
   --danger: #dc2626;
   --ok: #16a34a;
+  --rail: #14211b;
+  --rail-fg: #e8f1ec;
+  --rail-muted: #9fb5aa;
+  --rail-active: #244034;
+  --rail-accent: #3ddc97;
+  --on-rail-accent: #14211b;
+  --av1-bg: #d9e4ff;
+  --av1-fg: #2748a8;
+  --av2-bg: #fff0c2;
+  --av2-fg: #8a5a00;
+  --av3-bg: #d8f3e4;
+  --av3-fg: #0d5c41;
+  --av4-bg: #ffe0e4;
+  --av4-fg: #9f1239;
+  --av5-bg: #dff1ff;
+  --av5-fg: #075985;
+  --av6-bg: #efe3ff;
+  --av6-fg: #6b21a8;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) {
     color-scheme: dark;
-    --bg: #18181b;
-    --surface: #1f1f23;
-    --raised: #27272a;
-    --line: #3f3f46;
-    --fg: #fafafa;
-    --muted: #a1a1aa;
-    --faint: #71717a;
-    --primary: #fafafa;
-    --on-primary: #18181b;
-    --danger: #ef4444;
-    --ok: #4ade80;
+    --page: #0a0f0d;
+    --bg: #111a15;
+    --surface: #0d1511;
+    --raised: #1b2822;
+    --line: #1d2b24;
+    --fg: #e6efea;
+    --muted: #8fa398;
+    --faint: #7f9388;
+    --primary: #3ddc97;
+    --on-primary: #0a0f0d;
+    --accent: #3ddc97;
+    --on-accent: #0a0f0d;
+    --accent-soft: #163527;
+    --accent-ink: #7be3b3;
+    --danger: #ff6b6b;
+    --ok: #3ddc97;
+    --rail: #111a15;
+    --rail-fg: #e8f1ec;
+    --rail-muted: #9fb5aa;
+    --rail-active: #1c3027;
+    --rail-accent: #3ddc97;
+    --on-rail-accent: #0a0f0d;
+    --av1-bg: #1e2a4d;
+    --av1-fg: #a9c0ff;
+    --av2-bg: #3a2f12;
+    --av2-fg: #ffd972;
+    --av3-bg: #163527;
+    --av3-fg: #7be3b3;
+    --av4-bg: #40202a;
+    --av4-fg: #ff9db0;
+    --av5-bg: #12303f;
+    --av5-fg: #8ccdf5;
+    --av6-bg: #2f2342;
+    --av6-fg: #cfa9ff;
   }
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #18181b;
-  --surface: #1f1f23;
-  --raised: #27272a;
-  --line: #3f3f46;
-  --fg: #fafafa;
-  --muted: #a1a1aa;
-  --faint: #71717a;
-  --primary: #fafafa;
-  --on-primary: #18181b;
-  --danger: #ef4444;
-  --ok: #4ade80;
+  --page: #0a0f0d;
+  --bg: #111a15;
+  --surface: #0d1511;
+  --raised: #1b2822;
+  --line: #1d2b24;
+  --fg: #e6efea;
+  --muted: #8fa398;
+  --faint: #7f9388;
+  --primary: #3ddc97;
+  --on-primary: #0a0f0d;
+  --accent: #3ddc97;
+  --on-accent: #0a0f0d;
+  --accent-soft: #163527;
+  --accent-ink: #7be3b3;
+  --danger: #ff6b6b;
+  --ok: #3ddc97;
+  --rail: #111a15;
+  --rail-fg: #e8f1ec;
+  --rail-muted: #9fb5aa;
+  --rail-active: #1c3027;
+  --rail-accent: #3ddc97;
+  --on-rail-accent: #0a0f0d;
+  --av1-bg: #1e2a4d;
+  --av1-fg: #a9c0ff;
+  --av2-bg: #3a2f12;
+  --av2-fg: #ffd972;
+  --av3-bg: #163527;
+  --av3-fg: #7be3b3;
+  --av4-bg: #40202a;
+  --av4-fg: #ff9db0;
+  --av5-bg: #12303f;
+  --av5-fg: #8ccdf5;
+  --av6-bg: #2f2342;
+  --av6-fg: #cfa9ff;
 }
 
 @theme inline {
+  --color-page: var(--page);
   --color-bg: var(--bg);
   --color-surface: var(--surface);
   --color-raised: var(--raised);
@@ -62,12 +133,22 @@
   --color-faint: var(--faint);
   --color-primary: var(--primary);
   --color-on-primary: var(--on-primary);
+  --color-accent: var(--accent);
+  --color-on-accent: var(--on-accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-ink: var(--accent-ink);
   --color-danger: var(--danger);
   --color-ok: var(--ok);
+  --color-rail: var(--rail);
+  --color-rail-fg: var(--rail-fg);
+  --color-rail-muted: var(--rail-muted);
+  --color-rail-active: var(--rail-active);
+  --color-rail-accent: var(--rail-accent);
+  --color-on-rail-accent: var(--on-rail-accent);
 }
 
 body {
-  background: var(--bg);
+  background: var(--page);
   color: var(--fg);
   font-family:
     ui-sans-serif,
