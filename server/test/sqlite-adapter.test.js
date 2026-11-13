@@ -1,4 +1,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
+import { existsSync, mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { openDatabase } from '../src/db/sqlite.js';
 
 // The server was written against a Postgres pool: query(sql, [params]) gives { rows, rowCount },
@@ -268,5 +271,40 @@ describe('rules of the database', () => {
     await db.query('INSERT INTO t VALUES ($1)', ['x']);
 
     await expect(db.query('INSERT INTO t VALUES ($1)', ['x'])).rejects.toThrow(/UNIQUE/i);
+  });
+});
+
+describe('a database file', () => {
+  it('creates the folder it lives in, and the file', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'nf-db-'));
+    const file = join(dir, 'not', 'there', 'yet', 'data.db');
+
+    db = openDatabase(file);
+
+    expect(existsSync(file)).toBe(true);
+  });
+
+  it('keeps its data when it is closed and opened again', async () => {
+    const file = join(mkdtempSync(join(tmpdir(), 'nf-db-')), 'data.db');
+    const first = openDatabase(file);
+    await first.query('CREATE TABLE t (n integer)');
+    await first.query('INSERT INTO t VALUES ($1)', [42]);
+    await first.end();
+
+    db = openDatabase(file);
+
+    expect((await db.query('SELECT n FROM t')).rows).toEqual([{ n: 42 }]);
+  });
+
+  it('can be opened twice at once for reading and writing (a backup, or reset-totp)', async () => {
+    const file = join(mkdtempSync(join(tmpdir(), 'nf-db-')), 'data.db');
+    const server = openDatabase(file);
+    await server.query('CREATE TABLE t (n integer)');
+
+    db = openDatabase(file);
+    await db.query('INSERT INTO t VALUES (1)');
+
+    expect((await server.query('SELECT count(*) AS c FROM t')).rows[0].c).toBe(1);
+    await server.end();
   });
 });

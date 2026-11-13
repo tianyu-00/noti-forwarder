@@ -1,5 +1,7 @@
 import Database from 'better-sqlite3';
 import { randomUUID } from 'node:crypto';
+import { mkdirSync } from 'node:fs';
+import { dirname } from 'node:path';
 
 // The server talks to its database the way it did to a Postgres pool: query(sql, [params]) gives
 // { rows, rowCount } and connect() gives a client for a transaction. This keeps that shape on one
@@ -29,6 +31,7 @@ function toRow(row) {
 
 /** Opens (or creates) the database file. Use ':memory:' for a throwaway one in tests. */
 export function openDatabase(path) {
+  if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true });
   const raw = new Database(path);
   raw.pragma('journal_mode = WAL');
   raw.pragma('synchronous = NORMAL');

@@ -3,3 +3,6 @@
 # Android signing keys must never be committed
 *.jks
 *.keystore
+
+# SQLite database when running the server by hand
+server/data/

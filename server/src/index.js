@@ -1,5 +1,5 @@
 import { fileURLToPath } from 'node:url';
-import pg from 'pg';
+import { openDatabase } from './db/sqlite.js';
 import { createApp } from './app.js';
 import { cookieSecureFor } from './cookie-secure.js';
 import { createSilentMonitor } from './silent.js';
@@ -21,28 +21,22 @@ function requireEnv(name) {
   return process.env[name];
 }
 
-const databaseUrl = requireEnv('DATABASE_URL');
 const publicUrl = requireEnv('PUBLIC_URL');
 if (process.env.ADMIN_PASSWORD && process.env.ADMIN_PASSWORD.length < 12) {
   console.error('ADMIN_PASSWORD must be at least 12 characters');
   process.exit(1);
 }
 
-const db = new pg.Pool({ connectionString: databaseUrl });
+// The whole database is one file (plus its write-ahead log next to it). The Docker image points this
+// at a volume; the default suits running the server by hand.
+const databasePath = process.env.DATABASE_PATH || './data/notiforwarder.db';
+const db = openDatabase(databasePath);
+console.log(`database: ${databasePath}`);
 const migrationsDir = fileURLToPath(new URL('../migrations', import.meta.url));
 
-// Migrations run automatically on start (see CLAUDE.md); retry while Postgres boots.
-for (let attempt = 1; ; attempt++) {
-  try {
-    const applied = await runMigrations(db, migrationsDir);
-    if (applied.length) console.log(`applied migrations: ${applied.join(', ')}`);
-    break;
-  } catch (err) {
-    if (attempt >= 20) throw err;
-    console.log(`database not ready (${err.code || err.message}), retrying...`);
-    await new Promise((r) => setTimeout(r, 1500));
-  }
-}
+// Migrations run automatically on start (see CLAUDE.md).
+const applied = await runMigrations(db, migrationsDir);
+if (applied.length) console.log(`applied migrations: ${applied.join(', ')}`);
 
 // Optional: SECRET_KEY encrypts the two-step login secret in the database. Without it the
 // secret is stored as plain text (protect your database backups).
@@ -111,3 +105,10 @@ if (silentAfterMinutes > 0) {
 app.listen(port, () => {
   console.log(`server listening on :${port}`);
 });
+
+// docker stop sends SIGTERM: close the database cleanly so its log is folded into the file.
+for (const signal of ['SIGTERM', 'SIGINT']) {
+  process.on(signal, () => {
+    db.end().finally(() => process.exit(0));
+  });
+}
