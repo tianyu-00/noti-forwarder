@@ -1,12 +1,12 @@
-import { useEffect, useState } from 'react';
-import PropTypes from 'prop-types';
-import * as Tabs from '@radix-ui/react-tabs';
-import { fieldClass } from './ui.jsx';
+import { useEffect, useState } from "react";
+import PropTypes from "prop-types";
+import * as Tabs from "@radix-ui/react-tabs";
+import { fieldClass } from "./ui.jsx";
 
 const TYPES = [
-  { value: 'all', label: 'All' },
-  { value: 'sms', label: 'SMS' },
-  { value: 'notification', label: 'Notifications' },
+  { value: "all", label: "All" },
+  { value: "sms", label: "SMS" },
+  { value: "notification", label: "Notifications" },
 ];
 
 const SEARCH_DEBOUNCE_MS = 250;
@@ -17,17 +17,25 @@ export default function Filters({ filters, apps, onChange }) {
   // Debounce typing so each keystroke does not trigger a request.
   useEffect(() => {
     if (text === filters.q) return undefined;
-    const timer = setTimeout(() => onChange({ ...filters, q: text }), SEARCH_DEBOUNCE_MS);
+    const timer = setTimeout(
+      () => onChange({ ...filters, q: text }),
+      SEARCH_DEBOUNCE_MS,
+    );
     return () => clearTimeout(timer);
   }, [text, filters, onChange]);
 
   return (
     <div className="flex flex-wrap items-center gap-2 px-4 pb-4">
       <Tabs.Root
-        value={filters.type || 'all'}
-        onValueChange={(v) => onChange({ ...filters, type: v === 'all' ? '' : v })}
+        value={filters.type || "all"}
+        onValueChange={(v) =>
+          onChange({ ...filters, type: v === "all" ? "" : v })
+        }
       >
-        <Tabs.List aria-label="Message type" className="flex rounded-md border border-line p-0.5 text-sm">
+        <Tabs.List
+          aria-label="Message type"
+          className="flex rounded-md border border-line p-0.5 text-sm"
+        >
           {TYPES.map((t) => (
             <Tabs.Trigger
               key={t.value}

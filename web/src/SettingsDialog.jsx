@@ -1,22 +1,22 @@
-import { useEffect, useState } from 'react';
-import PropTypes from 'prop-types';
-import { api } from './api.js';
-import EncryptionSection from './EncryptionSection.jsx';
-import { Button, Modal } from './ui.jsx';
+import { useEffect, useState } from "react";
+import PropTypes from "prop-types";
+import { api } from "./api.js";
+import EncryptionSection from "./EncryptionSection.jsx";
+import { Button, Modal } from "./ui.jsx";
 
 const MAX_DAYS = 3650;
 
 function RetentionForm({ onPurged }) {
   const [loaded, setLoaded] = useState(false);
   const [limited, setLimited] = useState(false);
-  const [days, setDays] = useState('30');
+  const [days, setDays] = useState("30");
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
 
   useEffect(() => {
     let stale = false;
-    api('/settings')
+    api("/settings")
       .then((s) => {
         if (stale) return;
         setLimited(s.retentionDays !== null);
@@ -24,7 +24,7 @@ function RetentionForm({ onPurged }) {
         setLoaded(true);
       })
       .catch(() => {
-        if (!stale) setError('Could not load settings.');
+        if (!stale) setError("Could not load settings.");
       });
     return () => {
       stale = true;
@@ -35,16 +35,20 @@ function RetentionForm({ onPurged }) {
     setError(null);
     setResult(null);
     try {
-      const saved = await api('/settings', {
-        method: 'PUT',
+      const saved = await api("/settings", {
+        method: "PUT",
         body: { retentionDays: limited ? Number(days) : null },
       });
       setConfirming(false);
-      setResult(saved.purged > 0 ? `Saved. Deleted ${saved.purged} old messages.` : 'Saved.');
+      setResult(
+        saved.purged > 0
+          ? `Saved. Deleted ${saved.purged} old messages.`
+          : "Saved.",
+      );
       if (saved.purged > 0) onPurged();
     } catch {
       setConfirming(false);
-      setError('Could not save the setting.');
+      setError("Could not save the setting.");
     }
   }
 
@@ -69,13 +73,27 @@ function RetentionForm({ onPurged }) {
   return (
     <form onSubmit={submit} noValidate className="space-y-4">
       <fieldset className="space-y-3 text-sm">
-        <legend className="mb-2 text-sm font-semibold">How long to keep messages</legend>
+        <legend className="mb-2 text-sm font-semibold">
+          How long to keep messages
+        </legend>
         <label className="flex items-center gap-2.5">
-          <input type="radio" name="retention" className="accent-[var(--primary)]" checked={!limited} onChange={() => setLimited(false)} />
+          <input
+            type="radio"
+            name="retention"
+            className="accent-[var(--primary)]"
+            checked={!limited}
+            onChange={() => setLimited(false)}
+          />
           Keep messages forever
         </label>
         <label className="flex flex-wrap items-center gap-2.5">
-          <input type="radio" name="retention" className="accent-[var(--primary)]" checked={limited} onChange={() => setLimited(true)} />
+          <input
+            type="radio"
+            name="retention"
+            className="accent-[var(--primary)]"
+            checked={limited}
+            onChange={() => setLimited(true)}
+          />
           Delete messages older than
           <input
             type="number"
@@ -101,7 +119,8 @@ function RetentionForm({ onPurged }) {
       {confirming ? (
         <div className="space-y-3 rounded-lg border border-line bg-surface p-4 text-sm">
           <p>
-            Messages older than {Number(days)} days are deleted now and then every hour. This cannot be undone.
+            Messages older than {Number(days)} days are deleted now and then
+            every hour. This cannot be undone.
           </p>
           <div className="flex gap-2">
             <Button variant="danger" onClick={save}>
@@ -123,7 +142,12 @@ RetentionForm.propTypes = { onPurged: PropTypes.func.isRequired };
 
 export default function SettingsDialog({ open, onOpenChange, onPurged }) {
   return (
-    <Modal open={open} onOpenChange={onOpenChange} title="Settings" description="Message retention applies to every phone.">
+    <Modal
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Settings"
+      description="Message retention applies to every phone."
+    >
       <RetentionForm onPurged={onPurged} />
       <EncryptionSection />
     </Modal>

@@ -1,4 +1,4 @@
-import { gcm } from '@noble/ciphers/aes.js';
+import { gcm } from "@noble/ciphers/aes.js";
 
 // End-to-end encryption of message text. The key never leaves the phones and the browsers.
 //
@@ -11,32 +11,39 @@ import { gcm } from '@noble/ciphers/aes.js';
 // A pure-JavaScript AES is used on purpose: the browser's own crypto.subtle is switched off on
 // plain http pages, and the dashboard may be opened on a LAN address without a certificate.
 
-const PREFIX = 'e2e:v1:';
+const PREFIX = "e2e:v1:";
 const KEY_BYTES = 32;
 const NONCE_BYTES = 12;
 const TAG_BYTES = 16;
 
 const encoder = new TextEncoder();
-const decoder = new TextDecoder('utf-8', { fatal: true });
+const decoder = new TextDecoder("utf-8", { fatal: true });
 
 export function toBase64Url(bytes) {
-  let binary = '';
+  let binary = "";
   for (const b of bytes) binary += String.fromCharCode(b);
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  return btoa(binary)
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
 }
 
 export function fromBase64Url(text) {
-  const padded = text.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(text.length / 4) * 4, '=');
+  const padded = text
+    .replace(/-/g, "+")
+    .replace(/_/g, "/")
+    .padEnd(Math.ceil(text.length / 4) * 4, "=");
   const binary = atob(padded);
   return Uint8Array.from(binary, (c) => c.charCodeAt(0));
 }
 
 export function isEncrypted(text) {
-  return typeof text === 'string' && text.startsWith(PREFIX);
+  return typeof text === "string" && text.startsWith(PREFIX);
 }
 
 export function isValidKey(text) {
-  if (typeof text !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(text)) return false;
+  if (typeof text !== "string" || !/^[A-Za-z0-9_-]{43}$/.test(text))
+    return false;
   return fromBase64Url(text).length === KEY_BYTES;
 }
 
@@ -47,12 +54,14 @@ export function generateKey() {
 
 /** Throws if the key is wrong, the field is not the one it was made for, or the text was changed. */
 export function decryptField(key, field, blob) {
-  if (!isValidKey(key)) throw new Error('bad key');
-  if (!isEncrypted(blob)) throw new Error('not encrypted');
+  if (!isValidKey(key)) throw new Error("bad key");
+  if (!isEncrypted(blob)) throw new Error("not encrypted");
   const raw = fromBase64Url(blob.slice(PREFIX.length));
-  if (raw.length < NONCE_BYTES + TAG_BYTES) throw new Error('too short');
+  if (raw.length < NONCE_BYTES + TAG_BYTES) throw new Error("too short");
   const nonce = raw.subarray(0, NONCE_BYTES);
   const aad = encoder.encode(`nf-e2e-v1:${field}`);
-  const plain = gcm(fromBase64Url(key), nonce, aad).decrypt(raw.subarray(NONCE_BYTES));
+  const plain = gcm(fromBase64Url(key), nonce, aad).decrypt(
+    raw.subarray(NONCE_BYTES),
+  );
   return decoder.decode(plain);
 }

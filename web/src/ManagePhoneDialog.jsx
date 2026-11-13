@@ -1,8 +1,8 @@
-import { useState } from 'react';
-import PropTypes from 'prop-types';
-import { api } from './api.js';
-import { deviceShape } from './Sidebar.jsx';
-import { Button, Modal, inputClass } from './ui.jsx';
+import { useState } from "react";
+import PropTypes from "prop-types";
+import { api } from "./api.js";
+import { deviceShape } from "./Sidebar.jsx";
+import { Button, Modal, inputClass } from "./ui.jsx";
 
 function Confirm({ children, yes, onYes, onCancel }) {
   return (
@@ -38,44 +38,49 @@ function Panel({ device, onRenamed, onRevoked, onErased, onCleared, onDone }) {
     e.preventDefault();
     setError(null);
     try {
-      onRenamed(await api(`/devices/${device.deviceId}`, { method: 'PATCH', body: { name } }));
+      onRenamed(
+        await api(`/devices/${device.deviceId}`, {
+          method: "PATCH",
+          body: { name },
+        }),
+      );
       onDone();
     } catch {
-      setError('Could not rename the phone.');
+      setError("Could not rename the phone.");
     }
   }
 
   async function revoke() {
     setError(null);
     try {
-      await api(`/devices/${device.deviceId}`, { method: 'DELETE' });
+      await api(`/devices/${device.deviceId}`, { method: "DELETE" });
       onRevoked(device.deviceId);
       onDone();
     } catch {
-      setError('Could not revoke the phone.');
+      setError("Could not revoke the phone.");
     }
   }
 
   async function clearMessages() {
     setError(null);
     try {
-      await api(`/devices/${device.deviceId}/messages`, { method: 'DELETE' });
+      await api(`/devices/${device.deviceId}/messages`, { method: "DELETE" });
       onCleared(device.deviceId);
       onDone();
     } catch {
       setConfirmingClear(false);
-      setError('Could not clear the messages.');
+      setError("Could not clear the messages.");
     }
   }
 
   async function erase() {
     setError(null);
     try {
-      await api(`/devices/${device.deviceId}/permanent`, { method: 'DELETE' });
+      await api(`/devices/${device.deviceId}/permanent`, { method: "DELETE" });
       onErased(device.deviceId);
       onDone();
     } catch {
-      setError('Could not erase the phone.');
+      setError("Could not erase the phone.");
     }
   }
 
@@ -84,7 +89,12 @@ function Panel({ device, onRenamed, onRevoked, onErased, onCleared, onDone }) {
       <form onSubmit={rename} className="space-y-3">
         <label className="block space-y-1.5 text-sm font-medium">
           Name
-          <input value={name} onChange={(e) => setName(e.target.value)} maxLength={100} className={inputClass} />
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            maxLength={100}
+            className={inputClass}
+          />
         </label>
         <Button type="submit">Save</Button>
       </form>
@@ -97,8 +107,13 @@ function Panel({ device, onRenamed, onRevoked, onErased, onCleared, onDone }) {
 
       <div className="space-y-3 border-t border-line pt-5">
         {confirmingClear ? (
-          <Confirm yes="Yes, clear" onYes={clearMessages} onCancel={() => setConfirmingClear(false)}>
-            Delete every message from {device.name}? The phone stays paired and keeps sending. This cannot be undone.
+          <Confirm
+            yes="Yes, clear"
+            onYes={clearMessages}
+            onCancel={() => setConfirmingClear(false)}
+          >
+            Delete every message from {device.name}? The phone stays paired and
+            keeps sending. This cannot be undone.
           </Confirm>
         ) : (
           <Button variant="secondary" onClick={() => setConfirmingClear(true)}>
@@ -112,18 +127,31 @@ function Panel({ device, onRenamed, onRevoked, onErased, onCleared, onDone }) {
           <>
             <p className="text-sm text-muted">This phone has been revoked.</p>
             {confirmingErase ? (
-              <Confirm yes="Yes, erase" onYes={erase} onCancel={() => setConfirmingErase(false)}>
-                Erase {device.name} and every message it sent? This cannot be undone.
+              <Confirm
+                yes="Yes, erase"
+                onYes={erase}
+                onCancel={() => setConfirmingErase(false)}
+              >
+                Erase {device.name} and every message it sent? This cannot be
+                undone.
               </Confirm>
             ) : (
-              <Button variant="secondary" onClick={() => setConfirmingErase(true)}>
+              <Button
+                variant="secondary"
+                onClick={() => setConfirmingErase(true)}
+              >
                 Erase this phone and its messages
               </Button>
             )}
           </>
         ) : confirming ? (
-          <Confirm yes="Yes, revoke" onYes={revoke} onCancel={() => setConfirming(false)}>
-            Revoke {device.name}? It will stop sending and must be paired again. Messages already received are kept.
+          <Confirm
+            yes="Yes, revoke"
+            onYes={revoke}
+            onCancel={() => setConfirming(false)}
+          >
+            Revoke {device.name}? It will stop sending and must be paired again.
+            Messages already received are kept.
           </Confirm>
         ) : (
           <Button variant="secondary" onClick={() => setConfirming(true)}>
@@ -144,15 +172,24 @@ Panel.propTypes = {
   onDone: PropTypes.func.isRequired,
 };
 
-export default function ManagePhoneDialog({ device, open, onOpenChange, onRenamed, onRevoked, onErased, onCleared }) {
+export default function ManagePhoneDialog({
+  device,
+  open,
+  onOpenChange,
+  onRenamed,
+  onRevoked,
+  onErased,
+  onCleared,
+}) {
   return (
     <Modal
       open={open}
       onOpenChange={onOpenChange}
       title={device.name}
       description={
-        [device.model, device.appVersion && `app ${device.appVersion}`].filter(Boolean).join(' · ') ||
-        'Rename or revoke this phone.'
+        [device.model, device.appVersion && `app ${device.appVersion}`]
+          .filter(Boolean)
+          .join(" · ") || "Rename or revoke this phone."
       }
     >
       <Panel

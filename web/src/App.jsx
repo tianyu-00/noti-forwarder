@@ -1,52 +1,56 @@
-import { useEffect, useState } from 'react';
-import { api, setCsrfToken } from './api.js';
-import Login from './Login.jsx';
-import Dashboard from './Dashboard.jsx';
+import { useEffect, useState } from "react";
+import { api, setCsrfToken } from "./api.js";
+import Login from "./Login.jsx";
+import Dashboard from "./Dashboard.jsx";
 
 const LOGIN_ERRORS = {
-  429: 'Too many attempts. Try again in a few minutes.',
-  default: 'Incorrect username or password.',
+  429: "Too many attempts. Try again in a few minutes.",
+  default: "Incorrect username or password.",
 };
 
 export default function App() {
-  const [session, setSession] = useState({ status: 'loading' });
+  const [session, setSession] = useState({ status: "loading" });
   const [loginError, setLoginError] = useState(null);
   const [needsCode, setNeedsCode] = useState(false); // the server asked for the 2FA code
 
   useEffect(() => {
-    api('/auth/me')
+    api("/auth/me")
       .then((me) => {
         setCsrfToken(me.csrfToken);
-        setSession({ status: 'in', username: me.username });
+        setSession({ status: "in", username: me.username });
       })
-      .catch(() => setSession({ status: 'out' }));
+      .catch(() => setSession({ status: "out" }));
   }, []);
 
   async function login(credentials) {
     setLoginError(null);
     try {
-      const me = await api('/auth/login', { method: 'POST', body: credentials });
+      const me = await api("/auth/login", {
+        method: "POST",
+        body: credentials,
+      });
       setCsrfToken(me.csrfToken);
-      setSession({ status: 'in', username: me.username });
+      setSession({ status: "in", username: me.username });
     } catch (err) {
-      if (err.body?.error === 'totp_required') {
+      if (err.body?.error === "totp_required") {
         setNeedsCode(true); // the next step, not an error
       } else if (needsCode && err.status === 401) {
-        setLoginError('That code was not accepted.');
+        setLoginError("That code was not accepted.");
       } else {
         setLoginError(LOGIN_ERRORS[err.status] ?? LOGIN_ERRORS.default);
       }
     }
   }
 
-  if (session.status === 'loading') return null;
-  if (session.status === 'out') return <Login onSubmit={login} error={loginError} needsCode={needsCode} />;
+  if (session.status === "loading") return null;
+  if (session.status === "out")
+    return <Login onSubmit={login} error={loginError} needsCode={needsCode} />;
   return (
     <Dashboard
       username={session.username}
       onLogout={() => {
         setCsrfToken(null);
-        setSession({ status: 'out' });
+        setSession({ status: "out" });
       }}
     />
   );

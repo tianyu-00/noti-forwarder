@@ -9,7 +9,7 @@ export function splitAroundCode(body, code) {
   // Digits only: a code like ".*" can never act as a pattern.
   if (!code || !/^\d+$/.test(code)) return whole;
 
-  const pattern = new RegExp(`(?<!\\d)${[...code].join('[ -]?')}(?!\\d)`);
+  const pattern = new RegExp(`(?<!\\d)${[...code].join("[ -]?")}(?!\\d)`);
   const match = pattern.exec(body);
   if (!match) return whole;
 
@@ -17,5 +17,5 @@ export function splitAroundCode(body, code) {
     { text: body.slice(0, match.index), isCode: false },
     { text: match[0], isCode: true },
     { text: body.slice(match.index + match[0].length), isCode: false },
-  ].filter((part) => part.text !== '');
+  ].filter((part) => part.text !== "");
 }

@@ -14,7 +14,8 @@ export class FakeIntersectionObserver {
 
   observe(target) {
     this.targets.push(target);
-    if (FakeIntersectionObserver.startVisible) queueMicrotask(() => this.trigger(true));
+    if (FakeIntersectionObserver.startVisible)
+      queueMicrotask(() => this.trigger(true));
   }
 
   disconnect() {

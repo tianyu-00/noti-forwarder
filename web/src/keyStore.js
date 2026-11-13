@@ -1,9 +1,9 @@
-import { useSyncExternalStore } from 'react';
-import { isValidKey } from './e2e.js';
+import { useSyncExternalStore } from "react";
+import { isValidKey } from "./e2e.js";
 
 // The end-to-end encryption key lives only in this browser (localStorage). It is never sent to
 // the server. Another browser needs the key typed in once (Settings shows it for that).
-const STORAGE_KEY = 'nf_e2e_key';
+const STORAGE_KEY = "nf_e2e_key";
 const listeners = new Set();
 let memory = null; // used when localStorage is blocked, for this tab only
 
@@ -32,7 +32,7 @@ export function getKey() {
 }
 
 export function setKey(key) {
-  if (!isValidKey(key)) throw new Error('That is not a valid encryption key.');
+  if (!isValidKey(key)) throw new Error("That is not a valid encryption key.");
   write(key);
 }
 

@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react';
-import { api } from './api.js';
+import { useEffect, useState } from "react";
+import { api } from "./api.js";
 
 export default function Footer() {
   const [server, setServer] = useState(null);
 
   useEffect(() => {
-    api('/health')
+    api("/health")
       .then(setServer)
       .catch(() => setServer(null));
   }, []);

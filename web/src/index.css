@@ -1,4 +1,4 @@
-@import 'tailwindcss';
+@import "tailwindcss";
 
 /*
  * Two themes, black and white. Everything uses these names (bg-bg, text-muted, border-line…)
@@ -37,7 +37,7 @@
   }
 }
 
-:root[data-theme='dark'] {
+:root[data-theme="dark"] {
   color-scheme: dark;
   --bg: #18181b;
   --surface: #1f1f23;
@@ -69,7 +69,15 @@
 body {
   background: var(--bg);
   color: var(--fg);
-  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-family:
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    "Helvetica Neue",
+    Arial,
+    sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -80,10 +88,21 @@ body {
 
 /* The dot beside a phone that holds its connection: a soft green glow that fades in and out. */
 @keyframes status-dot-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ok) 55%, transparent); opacity: 1; }
-  50% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--ok) 0%, transparent); opacity: 0.55; }
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--ok) 55%, transparent);
+    opacity: 1;
+  }
+  50% {
+    box-shadow: 0 0 0 5px color-mix(in srgb, var(--ok) 0%, transparent);
+    opacity: 0.55;
+  }
 }
-.status-dot-live { animation: status-dot-pulse 2.4s ease-in-out infinite; }
+.status-dot-live {
+  animation: status-dot-pulse 2.4s ease-in-out infinite;
+}
 @media (prefers-reduced-motion: reduce) {
-  .status-dot-live { animation: none; }
+  .status-dot-live {
+    animation: none;
+  }
 }

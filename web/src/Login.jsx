@@ -1,12 +1,12 @@
-import { useState } from 'react';
-import PropTypes from 'prop-types';
-import { Button, inputClass } from './ui.jsx';
-import ThemeToggle from './ThemeToggle.jsx';
+import { useState } from "react";
+import PropTypes from "prop-types";
+import { Button, inputClass } from "./ui.jsx";
+import ThemeToggle from "./ThemeToggle.jsx";
 
 export default function Login({ onSubmit, error, needsCode = false }) {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [code, setCode] = useState('');
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [code, setCode] = useState("");
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-bg p-4">
@@ -17,17 +17,29 @@ export default function Login({ onSubmit, error, needsCode = false }) {
         className="w-full max-w-sm space-y-5"
         onSubmit={(e) => {
           e.preventDefault();
-          onSubmit(needsCode ? { username, password, code: code.trim() } : { username, password });
+          onSubmit(
+            needsCode
+              ? { username, password, code: code.trim() }
+              : { username, password },
+          );
         }}
       >
         <div className="space-y-1">
-          <p className="text-sm font-semibold tracking-tight text-muted">Notiforwarder</p>
-          <h1 className="text-2xl font-semibold tracking-tight text-fg">Sign in</h1>
+          <p className="text-sm font-semibold tracking-tight text-muted">
+            Notiforwarder
+          </p>
+          <h1 className="text-2xl font-semibold tracking-tight text-fg">
+            Sign in
+          </h1>
         </div>
         {!window.isSecureContext && (
-          <p role="status" className="rounded-md border border-line bg-surface p-3 text-sm text-muted">
-            This page is not using HTTPS, so your password and messages are not encrypted. Use it only on a
-            network you trust, and prefer the https:// address when you have one.
+          <p
+            role="status"
+            className="rounded-md border border-line bg-surface p-3 text-sm text-muted"
+          >
+            This page is not using HTTPS, so your password and messages are not
+            encrypted. Use it only on a network you trust, and prefer the
+            https:// address when you have one.
           </p>
         )}
         {error && (

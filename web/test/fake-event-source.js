@@ -23,7 +23,8 @@ export class FakeEventSource {
 
   // Test helper: deliver an event as the server would.
   emit(type, data) {
-    for (const fn of this.listeners[type] || []) fn({ data: JSON.stringify(data) });
+    for (const fn of this.listeners[type] || [])
+      fn({ data: JSON.stringify(data) });
   }
 
   static get current() {
