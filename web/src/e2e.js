@@ -6,7 +6,10 @@ import { gcm } from "@noble/ciphers/aes.js";
 // Cipher: AES-256-GCM. Additional data: "nf-e2e-v1:" + field name ("body" or "sender"), so the
 // server cannot move one field's ciphertext into another. The phone derives the nonce from the
 // message itself (see android/.../E2eCipher.kt), so a repeated message gives identical output
-// and the server's duplicate check keeps working. This side only decrypts.
+// and the server's duplicate check keeps working. This side decrypts those, and encrypts the
+// replies typed here (fields "reply-to" and "reply-body", each with its own additional data, so
+// one cannot be passed off as another or as a received message). A reply is sent once and never
+// deduplicated, so its nonce is random.
 //
 // A pure-JavaScript AES is used on purpose: the browser's own crypto.subtle is switched off on
 // plain http pages, and the dashboard may be opened on a LAN address without a certificate.
@@ -64,4 +67,18 @@ export function decryptField(key, field, blob) {
     raw.subarray(NONCE_BYTES),
   );
   return decoder.decode(plain);
+}
+
+/** Encrypts text for the phone to read. Throws on a bad key. */
+export function encryptField(key, field, text) {
+  if (!isValidKey(key)) throw new Error("bad key");
+  const nonce = crypto.getRandomValues(new Uint8Array(NONCE_BYTES));
+  const aad = encoder.encode(`nf-e2e-v1:${field}`);
+  const sealed = gcm(fromBase64Url(key), nonce, aad).encrypt(
+    encoder.encode(text),
+  );
+  const raw = new Uint8Array(NONCE_BYTES + sealed.length);
+  raw.set(nonce);
+  raw.set(sealed, NONCE_BYTES);
+  return PREFIX + toBase64Url(raw);
 }

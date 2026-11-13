@@ -130,7 +130,7 @@ describe("2FA codes", () => {
 
     it("still copies the code, through a temporary text field", async () => {
       document.execCommand = vi.fn(() => {
-        copied.push(document.querySelector("textarea")?.value);
+        copied.push(document.querySelector("textarea[readonly]")?.value);
         return true;
       });
       const user = await setup(
@@ -144,7 +144,7 @@ describe("2FA codes", () => {
       expect(
         await screen.findByRole("button", { name: /copied/i }),
       ).toBeInTheDocument();
-      expect(document.querySelector("textarea")).toBeNull(); // the temporary field is removed
+      expect(document.querySelector("textarea[readonly]")).toBeNull(); // the temporary field is removed
     });
 
     it("says so when the browser refuses that too", async () => {

@@ -1,5 +1,6 @@
 import {
   decryptField,
+  encryptField,
   generateKey,
   isEncrypted,
   isValidKey,
@@ -47,5 +48,42 @@ describe("end-to-end encryption format", () => {
     expect(isValidKey(`${a}x`)).toBe(false);
     expect(isValidKey("not a key")).toBe(false);
     expect(isValidKey("")).toBe(false);
+  });
+});
+
+describe("encrypting a reply in the browser", () => {
+  it("makes text the same decryptor reads back, for the field it was made for", () => {
+    const blob = encryptField(VECTOR.key, "reply-body", "On my way");
+
+    expect(isEncrypted(blob)).toBe(true);
+    expect(blob).not.toContain("On my way");
+    expect(decryptField(VECTOR.key, "reply-body", blob)).toBe("On my way");
+  });
+
+  it("uses a fresh nonce each time, so the same text never gives the same bytes", () => {
+    const a = encryptField(VECTOR.key, "reply-body", "hi");
+    const b = encryptField(VECTOR.key, "reply-body", "hi");
+
+    expect(a).not.toBe(b);
+  });
+
+  it("cannot be moved to another field, such as from the number to the text", () => {
+    const blob = encryptField(VECTOR.key, "reply-to", "+15551234567");
+
+    expect(() => decryptField(VECTOR.key, "reply-body", blob)).toThrow();
+    expect(() => decryptField(VECTOR.key, "body", blob)).toThrow();
+  });
+
+  it("handles accents and emoji, and refuses a bad key", () => {
+    const text = "Café ☕ 你好";
+
+    expect(
+      decryptField(
+        VECTOR.key,
+        "reply-body",
+        encryptField(VECTOR.key, "reply-body", text),
+      ),
+    ).toBe(text);
+    expect(() => encryptField("short", "reply-body", "x")).toThrow();
   });
 });

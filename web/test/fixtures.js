@@ -50,6 +50,7 @@ export function mockApi({
       }),
     ),
     http.get("/api/v1/devices", () => HttpResponse.json({ devices })),
+    http.get("/api/v1/outbox", () => HttpResponse.json({ replies: [] })),
     http.get("/api/v1/messages", ({ request }) => {
       const url = new URL(request.url);
       requests.messages.push(url.searchParams);
@@ -66,3 +67,19 @@ export function mockApi({
 export const inThread = { selector: "article p" };
 export const phonesNav = () =>
   screen.getByRole("navigation", { name: "Phones" });
+
+// A reply typed on the dashboard, as the server returns it.
+export function reply(overrides = {}) {
+  counter += 1;
+  return {
+    id: `11111111-0000-4000-8000-${String(counter).padStart(12, "0")}`,
+    deviceId: "dev-1",
+    to: "+15551234567",
+    body: `Reply ${counter}`,
+    status: "queued",
+    error: null,
+    createdAt: "2026-11-11T10:05:00.000Z",
+    sentAt: null,
+    ...overrides,
+  };
+}

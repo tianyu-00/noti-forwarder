@@ -175,18 +175,6 @@ describe("thread", () => {
     expect(send.querySelector("svg")).not.toBeNull();
     expect(send).not.toHaveTextContent("→");
   });
-
-  it("has a reply box that is switched off for now", async () => {
-    setup();
-
-    const thread = await screen.findByRole("region", { name: "NORTHWIND" });
-    const box = within(thread).getByRole("textbox", { name: /reply/i });
-    expect(box).toBeDisabled();
-    expect(box).toHaveAttribute(
-      "placeholder",
-      "Replying from this PC is not available yet",
-    );
-  });
 });
 
 describe("one pane at a time on a narrow screen", () => {

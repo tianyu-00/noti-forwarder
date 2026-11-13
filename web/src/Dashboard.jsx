@@ -22,7 +22,8 @@ import { Button } from "./ui.jsx";
 import { useStream } from "./useStream.js";
 import { matchesView } from "./matches.js";
 import { useE2eKey } from "./keyStore.js";
-import { readMessage } from "./readable.js";
+import { readMessage, readReply } from "./readable.js";
+import { encryptField } from "./e2e.js";
 import { useNow } from "./useNow.js";
 
 // Package name -> real app name, for the messages that carry one.
@@ -38,6 +39,27 @@ function withoutDevice(unread, deviceId) {
       ([id]) => conversationDevice(id) !== deviceId,
     ),
   );
+}
+
+// Adds or updates a reply by id. A queued copy never overwrites a newer state: the answer to our own
+// request can arrive after the live event that already says "sent".
+function upsertReply(list, item) {
+  const known = list.find((r) => r.id === item.id);
+  if (!known) return [...list, item];
+  if (known.status !== "queued" && item.status === "queued") return list;
+  return list.map((r) => (r.id === item.id ? item : r));
+}
+
+// Why the reply box is off for this conversation, or null when replying is possible.
+function replyBlock(conversation, device, key) {
+  if (conversation.type !== "sms") return "You can only reply to text messages";
+  if (device?.revokedAt) return "This phone is unpaired";
+  const latest = conversation.latest;
+  if (latest.locked || !latest.sender)
+    return "Add the encryption key in Settings to reply";
+  if (latest.encrypted && !key)
+    return "Add the encryption key in Settings to reply";
+  return null;
 }
 
 function RailLink({ onClick, children }) {
@@ -96,6 +118,8 @@ export default function Dashboard({ username, onLogout, pairingTiming }) {
   const [accountOpen, setAccountOpen] = useState(false);
   const [clearAllOpen, setClearAllOpen] = useState(false);
   const [reloadKey, setReloadKey] = useState(0); // bump to load the message list again
+  // Replies typed on the dashboard, as the server stores them (numbers and text possibly encrypted).
+  const [replies, setReplies] = useState([]);
 
   const endRef = useRef(null); // sits below the last message; scrolling near it loads more
   const loadingRef = useRef(false);
@@ -135,11 +159,13 @@ export default function Dashboard({ username, onLogout, pairingTiming }) {
   // A phone's messages were cleared (here or on another dashboard): the phone itself stays.
   const clearMessagesOf = useCallback((deviceId) => {
     setMessages((list) => list.filter((m) => m.deviceId !== deviceId));
+    setReplies((list) => list.filter((r) => r.deviceId !== deviceId));
     setUnread((u) => withoutDevice(u, deviceId));
   }, []);
 
   const clearAllMessages = useCallback(() => {
     setMessages([]);
+    setReplies([]);
     setUnread({});
   }, []);
 
@@ -147,6 +173,7 @@ export default function Dashboard({ username, onLogout, pairingTiming }) {
   const removeDevice = useCallback((deviceId) => {
     setDevices((list) => list.filter((x) => x.deviceId !== deviceId));
     setMessages((list) => list.filter((m) => m.deviceId !== deviceId));
+    setReplies((list) => list.filter((r) => r.deviceId !== deviceId));
     setUnread((u) => withoutDevice(u, deviceId));
     setSelected((current) => (current === deviceId ? null : current));
   }, []);
@@ -193,6 +220,7 @@ export default function Dashboard({ username, onLogout, pairingTiming }) {
       )
         setUnread((u) => ({ ...u, [key]: (u[key] ?? 0) + 1 }));
     },
+    outbox: (r) => setReplies((list) => upsertReply(list, r)),
     device_deleted: (d) => removeDevice(d.deviceId),
     messages_cleared: (d) => clearMessagesOf(d.deviceId),
     messages_cleared_all: clearAllMessages,
@@ -208,6 +236,12 @@ export default function Dashboard({ username, onLogout, pairingTiming }) {
           : [d, ...list],
       ),
   });
+
+  useEffect(() => {
+    api("/outbox")
+      .then((o) => setReplies(o.replies))
+      .catch(() => {}); // replies are a bonus: the messages still load without them
+  }, []);
 
   useEffect(() => {
     api("/devices")
@@ -332,6 +366,33 @@ export default function Dashboard({ username, onLogout, pairingTiming }) {
   useEffect(() => {
     openRef.current = openConversation?.id ?? null;
   });
+  // The open conversation's replies, readable here. They belong to it when they went to its number.
+  const threadReplies = useMemo(() => {
+    if (!openConversation || openConversation.type !== "sms") return [];
+    return replies
+      .filter((r) => r.deviceId === openConversation.deviceId)
+      .map((r) => readReply(r, e2eKey))
+      .filter((r) => !r.locked && r.to === openConversation.latest.sender);
+  }, [replies, openConversation, e2eKey]);
+
+  // Queues a reply for the phone to send. Encrypted here when the conversation is, so the server
+  // only ever holds scrambled text. Throws when the server refuses, so the box keeps the text.
+  async function sendReply(text) {
+    const latest = openConversation.latest;
+    const seal = latest.encrypted && e2eKey;
+    const item = await api("/outbox", {
+      method: "POST",
+      body: {
+        deviceId: openConversation.deviceId,
+        to: seal
+          ? encryptField(e2eKey, "reply-to", latest.sender)
+          : latest.sender,
+        body: seal ? encryptField(e2eKey, "reply-body", text) : text,
+      },
+    });
+    setReplies((list) => upsertReply(list, item));
+  }
+
   const unreadByDevice = useMemo(() => {
     const byDevice = {};
     for (const [id, count] of Object.entries(unread)) {
@@ -465,6 +526,13 @@ export default function Dashboard({ username, onLogout, pairingTiming }) {
               conversation={openConversation}
               deviceName={deviceNames[openConversation.deviceId]}
               onBack={threadShown ? () => setThreadShown(false) : undefined}
+              replies={threadReplies}
+              onReply={sendReply}
+              replyBlockedReason={replyBlock(
+                openConversation,
+                devices.find((d) => d.deviceId === openConversation.deviceId),
+                e2eKey,
+              )}
             />
           </div>
         ) : (

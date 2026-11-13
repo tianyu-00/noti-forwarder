@@ -165,9 +165,160 @@ function Bubble({ message: m }) {
 
 Bubble.propTypes = { message: messageShape.isRequired };
 
-/** One conversation: a header, its messages oldest first, and a reply box that is not live yet. */
-export default function Thread({ conversation, deviceName, onBack, actions }) {
-  const oldestFirst = [...conversation.messages].reverse();
+const replyShape = PropTypes.shape({
+  id: PropTypes.string.isRequired,
+  body: PropTypes.string.isRequired,
+  status: PropTypes.string.isRequired,
+  error: PropTypes.string,
+  createdAt: PropTypes.string.isRequired,
+});
+
+// What the phone reports when it cannot send, in plain words.
+const FAILURES = {
+  no_permission:
+    "Allow the phone to send texts: turn on Replies in the Notiforwarder app.",
+  replies_off:
+    "Allow the phone to send texts: turn on Replies in the Notiforwarder app.",
+  expired: "The phone was offline too long, so it was not sent.",
+  no_key: "The phone does not have the encryption key for this reply.",
+};
+
+function replyStatus(reply) {
+  if (reply.status === "sent") return "Sent";
+  if (reply.status === "failed")
+    return `Not sent. ${FAILURES[reply.error] ?? "The phone could not send it."}`;
+  return "Sending…";
+}
+
+function ReplyBubble({ reply }) {
+  return (
+    <div
+      role="group"
+      aria-label="Your reply"
+      data-reply-id={reply.id}
+      className="max-w-[min(34rem,100%)] space-y-1.5 self-end"
+    >
+      <div className="rounded-2xl rounded-tr-md bg-accent px-4 py-3 text-on-accent">
+        <p className="whitespace-pre-wrap wrap-break-word text-sm leading-relaxed">
+          {reply.body}
+        </p>
+      </div>
+      <p
+        className={clsx(
+          "px-1 text-right text-xs",
+          reply.status === "failed" ? "text-danger" : "text-muted",
+        )}
+      >
+        <time dateTime={reply.createdAt}>
+          {new Date(reply.createdAt).toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          })}
+        </time>
+        {" · "}
+        {replyStatus(reply)}
+      </p>
+    </div>
+  );
+}
+
+ReplyBubble.propTypes = { reply: replyShape.isRequired };
+
+// The box under a thread. `blockedReason` is the placeholder shown while replying is not possible.
+function Composer({ onSend, blockedReason }) {
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const blocked = blockedReason != null;
+  const ready = !blocked && !busy && text.trim() !== "";
+
+  async function send() {
+    if (!ready) return;
+    setBusy(true);
+    setFailed(false);
+    try {
+      await onSend(text.trim());
+      setText("");
+    } catch {
+      setFailed(true);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="border-t border-line px-6 py-4">
+      {failed && (
+        <p role="alert" className="mb-2 text-sm text-danger">
+          Could not send the reply. Try again.
+        </p>
+      )}
+      <div className="flex items-end gap-3">
+        <textarea
+          rows={1}
+          disabled={blocked}
+          aria-label="Reply"
+          placeholder={blocked ? blockedReason : "Write a reply"}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              send();
+            }
+          }}
+          className="max-h-32 min-w-0 flex-1 resize-none rounded-3xl border border-line bg-surface px-5 py-3 text-sm [field-sizing:content] placeholder:text-faint disabled:opacity-70"
+        />
+        {/* A plain button, not Button: its own rounded-md would win over rounded-full. */}
+        <button
+          type="button"
+          disabled={!ready}
+          onClick={send}
+          aria-label="Send reply"
+          className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent text-on-accent disabled:opacity-50"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            width="20"
+            height="20"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M5 12h14" />
+            <path d="M12 5l7 7-7 7" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+Composer.propTypes = {
+  onSend: PropTypes.func.isRequired,
+  blockedReason: PropTypes.string,
+};
+
+/** One conversation: a header, its messages and replies oldest first, and a reply box. */
+export default function Thread({
+  conversation,
+  deviceName,
+  onBack,
+  actions,
+  replies = [],
+  onReply,
+  replyBlockedReason = null,
+}) {
+  // Messages and our replies in one timeline, oldest first (a tie keeps the message first).
+  const timeline = [
+    ...[...conversation.messages]
+      .reverse()
+      .map((m) => ({ at: m.receivedAt, message: m })),
+    ...replies.map((r) => ({ at: r.createdAt, reply: r })),
+  ].sort((a, b) => new Date(a.at) - new Date(b.at));
   return (
     <section
       aria-label={conversation.name}
@@ -205,59 +356,40 @@ export default function Thread({ conversation, deviceName, onBack, actions }) {
         {actions}
       </header>
       <div className="flex flex-1 flex-col gap-3 overflow-y-auto bg-surface px-6 py-6">
-        {oldestFirst.map((m, i) => {
-          const day = dayLabel(m.receivedAt);
-          const startsDay =
-            i === 0 || day !== dayLabel(oldestFirst[i - 1].receivedAt);
+        {timeline.map((item, i) => {
+          const day = dayLabel(item.at);
+          const startsDay = i === 0 || day !== dayLabel(timeline[i - 1].at);
           return (
-            <div key={m.id} className="flex flex-col gap-3">
+            <div
+              key={item.message?.id ?? item.reply.id}
+              className="flex flex-col gap-3"
+            >
               {startsDay && (
                 <p className="self-center rounded-full bg-raised px-3 py-1 text-xs text-muted">
                   {day}
                 </p>
               )}
-              <Bubble message={m} />
+              {item.message ? (
+                <Bubble message={item.message} />
+              ) : (
+                <ReplyBubble reply={item.reply} />
+              )}
             </div>
           );
         })}
       </div>
-      <div className="flex items-center gap-3 border-t border-line px-6 py-4">
-        <input
-          type="text"
-          disabled
-          aria-label="Reply"
-          placeholder="Replying from this PC is not available yet"
-          className="min-w-0 flex-1 rounded-full border border-line bg-surface px-5 py-3 text-sm placeholder:text-faint"
-        />
-        {/* A plain button, not Button: its own rounded-md would win over rounded-full. */}
-        <button
-          type="button"
-          disabled
-          aria-label="Send reply"
-          className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent text-on-accent disabled:opacity-50"
-        >
-          <svg
-            viewBox="0 0 24 24"
-            width="20"
-            height="20"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <path d="M5 12h14" />
-            <path d="M12 5l7 7-7 7" />
-          </svg>
-        </button>
-      </div>
+      <Composer
+        key={conversation.id}
+        onSend={onReply}
+        blockedReason={replyBlockedReason}
+      />
     </section>
   );
 }
 
 Thread.propTypes = {
   conversation: PropTypes.shape({
+    id: PropTypes.string.isRequired,
     name: PropTypes.string.isRequired,
     type: PropTypes.string.isRequired,
     app: PropTypes.string,
@@ -267,4 +399,10 @@ Thread.propTypes = {
   // Set only on a narrow screen, where the list and the thread take turns.
   onBack: PropTypes.func,
   actions: PropTypes.node,
+  // Our replies in this conversation, already readable (decrypted), oldest or newest in any order.
+  replies: PropTypes.arrayOf(replyShape),
+  // Sends a reply: returns a promise that rejects when it could not be queued.
+  onReply: PropTypes.func.isRequired,
+  // Why replying is not possible right now (shown in the box), or null when it is.
+  replyBlockedReason: PropTypes.string,
 };

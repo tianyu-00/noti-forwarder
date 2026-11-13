@@ -8,9 +8,16 @@ import { extractCode } from "./codes.js";
  */
 export function readMessage(message, key) {
   if (!isEncrypted(message.body) && !isEncrypted(message.sender))
-    return { ...message, locked: null };
+    return { ...message, encrypted: false, locked: null };
   if (!key)
-    return { ...message, sender: "", body: "", code: null, locked: "no-key" };
+    return {
+      ...message,
+      sender: "",
+      body: "",
+      code: null,
+      encrypted: true,
+      locked: "no-key",
+    };
   try {
     const sender = isEncrypted(message.sender)
       ? decryptField(key, "sender", message.sender)
@@ -18,14 +25,46 @@ export function readMessage(message, key) {
     const body = isEncrypted(message.body)
       ? decryptField(key, "body", message.body)
       : message.body;
-    return { ...message, sender, body, code: extractCode(body), locked: null };
+    return {
+      ...message,
+      sender,
+      body,
+      code: extractCode(body),
+      encrypted: true,
+      locked: null,
+    };
   } catch {
     return {
       ...message,
       sender: "",
       body: "",
       code: null,
+      encrypted: true,
       locked: "wrong-key",
     };
+  }
+}
+
+/**
+ * A reply as the server stores it, readable here. The number and text are plain, or encrypted
+ * by a browser with the shared key; one this browser cannot read has `locked` set.
+ */
+export function readReply(reply, key) {
+  if (!isEncrypted(reply.to) && !isEncrypted(reply.body))
+    return { ...reply, locked: null };
+  if (!key) return { ...reply, to: "", body: "", locked: "no-key" };
+  try {
+    return {
+      ...reply,
+      to: isEncrypted(reply.to)
+        ? decryptField(key, "reply-to", reply.to)
+        : reply.to,
+      body: isEncrypted(reply.body)
+        ? decryptField(key, "reply-body", reply.body)
+        : reply.body,
+      locked: null,
+    };
+  } catch {
+    return { ...reply, to: "", body: "", locked: "wrong-key" };
   }
 }
