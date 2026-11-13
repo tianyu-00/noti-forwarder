@@ -1,4 +1,6 @@
 import { useState } from "react";
+import PropTypes from "prop-types";
+import clsx from "clsx";
 import { chooseTheme, currentTheme } from "./theme.js";
 
 const sun = (
@@ -33,7 +35,7 @@ const moon = (
 );
 
 /** One button that switches between the light and dark theme. */
-export default function ThemeToggle() {
+export default function ThemeToggle({ className }) {
   const [theme, setTheme] = useState(currentTheme);
   const next = theme === "dark" ? "light" : "dark";
 
@@ -46,9 +48,14 @@ export default function ThemeToggle() {
       }}
       aria-label={`Switch to ${next} theme`}
       title={`Switch to ${next} theme`}
-      className="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted hover:bg-raised hover:text-fg"
+      className={clsx(
+        "inline-flex h-9 w-9 items-center justify-center rounded-md text-muted hover:bg-raised hover:text-fg",
+        className,
+      )}
     >
       {theme === "dark" ? sun : moon}
     </button>
   );
 }
+
+ThemeToggle.propTypes = { className: PropTypes.string };

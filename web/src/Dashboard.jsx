@@ -33,6 +33,34 @@ function withoutDevice(unread, deviceId) {
   );
 }
 
+function RailLink({ onClick, children }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="whitespace-nowrap rounded-md px-1 py-1 hover:text-rail-fg"
+    >
+      {children}
+    </button>
+  );
+}
+
+RailLink.propTypes = {
+  onClick: PropTypes.func.isRequired,
+  children: PropTypes.node.isRequired,
+};
+
+// The small rounded button in a panel header.
+function PillButton(props) {
+  return (
+    <button
+      type="button"
+      className="shrink-0 rounded-full bg-raised px-3.5 py-2 text-xs font-semibold text-fg hover:opacity-80"
+      {...props}
+    />
+  );
+}
+
 export default function Dashboard({ username, onLogout, pairingTiming }) {
   const [devices, setDevices] = useState([]);
   const [silentAfterMinutes, setSilentAfterMinutes] = useState(0);
@@ -305,29 +333,23 @@ export default function Dashboard({ username, onLogout, pairingTiming }) {
   const title = selected ? (deviceNames[selected] ?? "Phone") : "All phones";
 
   return (
-    <div className="min-h-screen bg-bg text-fg">
-      <header className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
-        <span className="text-sm font-semibold tracking-tight">
-          Notiforwarder
-        </span>
-        <div className="flex items-center gap-1">
-          <span className="hidden text-sm text-muted sm:inline">
-            Signed in as {username}
-          </span>
-          <ThemeToggle />
-          <Button variant="ghost" onClick={() => setAccountOpen(true)}>
-            Account
-          </Button>
-          <Button variant="ghost" onClick={() => setSettingsOpen(true)}>
-            Settings
-          </Button>
-          <Button variant="ghost" onClick={signOut}>
-            Sign out
-          </Button>
-        </div>
-      </header>
-      <div className="md:flex">
-        <div className="md:border-r md:border-line">
+    <div className="flex min-h-screen flex-col bg-page text-fg">
+      <div className="flex flex-1 flex-col gap-3 p-3 md:h-[calc(100vh-2.5rem)] md:flex-none md:flex-row md:gap-4 md:p-4">
+        <aside
+          className={clsx(
+            "flex-col gap-2 rounded-2xl border border-line bg-rail p-3 text-rail-fg md:flex md:w-60 md:shrink-0 md:p-3.5",
+            threadShown ? "hidden" : "flex",
+          )}
+        >
+          <div className="flex items-center gap-2.5 px-2 pb-2 md:pb-4">
+            <span
+              aria-hidden="true"
+              className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-rail-accent text-sm font-extrabold text-on-rail-accent"
+            >
+              N
+            </span>
+            <span className="text-[15px] font-semibold">Notiforwarder</span>
+          </div>
           <Sidebar
             devices={devices}
             selected={selected}
@@ -337,82 +359,102 @@ export default function Dashboard({ username, onLogout, pairingTiming }) {
             silentAfterMinutes={silentAfterMinutes}
             now={now}
           />
-          <div className="px-3 pb-3">
-            <Button onClick={() => setAddOpen(true)} className="w-full">
-              Add phone
-            </Button>
+          <div className="md:flex-1" />
+          <button
+            type="button"
+            onClick={() => setAddOpen(true)}
+            className="rounded-xl bg-rail-accent px-3 py-3 text-sm font-bold text-on-rail-accent hover:opacity-90"
+          >
+            Add phone
+          </button>
+          <p className="truncate px-1.5 pt-2 text-xs text-rail-muted">
+            Signed in as {username}
+          </p>
+          <div className="flex items-center justify-between gap-1 text-[13px] text-rail-muted">
+            <RailLink onClick={() => setAccountOpen(true)}>Account</RailLink>
+            <RailLink onClick={() => setSettingsOpen(true)}>Settings</RailLink>
+            <RailLink onClick={signOut}>Sign out</RailLink>
+            <ThemeToggle className="h-8 w-8 text-rail-muted hover:bg-rail-active hover:text-rail-fg" />
           </div>
-        </div>
-        <main className="min-w-0 flex-1">
-          <div className="flex items-center justify-between gap-2 px-4 py-4">
-            <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
+        </aside>
+
+        <main
+          className={clsx(
+            "min-h-0 min-w-0 flex-col overflow-hidden rounded-2xl border border-line bg-bg md:flex md:w-96 md:shrink-0",
+            threadShown ? "hidden" : "flex",
+          )}
+        >
+          <div className="flex items-center justify-between gap-2 px-5 pb-3 pt-5">
+            <h1 className="truncate text-[22px] font-bold tracking-tight">
+              {title}
+            </h1>
             {selectedDevice ? (
-              <Button variant="secondary" onClick={() => setManageOpen(true)}>
+              <PillButton onClick={() => setManageOpen(true)}>
                 Manage phone
-              </Button>
+              </PillButton>
             ) : (
               !selected && (
-                <Button
-                  variant="secondary"
+                <PillButton
                   onClick={() => setClearAllOpen(true)}
+                  aria-label="Clear all messages"
                 >
-                  Clear all messages
-                </Button>
+                  Clear all
+                </PillButton>
               )
             )}
           </div>
           <Filters filters={filters} apps={apps} onChange={setFilters} />
           {loadError && (
-            <p role="alert" className="px-4 pb-3 text-sm text-danger">
+            <p role="alert" className="px-5 pb-3 text-sm text-danger">
               {loadError}
             </p>
           )}
-          <div className="md:flex">
-            <div
-              className={clsx(
-                "md:block md:w-80 md:shrink-0 md:border-r md:border-line",
-                threadShown && "hidden",
-              )}
-            >
-              <ConversationList
-                conversations={conversations}
-                deviceNames={deviceNames}
-                openId={openConversation?.id}
-                onOpen={openConversationById}
-                unread={unread}
-                now={now}
-              />
-            </div>
-            {openConversation && (
-              <div
-                className={clsx(
-                  "min-w-0 flex-1 md:flex md:h-[70vh]",
-                  !threadShown && "hidden",
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            <ConversationList
+              conversations={conversations}
+              deviceNames={deviceNames}
+              openId={openConversation?.id}
+              onOpen={openConversationById}
+              unread={unread}
+              now={now}
+            />
+            {nextBefore && (
+              <div className="p-4 text-center">
+                <div ref={endRef} className="h-px" />
+                {olderFailed || !canWatchScroll ? (
+                  <Button variant="secondary" onClick={loadOlder}>
+                    {olderFailed ? "Try again" : "Load older"}
+                  </Button>
+                ) : (
+                  loadingOlder && (
+                    <p className="text-sm text-muted">
+                      Loading older messages…
+                    </p>
+                  )
                 )}
-              >
-                <Thread
-                  conversation={openConversation}
-                  deviceName={deviceNames[openConversation.deviceId]}
-                  onBack={threadShown ? () => setThreadShown(false) : undefined}
-                />
               </div>
             )}
           </div>
-          {nextBefore && (
-            <div className="p-4 text-center">
-              <div ref={endRef} className="h-px" />
-              {olderFailed || !canWatchScroll ? (
-                <Button variant="secondary" onClick={loadOlder}>
-                  {olderFailed ? "Try again" : "Load older"}
-                </Button>
-              ) : (
-                loadingOlder && (
-                  <p className="text-sm text-muted">Loading older messages…</p>
-                )
-              )}
-            </div>
-          )}
         </main>
+
+        {openConversation ? (
+          <div
+            className={clsx(
+              "min-h-[calc(100dvh-1.5rem)] min-w-0 flex-1 overflow-hidden rounded-2xl border border-line bg-bg md:flex md:min-h-0",
+              threadShown ? "flex" : "hidden",
+            )}
+          >
+            <Thread
+              conversation={openConversation}
+              deviceName={deviceNames[openConversation.deviceId]}
+              onBack={threadShown ? () => setThreadShown(false) : undefined}
+            />
+          </div>
+        ) : (
+          <div className="hidden min-w-0 flex-1 items-center justify-center rounded-2xl border border-line bg-bg p-8 text-center text-sm text-muted md:flex">
+            A conversation opens here once a message arrives.
+          </div>
+        )}
       </div>
       {selectedDevice && (
         <ManagePhoneDialog

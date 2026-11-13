@@ -44,9 +44,9 @@ function status(device, state, silentAfterMinutes, now) {
 }
 
 const DOT_CLASS = {
-  live: "status-dot-live bg-ok",
-  idle: "bg-faint",
-  quiet: "bg-danger",
+  live: "status-dot-live bg-rail-accent",
+  idle: "bg-rail-muted",
+  quiet: "bg-rail-danger",
 };
 
 // Decorative: the words next to it carry the meaning, so screen readers skip it.
@@ -71,8 +71,8 @@ function Item({ active, onClick, children }) {
       onClick={onClick}
       aria-current={active ? "page" : undefined}
       className={clsx(
-        "flex shrink-0 flex-col gap-0.5 rounded-md border border-line px-3 py-2 text-left text-sm hover:bg-raised md:w-full md:border-transparent",
-        active && "border-fg bg-raised md:border-transparent",
+        "flex shrink-0 flex-col gap-0.5 rounded-xl px-3 py-2.5 text-left text-sm text-rail-fg hover:bg-rail-active/60 md:w-full",
+        active && "bg-rail-active",
       )}
     >
       {children}
@@ -89,8 +89,9 @@ Item.propTypes = {
 function StatusRow({ device, silentAfterMinutes, now }) {
   const state = stateOf(device, silentAfterMinutes, now);
   const tone =
-    { live: "text-ok", quiet: "font-medium text-danger" }[state] ??
-    "text-muted";
+    { live: "text-rail-accent", quiet: "font-medium text-rail-danger" }[
+      state
+    ] ?? "text-rail-muted";
   return (
     <span className={clsx("flex items-center gap-1.5 text-xs", tone)}>
       <StatusDot state={state} />
@@ -117,15 +118,15 @@ export default function Sidebar({
   return (
     <nav
       aria-label="Phones"
-      className="flex w-full gap-2 overflow-x-auto p-3 md:block md:w-64 md:space-y-0.5 md:overflow-visible"
+      className="flex w-full gap-2 overflow-x-auto md:flex-col md:gap-1 md:overflow-visible"
     >
       <Item active={selected === null} onClick={() => onSelect(null)}>
-        <span className="flex items-center justify-between gap-2 font-medium text-fg">
+        <span className="flex items-center justify-between gap-2 font-medium">
           All phones
           {unreadTotal > 0 && (
             <span
               aria-label={`${unreadTotal} unread`}
-              className="rounded-full bg-primary px-2 text-xs font-medium text-on-primary"
+              className="rounded-full bg-rail-accent px-2 text-xs font-bold text-on-rail-accent"
             >
               {unreadTotal}
             </span>
@@ -138,12 +139,12 @@ export default function Sidebar({
           active={selected === d.deviceId}
           onClick={() => onSelect(d.deviceId)}
         >
-          <span className="flex items-center justify-between gap-2 font-medium text-fg">
+          <span className="flex items-center justify-between gap-2 font-medium">
             {d.name}
             {unread[d.deviceId] > 0 && (
               <span
                 aria-label={`${unread[d.deviceId]} unread`}
-                className="rounded-full bg-primary px-2 text-xs font-medium text-on-primary"
+                className="rounded-full bg-rail-accent px-2 text-xs font-bold text-on-rail-accent"
               >
                 {unread[d.deviceId]}
               </span>

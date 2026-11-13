@@ -30,6 +30,7 @@
   --rail-active: #244034;
   --rail-accent: #3ddc97;
   --on-rail-accent: #14211b;
+  --rail-danger: #ff9a9a;
   --av1-bg: #d9e4ff;
   --av1-fg: #2748a8;
   --av2-bg: #fff0c2;
@@ -69,6 +70,7 @@
     --rail-active: #1c3027;
     --rail-accent: #3ddc97;
     --on-rail-accent: #0a0f0d;
+    --rail-danger: #ff9a9a;
     --av1-bg: #1e2a4d;
     --av1-fg: #a9c0ff;
     --av2-bg: #3a2f12;
@@ -108,6 +110,7 @@
   --rail-active: #1c3027;
   --rail-accent: #3ddc97;
   --on-rail-accent: #0a0f0d;
+  --rail-danger: #ff9a9a;
   --av1-bg: #1e2a4d;
   --av1-fg: #a9c0ff;
   --av2-bg: #3a2f12;
@@ -145,6 +148,7 @@
   --color-rail-active: var(--rail-active);
   --color-rail-accent: var(--rail-accent);
   --color-on-rail-accent: var(--on-rail-accent);
+  --color-rail-danger: var(--rail-danger);
 }
 
 body {

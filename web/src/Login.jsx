@@ -9,12 +9,12 @@ export default function Login({ onSubmit, error, needsCode = false }) {
   const [code, setCode] = useState("");
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-bg p-4">
+    <main className="flex min-h-screen flex-col items-center justify-center bg-page p-4">
       <div className="absolute right-4 top-4">
         <ThemeToggle />
       </div>
       <form
-        className="w-full max-w-sm space-y-5"
+        className="w-full max-w-sm space-y-5 rounded-2xl border border-line bg-bg p-8"
         onSubmit={(e) => {
           e.preventDefault();
           onSubmit(

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import PropTypes from "prop-types";
 import { splitAroundCode } from "./code.js";
 import { Button } from "./ui.jsx";
+import Avatar from "./Avatar.jsx";
 
 const messageShape = PropTypes.shape({
   id: PropTypes.string.isRequired,
@@ -63,9 +64,13 @@ function CopyCodeButton({ code }) {
 
   return (
     <span className="inline-flex items-center gap-2">
-      <Button onClick={copy} className="px-3 py-1.5 text-xs">
+      <button
+        type="button"
+        onClick={copy}
+        className="rounded-full bg-accent px-3 py-1 text-xs font-semibold text-on-accent hover:opacity-90"
+      >
         {state === "copied" ? "Copied" : "Copy code"}
-      </Button>
+      </button>
       {state === "failed" && (
         <span className="text-xs text-danger">
           Could not copy. Select the code instead.
@@ -89,7 +94,7 @@ function dayLabel(iso) {
 function Bubble({ message: m }) {
   return (
     <article className="max-w-[min(34rem,100%)] space-y-1.5 self-start">
-      <div className="rounded-2xl rounded-tl-sm border border-line bg-bg px-4 py-3">
+      <div className="rounded-2xl rounded-tl-md border border-line bg-bg px-4 py-3">
         {/* An SMS sender is the conversation itself; a notification's title changes each time. */}
         {m.type === "notification" && m.sender && (
           <p className="mb-1 text-sm font-semibold text-fg">{m.sender}</p>
@@ -107,7 +112,7 @@ function Bubble({ message: m }) {
               part.isCode ? (
                 <mark
                   key={i}
-                  className="rounded bg-raised px-1.5 py-0.5 font-mono text-[0.95em] font-semibold text-fg ring-1 ring-line"
+                  className="rounded-md bg-accent-soft px-2 py-0.5 font-mono text-[0.95em] font-bold text-accent-ink"
                 >
                   {part.text}
                 </mark>
@@ -141,8 +146,8 @@ export default function Thread({ conversation, deviceName, onBack, actions }) {
       aria-label={conversation.name}
       className="flex min-h-0 min-w-0 flex-1 flex-col"
     >
-      <header className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
-        <div className="flex min-w-0 items-center gap-2">
+      <header className="flex items-center justify-between gap-3 border-b border-line px-6 py-4">
+        <div className="flex min-w-0 items-center gap-3">
           {onBack && (
             <Button
               variant="ghost"
@@ -153,8 +158,9 @@ export default function Thread({ conversation, deviceName, onBack, actions }) {
               ←
             </Button>
           )}
+          <Avatar name={conversation.name} size="lg" />
           <div className="min-w-0">
-            <h2 className="truncate text-base font-semibold">
+            <h2 className="truncate text-[17px] font-bold">
               {conversation.name}
             </h2>
             <p className="text-xs text-muted">
@@ -165,7 +171,7 @@ export default function Thread({ conversation, deviceName, onBack, actions }) {
         </div>
         {actions}
       </header>
-      <div className="flex flex-1 flex-col gap-3 overflow-y-auto bg-surface px-4 py-5">
+      <div className="flex flex-1 flex-col gap-3 overflow-y-auto bg-surface px-6 py-6">
         {oldestFirst.map((m, i) => {
           const day = dayLabel(m.receivedAt);
           const startsDay =
@@ -182,15 +188,19 @@ export default function Thread({ conversation, deviceName, onBack, actions }) {
           );
         })}
       </div>
-      <div className="flex items-center gap-2 border-t border-line px-4 py-3">
+      <div className="flex items-center gap-3 border-t border-line px-6 py-4">
         <input
           type="text"
           disabled
           aria-label="Reply"
           placeholder="Replying from this PC is not available yet"
-          className="min-w-0 flex-1 rounded-full border border-line bg-surface px-4 py-2.5 text-sm placeholder:text-faint"
+          className="min-w-0 flex-1 rounded-full border border-line bg-surface px-5 py-3 text-sm placeholder:text-faint"
         />
-        <Button disabled aria-label="Send reply" className="rounded-full">
+        <Button
+          disabled
+          aria-label="Send reply"
+          className="h-11 w-11 rounded-full p-0"
+        >
           →
         </Button>
       </div>
