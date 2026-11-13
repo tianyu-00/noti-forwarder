@@ -1,17 +1,16 @@
 import PropTypes from "prop-types";
-import clsx from "clsx";
 
 /** Small tag saying whether a conversation is a text message or an app's notifications. */
 export default function KindBadge({ type }) {
   const sms = type === "sms";
+  // Two tints from the avatar palette: green for texts, blue for apps. Neither matches the
+  // grey of the open row, so both stay readable on it.
+  const tone = sms ? "var(--accent-soft)" : "var(--av1-bg)";
+  const ink = sms ? "var(--accent-ink)" : "var(--av1-fg)";
   return (
     <span
-      className={clsx(
-        "inline-block rounded-full px-2 py-px text-[11px] font-semibold",
-        sms
-          ? "bg-accent-soft text-accent-ink"
-          : "bg-surface text-muted ring-1 ring-faint/40",
-      )}
+      style={{ background: tone, color: ink }}
+      className="inline-block rounded-full px-2 py-px text-[11px] font-semibold"
     >
       {sms ? "SMS" : "App"}
     </span>
