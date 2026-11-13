@@ -100,4 +100,18 @@ describe('presence', () => {
     expect(() => presence.touch('nobody')).not.toThrow();
     expect(presence.isConnected('nobody')).toBe(false);
   });
+
+  it('sends an event to one connected phone, and says whether anyone was there to get it', () => {
+    const { presence } = setup();
+    const a = fakeConnection();
+    const b = fakeConnection();
+    presence.connect('a', a);
+    presence.connect('b', b);
+
+    expect(presence.send('a', 'outbox', { id: 1 })).toBe(true);
+    expect(presence.send('nobody', 'outbox', { id: 2 })).toBe(false);
+
+    expect(a.sent).toEqual([['outbox', { id: 1 }]]);
+    expect(b.sent).toEqual([]);
+  });
 });

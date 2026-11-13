@@ -72,6 +72,7 @@ export function devicesRouter({ db, requireViewer, events, presence, silentAfter
       const exists = await db.query('SELECT 1 FROM devices WHERE device_id = $1', [req.params.id]);
       if (exists.rowCount === 0) return res.status(404).json({ error: 'not_found' });
       const result = await db.query('DELETE FROM messages WHERE device_id = $1', [req.params.id]);
+      await db.query('DELETE FROM outbox WHERE device_id = $1', [req.params.id]);
       await audit(db, { event: 'clear_messages', actor: req.session.username, deviceId: req.params.id, ip: req.ip });
       events.publish('messages_cleared', { deviceId: req.params.id });
       res.json({ deleted: result.rowCount });
@@ -85,6 +86,7 @@ export function devicesRouter({ db, requireViewer, events, presence, silentAfter
   router.delete('/messages', requireViewer, requireCsrf, async (req, res, next) => {
     try {
       const result = await db.query('DELETE FROM messages');
+      await db.query('DELETE FROM outbox');
       await audit(db, { event: 'clear_all_messages', actor: req.session.username, ip: req.ip });
       events.publish('messages_cleared_all', {});
       res.json({ deleted: result.rowCount });

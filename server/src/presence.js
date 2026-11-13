@@ -28,6 +28,13 @@ export function createPresence({ onChange = () => {}, now = Date.now } = {}) {
   return {
     connect,
     isConnected: (deviceId) => connections.has(deviceId),
+    /** Sends an event to one phone. False when it is not connected (it will ask later instead). */
+    send(deviceId, event, data) {
+      const connection = connections.get(deviceId);
+      if (!connection) return false;
+      connection.send(event, data);
+      return true;
+    },
     connectedIds: () => [...connections.keys()],
     /**
      * The phone proved it is alive (it sends a small check-in while connected). A phone that

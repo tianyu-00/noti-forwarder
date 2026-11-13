@@ -32,3 +32,16 @@ export function deviceToApi(row) {
 }
 
 export const DEVICE_COLUMNS = 'device_id, name, model, app_version, paired_at, last_seen, revoked_at';
+
+export function outboxToApi(row) {
+  return {
+    id: row.id,
+    deviceId: row.device_id,
+    to: row.recipient,
+    body: row.body,
+    status: row.status,
+    error: row.error ?? null,
+    createdAt: row.created_at.toISOString(),
+    sentAt: row.sent_at ? row.sent_at.toISOString() : null,
+  };
+}
