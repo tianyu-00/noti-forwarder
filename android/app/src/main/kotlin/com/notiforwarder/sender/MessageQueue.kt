@@ -1,5 +1,21 @@
 package com.notiforwarder.sender
 
+enum class ActivityState { Waiting, Sent, Rejected }
+
+/**
+ * One line of the Activity tab: who a message was from, when, and how it stands. There is no text
+ * here on purpose: the text of a sent message is erased from the phone.
+ */
+data class ActivityRow(
+    val id: String,
+    val type: String,
+    val app: String,
+    val sender: String,
+    /** When it was sent, or for one still waiting, when it was captured. */
+    val at: Long,
+    val state: ActivityState,
+)
+
 /** A queued message plus how many times sending it has already failed. */
 data class Queued(val message: Message, val attempts: Int)
 
@@ -10,6 +26,8 @@ data class Queued(val message: Message, val attempts: Int)
  */
 class MessageQueue(
     private val dao: QueueDao,
+    /** How many sent messages to remember for the Activity tab. */
+    private val keepSent: Int = 50,
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
     /**
@@ -45,7 +63,27 @@ class MessageQueue(
         return ids.size
     }
 
-    fun confirmed(ids: List<String>) = dao.delete(ids)
+    /** The server has them. They stay as a short history (text erased) and are never sent again. */
+    fun confirmed(ids: List<String>) {
+        dao.markSent(ids, clock())
+        dao.pruneSent(keepSent)
+    }
+
+    /** Newest first: what was sent, what is waiting, what the server refused. */
+    fun recent(limit: Int): List<ActivityRow> = dao.recent(limit).map {
+        ActivityRow(
+            id = it.id,
+            type = it.type,
+            app = it.app,
+            sender = it.sender,
+            at = it.sentAt ?: it.enqueuedAt,
+            state = when {
+                it.sentAt != null -> ActivityState.Sent
+                it.quarantined -> ActivityState.Rejected
+                else -> ActivityState.Waiting
+            },
+        )
+    }
 
     fun retryLater(ids: List<String>, atMillis: Long) = dao.retryLater(ids, atMillis)
 

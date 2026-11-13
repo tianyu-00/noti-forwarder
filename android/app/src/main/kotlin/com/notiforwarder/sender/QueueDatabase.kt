@@ -2,6 +2,7 @@ package com.notiforwarder.sender
 
 import android.content.Context
 import androidx.room.Dao
+import androidx.room.AutoMigration
 import androidx.room.Database
 import androidx.room.Entity
 import androidx.room.Index
@@ -29,6 +30,11 @@ data class QueuedMessage(
     val nextAttemptAt: Long = 0,
     /** The server will never accept it. Kept for inspection, never retried. */
     val quarantined: Boolean = false,
+    /**
+     * When the server confirmed it. A sent row is kept as a short history for the Activity tab,
+     * with its text erased, and is never sent again.
+     */
+    val sentAt: Long? = null,
 )
 
 @Dao
@@ -39,12 +45,15 @@ interface QueueDao {
 
     // rowid breaks ties so messages enqueued in the same millisecond keep their order.
     @Query(
-        "SELECT * FROM queued_messages WHERE quarantined = 0 AND nextAttemptAt <= :now " +
+        "SELECT * FROM queued_messages WHERE sentAt IS NULL AND quarantined = 0 AND nextAttemptAt <= :now " +
             "ORDER BY enqueuedAt, rowid LIMIT :limit",
     )
     fun due(now: Long, limit: Int): List<QueuedMessage>
 
-    @Query("SELECT * FROM queued_messages WHERE type = 'notification' AND app IN (:apps) AND enqueuedAt >= :since")
+    @Query(
+        "SELECT * FROM queued_messages WHERE sentAt IS NULL AND type = 'notification' " +
+            "AND app IN (:apps) AND enqueuedAt >= :since",
+    )
     fun notificationsFrom(apps: List<String>, since: Long): List<QueuedMessage>
 
     @Query("DELETE FROM queued_messages WHERE id IN (:ids)")
@@ -56,17 +65,37 @@ interface QueueDao {
     @Query("UPDATE queued_messages SET quarantined = 1 WHERE id = :id")
     fun quarantine(id: String)
 
-    @Query("SELECT COUNT(*) FROM queued_messages WHERE quarantined = 0")
+    @Query("UPDATE queued_messages SET sentAt = :at, body = '' WHERE id IN (:ids)")
+    fun markSent(ids: List<String>, at: Long)
+
+    /** Keeps the newest [keep] sent rows and forgets older ones. Rows still waiting are never touched. */
+    @Query(
+        "DELETE FROM queued_messages WHERE sentAt IS NOT NULL AND id NOT IN " +
+            "(SELECT id FROM queued_messages WHERE sentAt IS NOT NULL ORDER BY sentAt DESC, rowid DESC LIMIT :keep)",
+    )
+    fun pruneSent(keep: Int)
+
+    /** Sent, waiting and refused rows together, newest first. */
+    @Query("SELECT * FROM queued_messages ORDER BY COALESCE(sentAt, enqueuedAt) DESC, rowid DESC LIMIT :limit")
+    fun recent(limit: Int): List<QueuedMessage>
+
+    @Query("SELECT COUNT(*) FROM queued_messages WHERE sentAt IS NULL AND quarantined = 0")
     fun count(): Int
 
-    @Query("SELECT COUNT(*) FROM queued_messages WHERE quarantined = 1")
+    @Query("SELECT COUNT(*) FROM queued_messages WHERE sentAt IS NULL AND quarantined = 1")
     fun quarantinedCount(): Int
 
-    @Query("SELECT MIN(nextAttemptAt) FROM queued_messages WHERE quarantined = 0 AND nextAttemptAt > :now")
+    @Query("SELECT MIN(nextAttemptAt) FROM queued_messages WHERE sentAt IS NULL AND quarantined = 0 AND nextAttemptAt > :now")
     fun nextDueAt(now: Long): Long?
 }
 
-@Database(entities = [QueuedMessage::class], version = 1, exportSchema = true)
+// Version 2 adds the nullable sentAt column; Room writes the migration from the two schema files.
+@Database(
+    entities = [QueuedMessage::class],
+    version = 2,
+    exportSchema = true,
+    autoMigrations = [AutoMigration(from = 1, to = 2)],
+)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun queueDao(): QueueDao
 
