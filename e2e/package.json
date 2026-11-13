@@ -1,0 +1,12 @@
+{
+  "name": "notiforwarder-e2e",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "api": "node run.mjs",
+    "browser": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.49.1"
+  }
+}

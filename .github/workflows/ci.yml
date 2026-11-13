@@ -80,6 +80,12 @@ jobs:
         run: docker compose -p notiforwarder-e2e -f e2e/docker-compose.yml up -d --build
       - name: Log in, pair a phone, send a message, see it arrive
         run: node e2e/run.mjs
+      - name: Install the browser test tools
+        run: npm ci && npx playwright install --with-deps chromium
+        working-directory: e2e
+      - name: The same in a real browser (log in, add a phone, live message, search)
+        run: npx playwright test
+        working-directory: e2e
       - name: Stack logs (only on failure, no message text is logged)
         if: failure()
         run: docker compose -p notiforwarder-e2e -f e2e/docker-compose.yml logs --no-color --tail 80
