@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!-- SMS permission implies a phone; say it is optional so the app stays installable elsewhere. -->
     <uses-feature android:name="android.hardware.telephony" android:required="false" />
@@ -17,8 +18,11 @@
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <!-- Sideloaded, so the Play Store policy on this permission does not apply. Without it Android 11+
-         hides most other apps, and the real name (Gmail) of a notification's app could not be found. -->
-    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
+         hides most other apps, and the real name (Gmail) of a notification's app could not be found.
+         A <queries> list cannot name every app that may post a notification, so lint is told to ignore this. -->
+    <uses-permission
+        android:name="android.permission.QUERY_ALL_PACKAGES"
+        tools:ignore="QueryAllPackagesPermission" />
 
     <!-- Lets the app list the apps on the launcher, for the "which apps to forward" screen. -->
     <queries>
