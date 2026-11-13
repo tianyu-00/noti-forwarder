@@ -9,8 +9,8 @@ export async function createSession(db, userId) {
   const csrfToken = randomBytes(24).toString('base64url');
   await db.query(
     `INSERT INTO sessions (token_hash, user_id, csrf_token, expires_at)
-     VALUES ($1, $2, $3, now() + ($4 || ' milliseconds')::interval)`,
-    [hashToken(token), userId, csrfToken, String(SESSION_TTL_MS)],
+     VALUES ($1, $2, $3, ts_add_ms(now(), $4))`,
+    [hashToken(token), userId, csrfToken, SESSION_TTL_MS],
   );
   return { token, csrfToken };
 }

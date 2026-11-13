@@ -100,6 +100,25 @@ export function openDatabase(path) {
         },
       };
     },
+    /**
+     * Runs [fn] in a transaction on the one connection: commits when it returns, rolls back when it
+     * throws, and gives the connection back either way. Code inside must use the client it is given,
+     * never the pool, which would wait for the very connection the transaction holds.
+     */
+    async transaction(fn) {
+      const client = await this.connect();
+      try {
+        await client.query('BEGIN');
+        const result = await fn(client);
+        await client.query('COMMIT');
+        return result;
+      } catch (err) {
+        await client.query('ROLLBACK').catch(() => {});
+        throw err;
+      } finally {
+        client.release();
+      }
+    },
     async end() {
       raw.close();
     },

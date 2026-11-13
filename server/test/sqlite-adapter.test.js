@@ -190,6 +190,64 @@ describe('transactions', () => {
   });
 });
 
+describe('transaction()', () => {
+  it('commits what the function did and returns its result', async () => {
+    open();
+    await db.query('CREATE TABLE t (n integer)');
+
+    const result = await db.transaction(async (client) => {
+      await client.query('INSERT INTO t VALUES (1)');
+      return 'done';
+    });
+
+    expect(result).toBe('done');
+    expect((await db.query('SELECT n FROM t')).rows).toEqual([{ n: 1 }]);
+  });
+
+  it('rolls everything back and rethrows when the function throws', async () => {
+    open();
+    await db.query('CREATE TABLE t (n integer)');
+
+    await expect(
+      db.transaction(async (client) => {
+        await client.query('INSERT INTO t VALUES (1)');
+        throw new Error('boom');
+      }),
+    ).rejects.toThrow('boom');
+
+    expect((await db.query('SELECT count(*) AS c FROM t')).rows[0].c).toBe(0);
+  });
+
+  it('lets other queries run once it is over, whether it worked or not', async () => {
+    open();
+    await db.transaction(async () => {});
+    await db.transaction(async () => {
+      throw new Error('x');
+    }).catch(() => {});
+
+    expect((await db.query('SELECT 1 AS one')).rows).toEqual([{ one: 1 }]);
+  });
+
+  it('runs two transactions one after the other, never mixed', async () => {
+    open();
+    await db.query('CREATE TABLE t (n integer)');
+    const log = [];
+    const slow = db.transaction(async (client) => {
+      await client.query('INSERT INTO t VALUES (1)');
+      await new Promise((r) => setTimeout(r, 20));
+      log.push('slow done');
+    });
+    const quick = db.transaction(async (client) => {
+      log.push('quick started');
+      await client.query('INSERT INTO t VALUES (2)');
+    });
+
+    await Promise.all([slow, quick]);
+
+    expect(log).toEqual(['slow done', 'quick started']);
+  });
+});
+
 describe('rules of the database', () => {
   it('enforces foreign keys and cascades deletes', async () => {
     open();

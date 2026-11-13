@@ -54,7 +54,9 @@ export function messagesRouter({
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
            ON CONFLICT DO NOTHING
            RETURNING *`,
-          [m.id, req.deviceId, m.type, m.app, m.appLabel ?? null, m.sender, m.body, m.receivedAt, hash],
+          // Ids are kept lower case and times as UTC (Date), because SQLite stores exactly the text it is
+          // given and the list sorts and pages on that text. Postgres did both by itself.
+          [m.id.toLowerCase(), req.deviceId, m.type, m.app, m.appLabel ?? null, m.sender, m.body, new Date(m.receivedAt), hash],
         );
         stored += result.rowCount;
         // Only newly stored messages are pushed; duplicates stay silent.
@@ -98,16 +100,19 @@ export function messagesRouter({
       if (app) where.push(`app = ${bind(app)}`);
       if (q) {
         const like = bind(`%${escapeLike(q)}%`);
-        where.push(`(body ILIKE ${like} OR sender ILIKE ${like} OR app ILIKE ${like})`);
+        // SQLite's LIKE ignores case for plain letters; the backslash escapes % and _ (see escapeLike).
+        where.push(
+          `(body LIKE ${like} ESCAPE '\\' OR sender LIKE ${like} ESCAPE '\\' OR app LIKE ${like} ESCAPE '\\' ` +
+            `OR app_label LIKE ${like} ESCAPE '\\')`,
+        );
       }
       if (before) {
         const { ts, id } = decodeCursor(before);
-        where.push(`(received_at, id) < (${bind(ts)}::timestamptz, ${bind(id)}::uuid)`);
+        where.push(`(received_at, id) < (${bind(ts)}, ${bind(id)})`);
       }
 
       const { rows } = await db.query(
-        `SELECT *, to_char(received_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS received_at_us
-           FROM messages ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+        `SELECT * FROM messages ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
           ORDER BY received_at DESC, id DESC
           LIMIT ${bind(limit + 1)}`,
         params,
@@ -116,7 +121,7 @@ export function messagesRouter({
       const last = page[page.length - 1];
       res.json({
         messages: page.map(toApi),
-        nextBefore: rows.length > limit ? encodeCursor(last.received_at_us, last.id) : null,
+        nextBefore: rows.length > limit ? encodeCursor(last.received_at.toISOString(), last.id) : null,
       });
     } catch (err) {
       next(err);

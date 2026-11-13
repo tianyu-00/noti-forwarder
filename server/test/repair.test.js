@@ -23,7 +23,7 @@ const pair = async (body) => request(ctx.app).post('/api/v1/pair').send({ code: 
 const send = (token, messages) =>
   request(ctx.app).post('/api/v1/messages').set('Authorization', `Bearer ${token}`).send({ messages });
 const count = async (where = 'true', params = []) =>
-  (await ctx.pool.query(`SELECT count(*)::int AS n FROM devices WHERE ${where}`, params)).rows[0].n;
+  (await ctx.pool.query(`SELECT count(*) AS n FROM devices WHERE ${where}`, params)).rows[0].n;
 
 describe('pairing the same phone again', () => {
   it('stores the hardware id when a phone pairs', async () => {

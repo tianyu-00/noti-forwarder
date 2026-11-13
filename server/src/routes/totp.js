@@ -37,7 +37,6 @@ export function totpRouter({ db, requireViewer, limiter, now, secretBox = plainS
 
   // Step 2: a correct code turns it on and returns the backup codes, shown only this once.
   router.post('/auth/totp/enable', ...guard, async (req, res, next) => {
-    const client = await db.connect();
     try {
       const parsed = enableSchema.safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ error: 'invalid_payload' });
@@ -47,20 +46,17 @@ export function totpRouter({ db, requireViewer, limiter, now, secretBox = plainS
       if (!check.ok) return res.status(400).json({ error: 'invalid_code' });
 
       const backupCodes = generateBackupCodes();
-      await client.query('BEGIN');
-      await client.query('UPDATE users SET totp_enabled_at = now(), totp_last_step = $2 WHERE id = $1', [user.id, check.step]);
-      await client.query('DELETE FROM totp_backup_codes WHERE user_id = $1', [user.id]);
-      for (const c of backupCodes) {
-        await client.query('INSERT INTO totp_backup_codes (code_hash, user_id) VALUES ($1, $2)', [hashBackupCode(c), user.id]);
-      }
-      await audit(client, { event: 'totp_enabled', actor: user.username, ip: req.ip });
-      await client.query('COMMIT');
+      await db.transaction(async (client) => {
+        await client.query('UPDATE users SET totp_enabled_at = now(), totp_last_step = $2 WHERE id = $1', [user.id, check.step]);
+        await client.query('DELETE FROM totp_backup_codes WHERE user_id = $1', [user.id]);
+        for (const c of backupCodes) {
+          await client.query('INSERT INTO totp_backup_codes (code_hash, user_id) VALUES ($1, $2)', [hashBackupCode(c), user.id]);
+        }
+        await audit(client, { event: 'totp_enabled', actor: user.username, ip: req.ip });
+      });
       res.json({ backupCodes });
     } catch (err) {
-      await client.query('ROLLBACK').catch(() => {});
       next(err);
-    } finally {
-      client.release();
     }
   });
 

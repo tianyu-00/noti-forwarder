@@ -122,8 +122,8 @@ describe('DELETE /api/v1/devices/:id/permanent (erase)', () => {
 
     const list = await agent.get('/api/v1/devices');
     expect(list.body.devices.some((x) => x.deviceId === gone.deviceId)).toBe(false);
-    const rows = await ctx.pool.query('SELECT device_id FROM messages WHERE device_id = ANY($1)', [
-      [gone.deviceId, kept.deviceId],
+    const rows = await ctx.pool.query('SELECT device_id FROM messages WHERE device_id IN (SELECT value FROM json_each($1))', [
+      JSON.stringify([gone.deviceId, kept.deviceId]),
     ]);
     expect(rows.rows).toEqual([{ device_id: kept.deviceId }]);
   });
@@ -167,8 +167,8 @@ describe('DELETE /api/v1/devices/:id/messages (clear messages, phone stays)', ()
 
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ deleted: 2 });
-    const rows = await ctx.pool.query('SELECT device_id FROM messages WHERE device_id = ANY($1)', [
-      [cleared.deviceId, other.deviceId],
+    const rows = await ctx.pool.query('SELECT device_id FROM messages WHERE device_id IN (SELECT value FROM json_each($1))', [
+      JSON.stringify([cleared.deviceId, other.deviceId]),
     ]);
     expect(rows.rows).toEqual([{ device_id: other.deviceId }]);
     // Still paired and still sending.
@@ -202,13 +202,13 @@ describe('DELETE /api/v1/messages (clear every phone\'s messages)', () => {
     const b = await ctx.addDevice();
     await send(a.token, [msg({ body: 'one' }), msg({ body: 'two' })]);
     await send(b.token, [msg({ body: 'three' })]);
-    const before = (await ctx.pool.query('SELECT count(*)::int AS n FROM messages')).rows[0].n;
+    const before = (await ctx.pool.query('SELECT count(*) AS n FROM messages')).rows[0].n;
 
     const res = await clearAll();
 
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ deleted: before });
-    expect((await ctx.pool.query('SELECT count(*)::int AS n FROM messages')).rows[0].n).toBe(0);
+    expect((await ctx.pool.query('SELECT count(*) AS n FROM messages')).rows[0].n).toBe(0);
     const list = await agent.get('/api/v1/devices');
     expect(list.body.devices.find((x) => x.deviceId === a.deviceId).revokedAt).toBeNull();
     expect((await send(b.token, [msg()])).status).toBe(201);

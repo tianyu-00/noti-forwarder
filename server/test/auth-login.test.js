@@ -85,7 +85,7 @@ describe('sessions', () => {
   it('rejects an expired session', async () => {
     const agent = request.agent(ctx.app);
     await login(agent);
-    await ctx.pool.query("UPDATE sessions SET expires_at = now() - interval '1 minute'");
+    await ctx.pool.query("UPDATE sessions SET expires_at = ts_add_ms(now(), -60000)");
     expect((await agent.get('/api/v1/auth/me')).status).toBe(401);
   });
 
@@ -112,7 +112,7 @@ describe('login protection and audit', () => {
   it('starts counting from zero once a lock has expired, so one typo does not lock again', async () => {
     const local = await buildTestApp({ realAuth: true });
     await ensureAdminUser(local.pool, ADMIN);
-    await local.pool.query("UPDATE users SET failed_logins = 5, locked_until = now() - interval '1 minute'");
+    await local.pool.query("UPDATE users SET failed_logins = 5, locked_until = ts_add_ms(now(), -60000)");
     const bad = { username: 'admin', password: 'bad bad bad bad' };
     expect((await login(request(local.app), bad)).status).toBe(401);
     // Not locked: the right password still works.

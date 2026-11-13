@@ -70,9 +70,9 @@ export function authRouter({
                                          THEN 1 ELSE failed_logins + 1 END,
                     locked_until = CASE WHEN (CASE WHEN locked_until IS NOT NULL AND locked_until <= now()
                                                    THEN 1 ELSE failed_logins + 1 END) >= $2
-                                        THEN now() + ($3 || ' minutes')::interval END
+                                        THEN ts_add_ms(now(), $3 * 60000) END
               WHERE id = $1`,
-            [user.id, MAX_FAILURES, String(LOCK_MINUTES)],
+            [user.id, MAX_FAILURES, LOCK_MINUTES],
           );
         }
         await audit(db, { event: 'login_failed', actor: username, ip: req.ip });

@@ -22,16 +22,16 @@ describe('POST /api/v1/heartbeat', () => {
 
   it('marks the phone as seen and records its app version, without needing a message', async () => {
     const d = await ctx.addDevice();
-    await ctx.pool.query("UPDATE devices SET last_seen = now() - interval '5 hours' WHERE device_id = $1", [d.deviceId]);
+    await ctx.pool.query("UPDATE devices SET last_seen = ts_add_ms(now(), -5 * 3600000) WHERE device_id = $1", [d.deviceId]);
 
     const res = await beat(d.token, { 'X-App-Version': '0.1.77' });
 
     expect(res.status).toBe(204);
     const { rows } = await ctx.pool.query(
-      "SELECT app_version, last_seen > now() - interval '1 minute' AS fresh FROM devices WHERE device_id = $1",
+      "SELECT app_version, last_seen > ts_add_ms(now(), -60000) AS fresh FROM devices WHERE device_id = $1",
       [d.deviceId],
     );
-    expect(rows[0]).toEqual({ app_version: '0.1.77', fresh: true });
+    expect(rows[0]).toEqual({ app_version: '0.1.77', fresh: 1 });
     const messages = await ctx.pool.query('SELECT 1 FROM messages WHERE device_id = $1', [d.deviceId]);
     expect(messages.rowCount).toBe(0);
   });

@@ -94,7 +94,7 @@ describe('POST /api/v1/pair', () => {
 
   it('rejects unknown and expired codes with the same error', async () => {
     const { body: code } = await createCode();
-    await ctx.pool.query("UPDATE pairing_codes SET expires_at = now() - interval '1 second'");
+    await ctx.pool.query("UPDATE pairing_codes SET expires_at = ts_add_ms(now(), -1000)");
 
     const expired = await pair({ code: code.code, ...phone });
     const unknown = await pair({ code: 'AAAA-BBBB-CCCC-DDDD-EEEE-FFFF-GGGG', ...phone });
@@ -132,9 +132,9 @@ describe('POST /api/v1/pair marks the phone as seen', () => {
     const res = await pair({ code: code.code, ...phone });
 
     const { rows } = await ctx.pool.query(
-      "SELECT last_seen > now() - interval '1 minute' AS fresh FROM devices WHERE device_id = $1",
+      "SELECT last_seen > ts_add_ms(now(), -60000) AS fresh FROM devices WHERE device_id = $1",
       [res.body.deviceId],
     );
-    expect(rows[0].fresh).toBe(true);
+    expect(rows[0].fresh).toBe(1);
   });
 });

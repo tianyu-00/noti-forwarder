@@ -45,8 +45,8 @@ describe('runMigrations', () => {
 
     await expect(runMigrations(pool, dir)).rejects.toThrow();
 
-    const t = await pool.query("SELECT to_regclass('d') AS t");
-    expect(t.rows[0].t).toBeNull();
+    const t = await pool.query("SELECT name FROM sqlite_master WHERE name = 'd'");
+    expect(t.rowCount).toBe(0);
     const rec = await pool.query("SELECT 1 FROM schema_migrations WHERE name = '001_d.sql'");
     expect(rec.rowCount).toBe(0);
   });

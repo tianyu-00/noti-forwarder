@@ -2,7 +2,7 @@
 
 export async function getRetentionDays(db) {
   const { rows } = await db.query("SELECT value FROM settings WHERE key = 'retention_days'");
-  return rows.length ? rows[0].value : null;
+  return rows.length ? JSON.parse(rows[0].value) : null;
 }
 
 export async function setRetentionDays(db, days) {
@@ -11,7 +11,7 @@ export async function setRetentionDays(db, days) {
     return;
   }
   await db.query(
-    `INSERT INTO settings (key, value) VALUES ('retention_days', $1::jsonb)
+    `INSERT INTO settings (key, value) VALUES ('retention_days', $1)
      ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`,
     [JSON.stringify(days)],
   );
@@ -21,8 +21,8 @@ export async function setRetentionDays(db, days) {
 export async function purgeOldMessages(db) {
   const days = await getRetentionDays(db);
   if (days === null) return 0;
-  const result = await db.query("DELETE FROM messages WHERE received_at < now() - ($1 || ' days')::interval", [
-    String(days),
+  const result = await db.query('DELETE FROM messages WHERE received_at < ts_add_ms(now(), $1)', [
+    -days * 24 * 60 * 60 * 1000,
   ]);
   return result.rowCount;
 }

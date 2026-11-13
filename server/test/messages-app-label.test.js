@@ -35,6 +35,18 @@ describe('app label', () => {
     expect(body.messages[0].appLabel).toBeNull();
   });
 
+  it('finds a message when searching for the app\'s real name', async () => {
+    const d = await ctx.addDevice();
+    await send(d.token, [
+      msg({ app: 'com.google.android.gm', appLabel: 'Gmail', body: 'Run failed' }),
+      msg({ app: 'com.other', appLabel: 'Weather', body: 'Rain later' }),
+    ]);
+
+    const { body } = await request(ctx.app).get(`/api/v1/messages?device=${d.deviceId}&q=gmail`);
+
+    expect(body.messages.map((m) => m.app)).toEqual(['com.google.android.gm']);
+  });
+
   it('refuses a name that is far too long', async () => {
     const d = await ctx.addDevice();
 

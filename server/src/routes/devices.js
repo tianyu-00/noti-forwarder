@@ -96,30 +96,23 @@ export function devicesRouter({ db, requireViewer, events, presence, silentAfter
   // Erasing removes a revoked phone and every message it sent. Irreversible, so the phone
   // must be revoked first (it can no longer be sending). The audit log keeps the record.
   router.delete('/devices/:id/permanent', requireViewer, requireCsrf, async (req, res, next) => {
-    const client = await db.connect();
     try {
-      await client.query('BEGIN');
-      const found = await client.query('SELECT revoked_at FROM devices WHERE device_id = $1 FOR UPDATE', [req.params.id]);
-      if (found.rowCount === 0) {
-        await client.query('ROLLBACK');
-        return res.status(404).json({ error: 'not_found' });
-      }
-      if (!found.rows[0].revoked_at) {
-        await client.query('ROLLBACK');
-        return res.status(409).json({ error: 'not_revoked' });
-      }
-      await client.query('DELETE FROM messages WHERE device_id = $1', [req.params.id]);
-      await client.query('DELETE FROM pairing_codes WHERE device_id = $1', [req.params.id]);
-      await client.query('DELETE FROM devices WHERE device_id = $1', [req.params.id]);
-      await audit(client, { event: 'erase', actor: req.session.username, deviceId: req.params.id, ip: req.ip });
-      await client.query('COMMIT');
+      const outcome = await db.transaction(async (client) => {
+        const found = await client.query('SELECT revoked_at FROM devices WHERE device_id = $1', [req.params.id]);
+        if (found.rowCount === 0) return 'not_found';
+        if (!found.rows[0].revoked_at) return 'not_revoked';
+        await client.query('DELETE FROM messages WHERE device_id = $1', [req.params.id]);
+        await client.query('DELETE FROM pairing_codes WHERE device_id = $1', [req.params.id]);
+        await client.query('DELETE FROM devices WHERE device_id = $1', [req.params.id]);
+        await audit(client, { event: 'erase', actor: req.session.username, deviceId: req.params.id, ip: req.ip });
+        return 'erased';
+      });
+      if (outcome === 'not_found') return res.status(404).json({ error: 'not_found' });
+      if (outcome === 'not_revoked') return res.status(409).json({ error: 'not_revoked' });
       events.publish('device_deleted', { deviceId: req.params.id });
       res.status(204).end();
     } catch (err) {
-      await client.query('ROLLBACK').catch(() => {});
       next(err);
-    } finally {
-      client.release();
     }
   });
 
