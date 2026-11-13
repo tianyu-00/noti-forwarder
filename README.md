@@ -1,8 +1,7 @@
 # Notiforwarder
 
 Self-hosted system that captures SMS and app notifications from Android phones and shows them
-in one place: a web dashboard you can open from a PC or phone. Phones send over HTTPS through a
-Cloudflare tunnel, and every message is queued on the phone first, so nothing is lost offline.
+in one place: a web dashboard you can open from a PC or phone. Phones send over HTTPS, and every message is queued on the phone first, so nothing is lost offline.
 
 | Folder | What it is |
 |---|---|
@@ -15,8 +14,7 @@ Design notes and project rules are in [CLAUDE.md](CLAUDE.md).
 
 ## Running it (day to day)
 
-It runs from the project's **`deploy/`** folder, using the private **`deploy/.env`** (passwords and
-tunnel token; git ignores it). Run every command below from there:
+It runs from the project's **`deploy/`** folder, using the private **`deploy/.env`** (passwords; git ignores it). Run every command below from there:
 
 ```bash
 cd ~/github/noti-forwarder/deploy
@@ -27,22 +25,17 @@ cd ~/github/noti-forwarder/deploy
 | **Start** everything (also after a reboot) | `docker compose up -d` |
 | **Stop** everything (your data is kept) | `docker compose down` |
 | **Restart** everything | `docker compose restart` |
-| Restart one part (`server`, `web`, `cloudflared`) | `docker compose restart server` |
+| Restart one part (`server`, `web`) | `docker compose restart server` |
 | See what is running | `docker compose ps` |
 | Watch the server's log (Ctrl+C stops watching) | `docker compose logs -f server` |
-| Check the tunnel | `docker compose logs --tail 30 cloudflared` |
 
-Two lines in `.env` matter for these plain commands:
-- `COMPOSE_PROFILES=tunnel` makes them include the Cloudflare tunnel. If it is ever missing, add
-  `--profile tunnel` after `docker compose` (for example `docker compose --profile tunnel up -d`),
-  otherwise the site stays unreachable.
+One line in `.env` matters for these plain commands:
 - `COMPOSE_PROJECT_NAME=notiforwarder-run` keeps the database volume from before the stack moved
   into `deploy/`. Do not change it, or Docker will start a new, empty database.
 
 ### Check that it works
 Open `<your PUBLIC_URL>/api/v1/health` in a browser. It should show a version and a commit.
-If the site does not load: run `docker compose ps` (all four should say `running`), then
-`docker compose logs --tail 30 cloudflared` (look for "Registered tunnel connection").
+If the site does not load: run `docker compose ps` (`web` and `server` should say `running`), then check that your HTTPS proxy points at port 3000.
 
 ### Reaching a stack in WSL from your phone (local testing)
 With WSL in mirrored networking mode, Windows blocks other devices from reaching a port a
@@ -102,7 +95,7 @@ docker compose start server
 ### Careful
 - `docker compose down -v` also **deletes the database** (the `-v`). Never add it unless you
   really want to erase every message.
-- Never commit `.env` or paste the tunnel token or passwords anywhere. They belong only in that
+- Never commit `.env` or paste passwords anywhere. They belong only in that
   file.
 - `git clean -fdx` deletes ignored files, including `deploy/.env`. Do not run it in this project
   without copying `.env` somewhere safe first.
@@ -203,4 +196,4 @@ your alerts**. Keep the topic secret, treat it like a password, and never share 
 want the text to leave your server, set `NTFY_INCLUDE_BODY=false`, or run your own ntfy server.
 The server refuses to start with a short topic on `ntfy.sh`, or with plain `http` to a remote server.
 
-More about the server install and the Cloudflare tunnel: [deploy/README.md](deploy/README.md).
+More about the server install and HTTPS: [deploy/README.md](deploy/README.md).

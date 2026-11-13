@@ -1,13 +1,13 @@
-# Notiforwarder with your own cloudflared (no tunnel container). There is no database to set up:
+# Notiforwarder, short version with defaults. There is no database to set up:
 # it is a single file, kept in the `notiforwarder-data` volume.
 # Only two values are required. Set them as environment variables (in your manager's env
 # panel or a .env file next to this file):
-#   PUBLIC_URL      https://notifications.example.com   (your tunnel address, no trailing slash)
+#   PUBLIC_URL      https://notifications.example.com   (https:// recommended, no trailing slash)
 #   ADMIN_PASSWORD  at least 12 characters
 # Everything else has a default. Optional: ADMIN_USERNAME (admin), VERSION (latest),
 # WEB_BIND (3000), TRUST_PROXY (2), GHCR_OWNER (tianyu-00), SECRET_KEY (off).
 #
-# Point your tunnel's service (type HTTP) at  http://<this machine's address>:3000
+# Put an HTTPS proxy or tunnel in front of  http://<this machine's address>:3000 for the full feature set.
 services:
   web:
     image: ghcr.io/${GHCR_OWNER:-tianyu-00}/notiforwarder-web:${VERSION:-latest}
@@ -16,8 +16,7 @@ services:
     depends_on:
       - server
     ports:
-      # Port 3000 on this machine, reachable from your network so a cloudflared container or
-      # another machine can connect. To allow only this machine itself: WEB_BIND=127.0.0.1:3000
+      # Port 3000 on this machine, reachable from your network so a proxy on another machine can connect. To allow only this machine itself: WEB_BIND=127.0.0.1:3000
       - "${WEB_BIND:-3000}:80"
 
   server:
