@@ -100,50 +100,22 @@ internal fun StatusScreen(
 
         NotiCard(padding = androidx.compose.foundation.layout.PaddingValues(horizontal = 18.dp, vertical = 8.dp)) {
             CardLabel("Keep it running")
-            CheckRow(
-                text = if (ready.accessGranted) "Notification access is on" else "Notification access is off",
-                ok = ready.accessGranted,
-                detail = if (ready.accessGranted) null else "Without it nothing can be forwarded",
-                action = if (ready.accessGranted) null else "Open",
-                onAction = onOpenAccessSettings,
-            )
-            RowDivider()
-            CheckRow(
-                text = if (ready.batteryExempt) "Battery optimisation is off" else "Battery optimisation is on",
-                ok = ready.batteryExempt,
-                detail = if (ready.batteryExempt) null else "It may stop this app in the background",
-                action = if (ready.batteryExempt) null else "Turn off",
-                onAction = onRequestBatteryExemption,
-            )
-            if (!ready.notificationsAllowed) {
-                RowDivider()
+            runningChecks(settings, ready).forEachIndexed { index, check ->
+                if (index > 0) RowDivider()
                 CheckRow(
-                    text = "Allow notifications",
-                    ok = false,
-                    detail = "Android needs it to show the \"running\" notice that keeps the app alive",
-                    action = "Allow",
-                    onAction = onAllowNotifications,
+                    text = check.text,
+                    ok = check.ok,
+                    detail = check.detail,
+                    action = check.action,
+                    onAction = when (check.kind) {
+                        RunningCheck.Kind.NotificationAccess -> onOpenAccessSettings
+                        RunningCheck.Kind.Battery -> onRequestBatteryExemption
+                        RunningCheck.Kind.PostNotifications -> onAllowNotifications
+                        RunningCheck.Kind.Sms -> onAllowSms
+                        RunningCheck.Kind.AutoStart -> onOpenAutoStart
+                    },
                 )
             }
-            if (settings.sendSms && !ready.smsAllowed) {
-                RowDivider()
-                CheckRow(
-                    text = "Allow reading texts",
-                    ok = false,
-                    detail = "Texts can only be forwarded once you allow the SMS permission",
-                    action = "Allow",
-                    onAction = onAllowSms,
-                )
-            }
-            RowDivider()
-            // Android cannot say whether auto-start is allowed, so this always asks the user to check.
-            CheckRow(
-                text = "Auto-start",
-                ok = false,
-                detail = autoStartHelp(),
-                action = "Open",
-                onAction = onOpenAutoStart,
-            )
         }
     }
 }
