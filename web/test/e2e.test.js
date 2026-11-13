@@ -51,7 +51,22 @@ describe("end-to-end encryption format", () => {
   });
 });
 
+// Reply text made by a separate Node script. The Android tests decrypt the same two values.
+const REPLY_VECTOR = {
+  to: "e2e:v1:eRE2mGyk26zCvJ9DQDOdL9sPPYIvagaIBZLDakFS8dqePXfeDqejsw",
+  body: "e2e:v1:NZoxaKYmRRH5ShFxwuztOqsIncHN-Ou3_Hh9zsOv9TPQkn6bWoARZA",
+};
+
 describe("encrypting a reply in the browser", () => {
+  it("reads the reference reply that the phone also decrypts", () => {
+    expect(decryptField(VECTOR.key, "reply-to", REPLY_VECTOR.to)).toBe(
+      "+15551234567",
+    );
+    expect(decryptField(VECTOR.key, "reply-body", REPLY_VECTOR.body)).toBe(
+      "On my way é",
+    );
+  });
+
   it("makes text the same decryptor reads back, for the field it was made for", () => {
     const blob = encryptField(VECTOR.key, "reply-body", "On my way");
 

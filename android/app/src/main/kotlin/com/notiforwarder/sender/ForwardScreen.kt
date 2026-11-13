@@ -37,7 +37,11 @@ import kotlinx.coroutines.withContext
 
 /** What leaves the phone: texts, app notifications, and which apps. Everything here is applied before sending. */
 @Composable
-internal fun ForwardScreen(settings: CaptureSettings, onChange: (CaptureSettings) -> Unit) {
+internal fun ForwardScreen(
+    settings: CaptureSettings,
+    onChange: (CaptureSettings) -> Unit,
+    onRepliesChange: (Boolean) -> Unit,
+) {
     val context = LocalContext.current
     var apps by remember { mutableStateOf<List<AppEntry>?>(null) }
     var query by remember { mutableStateOf("") }
@@ -67,6 +71,14 @@ internal fun ForwardScreen(settings: CaptureSettings, onChange: (CaptureSettings
                             "app has 50 waiting, so turn this on for a phone you leave untouched.",
                         settings.clearAfterForwarding,
                     ) { onChange(settings.copy(clearAfterForwarding = it)) }
+                    RowDivider()
+                    SwitchRow(
+                        "Reply from the dashboard",
+                        "Send the texts you type on the dashboard from this phone's number. Asks for permission to " +
+                            "send texts, which your carrier may charge for.",
+                        settings.allowReplies,
+                        onRepliesChange,
+                    )
                 }
                 OutlinedTextField(
                     value = query,

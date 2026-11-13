@@ -36,6 +36,11 @@ class DeviceStreamClient(
      */
     private val beat: () -> Unit = {},
     private val beatIntervalMs: Long = 25_000,
+    /**
+     * The server announces a reply typed on the dashboard. Called on the stream's thread, so it
+     * must return quickly (hand the work to another thread).
+     */
+    private val onOutbox: () -> Unit = {},
 ) {
     @Volatile private var call: Call? = null
 
@@ -90,7 +95,8 @@ class DeviceStreamClient(
     }
 
     // Server-sent events: lines of "event: name" and "data: ...", frames end with a blank line,
-    // and lines starting with ":" are pings. Only "revoked" matters; the rest is ignored.
+    // and lines starting with ":" are pings. "revoked" ends the connection and "outbox" says a reply
+    // is waiting (what it holds is fetched separately); the rest is ignored.
     private fun readEvents(source: okio.BufferedSource): StreamEnd {
         var event: String? = null
         try {
@@ -100,6 +106,7 @@ class DeviceStreamClient(
                     line.startsWith("event:") -> event = line.removePrefix("event:").trim()
                     line.isEmpty() -> {
                         if (event == "revoked") return StreamEnd.Revoked
+                        if (event == "outbox") onOutbox()
                         event = null
                     }
                 }

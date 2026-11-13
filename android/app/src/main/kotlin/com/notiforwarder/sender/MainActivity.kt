@@ -164,6 +164,24 @@ private fun MainScreen(
         settings = updated
         app.settingsStore.save(updated)
     }
+    // Replies are only switched on once the user has allowed this app to send texts.
+    val askSendSms = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) {
+            changeSettings(settings.copy(allowReplies = true))
+            app.sendReplies()
+        }
+    }
+    val changeReplies = { on: Boolean ->
+        val allowed = ContextCompat.checkSelfPermission(app, Manifest.permission.SEND_SMS) == PackageManager.PERMISSION_GRANTED
+        when {
+            !on -> changeSettings(settings.copy(allowReplies = false))
+            allowed -> {
+                changeSettings(settings.copy(allowReplies = true))
+                app.sendReplies()
+            }
+            else -> askSendSms.launch(Manifest.permission.SEND_SMS)
+        }
+    }
     var tab by rememberSaveable { mutableStateOf(Tab.Status) }
 
     // Refresh the queue numbers while the screen is visible.
@@ -205,7 +223,7 @@ private fun MainScreen(
                             onOpenAutoStart = onOpenAutoStart,
                         )
                     }
-                    Tab.Forward -> ForwardScreen(settings = settings, onChange = changeSettings)
+                    Tab.Forward -> ForwardScreen(settings = settings, onChange = changeSettings, onRepliesChange = changeReplies)
                     Tab.Activity -> ActivityScreen(activity)
                     Tab.Settings -> SettingsScreen(
                         paired = paired,

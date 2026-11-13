@@ -55,6 +55,15 @@ class SettingsStoreTest {
     }
 
     @Test
+    fun `replies from the dashboard are off until the user turns them on, and the choice is kept`() {
+        assertFalse(CaptureSettings().allowReplies)
+        val name = "replies-${System.nanoTime()}"
+        PrefsSettingsStore(context, name).save(CaptureSettings(allowReplies = true))
+
+        assertTrue(PrefsSettingsStore(context, name).load().allowReplies)
+    }
+
+    @Test
     fun `notifications are left in the shade unless clearing is switched on`() {
         assertFalse(CaptureSettings().clearAfterForwarding)
     }

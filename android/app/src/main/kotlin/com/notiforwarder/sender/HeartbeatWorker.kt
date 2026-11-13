@@ -16,7 +16,9 @@ import java.util.concurrent.TimeUnit
  */
 class HeartbeatWorker(context: Context, params: WorkerParameters) : Worker(context, params) {
     override fun doWork(): Result {
-        (applicationContext as NotiApp).heartbeat.send()
+        val app = applicationContext as NotiApp
+        app.heartbeat.send()
+        app.sendReplies() // a phone whose live connection was cut still collects replies now and then
         return Result.success()
     }
 

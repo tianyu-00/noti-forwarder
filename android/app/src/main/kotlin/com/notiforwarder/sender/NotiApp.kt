@@ -5,6 +5,8 @@ import android.content.Intent
 import android.os.Build
 import android.provider.Settings
 import android.provider.Telephony
+import androidx.core.content.ContextCompat
+import java.util.concurrent.Executors
 
 /** Wires the pure classes together once per process. */
 class NotiApp : Application() {
@@ -29,15 +31,40 @@ class NotiApp : Application() {
     val heartbeat by lazy {
         HeartbeatSender(store, appVersion = BuildConfig.VERSION_NAME, onRevoked = { controller.refresh() })
     }
+    // Replies typed on the dashboard. One thread, so two triggers (an announcement and a reconnect)
+    // never send the same reply at once; the processor also guards against it.
+    private val replyProcessor by lazy {
+        ReplyProcessor(
+            outbox = OutboxClient(store, appVersion = BuildConfig.VERSION_NAME, onRevoked = { controller.refresh() }),
+            sms = AndroidSmsSender(this),
+            ledger = PrefsReplyLedger(this),
+            settings = settingsStore::load,
+            canSendSms = {
+                ContextCompat.checkSelfPermission(this, android.Manifest.permission.SEND_SMS) ==
+                    android.content.pm.PackageManager.PERMISSION_GRANTED
+            },
+            e2eKey = { store.load()?.e2eKey },
+        )
+    }
+    private val replyThread = Executors.newSingleThreadExecutor { r -> Thread(r, "replies").apply { isDaemon = true } }
+
+    /** Looks for replies waiting on the server and sends them. Returns at once. */
+    fun sendReplies() {
+        replyThread.execute { runCatching { replyProcessor.process() } }
+    }
+
     // The phone's open connection to the server: it shows as connected on the dashboard, and a
     // revoke made there arrives here at once. Reconnects by itself after a drop.
     private val streamClient by lazy {
         // While connected it also checks in every 25 s: only the phone can prove it is still alive.
-        DeviceStreamClient(store, appVersion = BuildConfig.VERSION_NAME, beat = { heartbeat.send() })
+        DeviceStreamClient(
+            store, appVersion = BuildConfig.VERSION_NAME, beat = { heartbeat.send() }, onOutbox = ::sendReplies,
+        )
     }
     val deviceStream: DeviceStreamRunner by lazy {
         DeviceStreamRunner(
-            connect = { onConnected -> streamClient.run(onConnected) },
+            // Each time it connects, collect replies that were queued while the phone was away.
+            connect = { onConnected -> streamClient.run { onConnected(); sendReplies() } },
             store = store,
             onRevoked = { controller.refresh() },
             cancel = streamClient::cancel,

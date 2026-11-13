@@ -22,6 +22,12 @@ class E2eCipherTest {
     }
 
     @Test
+    fun `reads a reply that the dashboard encrypted (the same reference values the web tests use)`() {
+        assertEquals("+15551234567", cipher.decrypt("reply-to", "e2e:v1:eRE2mGyk26zCvJ9DQDOdL9sPPYIvagaIBZLDakFS8dqePXfeDqejsw"))
+        assertEquals("On my way é", cipher.decrypt("reply-body", "e2e:v1:NZoxaKYmRRH5ShFxwuztOqsIncHN-Ou3_Hh9zsOv9TPQkn6bWoARZA"))
+    }
+
+    @Test
     fun `decrypts what it encrypts, only for the field it was made for`() {
         val made = cipher.encrypt("sender", "Bank é中😀", app = "com.bank", receivedAtMs = 1L)
 

@@ -18,6 +18,11 @@ data class CaptureSettings(
      * never clears them would stop forwarding. Off by default: it removes notifications.
      */
     val clearAfterForwarding: Boolean = false,
+    /**
+     * Send the texts the user types on the dashboard from this phone's number. Off by default: it
+     * needs the SMS permission and the texts may cost money.
+     */
+    val allowReplies: Boolean = false,
 ) {
     fun shouldDismiss(outcome: CaptureOutcome) = clearAfterForwarding && outcome != CaptureOutcome.IGNORED
 
@@ -40,6 +45,7 @@ class PrefsSettingsStore(context: Context, name: String = "capture_settings") : 
         sendNotifications = prefs.getBoolean(NOTIFICATIONS, true),
         blockedApps = prefs.getStringSet(BLOCKED, emptySet())?.toSet().orEmpty(),
         clearAfterForwarding = prefs.getBoolean(CLEAR, false),
+        allowReplies = prefs.getBoolean(REPLIES, false),
     )
 
     override fun save(settings: CaptureSettings) = prefs.edit {
@@ -47,6 +53,7 @@ class PrefsSettingsStore(context: Context, name: String = "capture_settings") : 
         putBoolean(NOTIFICATIONS, settings.sendNotifications)
         putStringSet(BLOCKED, settings.blockedApps)
         putBoolean(CLEAR, settings.clearAfterForwarding)
+        putBoolean(REPLIES, settings.allowReplies)
     }
 
     private companion object {
@@ -54,5 +61,6 @@ class PrefsSettingsStore(context: Context, name: String = "capture_settings") : 
         const val NOTIFICATIONS = "sendNotifications"
         const val BLOCKED = "blockedApps"
         const val CLEAR = "clearAfterForwarding"
+        const val REPLIES = "allowReplies"
     }
 }

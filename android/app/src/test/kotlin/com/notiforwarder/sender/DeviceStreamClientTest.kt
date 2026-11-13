@@ -51,6 +51,16 @@ class DeviceStreamClientTest {
     }
 
     @Test
+    fun `tells the app when the server announces a reply to send, once per announcement`() {
+        stream(": connected\n\nevent: outbox\ndata: {\"id\":\"x\"}\n\n: ping\n\nevent: outbox\ndata: {}\n\n")
+        var announced = 0
+
+        DeviceStreamClient(store, appVersion = "0.1.9", onOutbox = { announced++ }).run()
+
+        assertEquals(2, announced)
+    }
+
+    @Test
     fun `a rejected token means the phone was revoked`() {
         server.enqueue(MockResponse.Builder().code(401).build())
 
