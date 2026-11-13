@@ -109,6 +109,18 @@ private fun TabIcon(tab: Tab, color: Color) {
                 drawLine(color, p(7f, 12f), p(17f, 12f), stroke.width, StrokeCap.Round)
                 drawLine(color, p(10f, 17f), p(14f, 17f), stroke.width, StrokeCap.Round)
             }
+            Tab.Activity -> {
+                drawCircle(color, radius = 8f * unit, center = p(12f, 12f), style = stroke)
+                drawPath(
+                    Path().apply {
+                        moveTo(12 * unit, 8 * unit)
+                        lineTo(12 * unit, 12 * unit)
+                        lineTo(15 * unit, 14 * unit)
+                    },
+                    color,
+                    style = stroke,
+                )
+            }
             Tab.Settings -> {
                 drawCircle(color, radius = 3f * unit, center = p(12f, 12f), style = stroke)
                 drawCircle(color, radius = 7f * unit, center = p(12f, 12f), style = stroke)

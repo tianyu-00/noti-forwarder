@@ -167,6 +167,7 @@ private fun MainScreen(
     val state by controller.state.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     var queueStatus by remember { mutableStateOf<QueueStatus?>(null) }
+    var activity by remember { mutableStateOf<ActivityView?>(null) }
     var now by remember { mutableStateOf(System.currentTimeMillis()) }
     val askNotifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
     val askSms = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
@@ -182,6 +183,7 @@ private fun MainScreen(
         while (true) {
             queueStatus = withContext(Dispatchers.IO) { app.statusReader.snapshot() }
             now = System.currentTimeMillis()
+            activity = withContext(Dispatchers.IO) { loadActivity(app, now) }
             delay(3_000)
         }
     }
@@ -216,6 +218,7 @@ private fun MainScreen(
                         )
                     }
                     Tab.Forward -> ForwardScreen(settings = settings, onChange = changeSettings)
+                    Tab.Activity -> ActivityScreen(activity)
                     Tab.Settings -> SettingsScreen(
                         paired = paired,
                         themeMode = themeMode,
@@ -232,3 +235,13 @@ private fun MainScreen(
         if (paired != null) BottomBar(tabs = visibleTabs(paired = true), current = tab, onSelect = { tab = it })
     }
 }
+
+/** The latest sends for the Activity tab. Blocking (database and app-name lookups): call it off the main thread. */
+private fun loadActivity(app: NotiApp, now: Long): ActivityView {
+    val rows = app.queue.recent(ACTIVITY_LIMIT)
+    val labels = PackageLabels(app.packageManager)
+    val startOfToday = java.time.LocalDate.now().atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+    return ActivityView(toActivityItems(rows, labels::labelFor, now), summarise(rows, startOfToday))
+}
+
+private const val ACTIVITY_LIMIT = 50

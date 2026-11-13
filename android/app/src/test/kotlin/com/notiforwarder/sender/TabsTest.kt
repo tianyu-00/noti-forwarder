@@ -8,7 +8,7 @@ class TabsTest {
     @Test
     fun `a paired phone has the tabs in this order`() {
         assertEquals(
-            listOf(Tab.Status, Tab.Forward, Tab.Settings),
+            listOf(Tab.Status, Tab.Forward, Tab.Activity, Tab.Settings),
             visibleTabs(paired = true),
         )
     }
@@ -21,7 +21,7 @@ class TabsTest {
     @Test
     fun `each tab has the name shown under its icon`() {
         assertEquals(
-            listOf("Status", "Forward", "Settings"),
+            listOf("Status", "Forward", "Activity", "Settings"),
             visibleTabs(paired = true).map { it.label },
         )
     }

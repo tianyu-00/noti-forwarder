@@ -4,6 +4,7 @@ package com.notiforwarder.sender
 enum class Tab(val label: String) {
     Status("Status"),
     Forward("Forward"),
+    Activity("Activity"),
     Settings("Settings"),
 }
 
