@@ -26,28 +26,13 @@ services:
     restart: unless-stopped
     env_file: .env
     environment:
-      DATABASE_URL: postgres://notiforwarder:${POSTGRES_PASSWORD}@db:5432/notiforwarder
       PUBLIC_URL: ${PUBLIC_URL}
       ADMIN_USERNAME: ${ADMIN_USERNAME}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
       TRUST_PROXY: ${TRUST_PROXY:-}
-    depends_on:
-      - db
-
-  db:
-    image: postgres:16-alpine
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: notiforwarder
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: notiforwarder
     volumes:
-      - pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U notiforwarder"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
+      # The whole database is one file in here. Keep this volume: it is all your messages.
+      - data:/data
 
 volumes:
-  pgdata:
+  data:

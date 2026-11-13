@@ -1,4 +1,4 @@
-// End-to-end check against the real stack (nginx + server + Postgres), with no dependencies.
+// End-to-end check against the real stack (nginx + server + SQLite), with no dependencies.
 // Walks the whole path: log in, pair a phone, send a message, see it arrive live and in the list.
 import assert from 'node:assert/strict';
 import { createCipheriv, createDecipheriv, randomBytes, randomUUID } from 'node:crypto';

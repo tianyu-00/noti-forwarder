@@ -1,7 +1,7 @@
-# Notiforwarder with your own PostgreSQL and your own cloudflared.
-# Only three values are required. Set them as environment variables (in your manager's env
+# Notiforwarder with your own cloudflared (no tunnel container). There is no database to set up:
+# it is a single file, kept in the `notiforwarder-data` volume.
+# Only two values are required. Set them as environment variables (in your manager's env
 # panel or a .env file next to this file):
-#   DATABASE_URL    postgres://notiforwarder:PASSWORD@HOST:5432/notiforwarder
 #   PUBLIC_URL      https://notifications.example.com   (your tunnel address, no trailing slash)
 #   ADMIN_PASSWORD  at least 12 characters
 # Everything else has a default. Optional: ADMIN_USERNAME (admin), VERSION (latest),
@@ -24,8 +24,6 @@ services:
     image: ghcr.io/${GHCR_OWNER:-tianyu-00}/notiforwarder-server:${VERSION:-latest}
     restart: unless-stopped
     environment:
-      # postgres://notiforwarder:PASSWORD@192.168.1.10:5432/notiforwarder
-      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL}
       # https://notifications.example.com
       PUBLIC_URL: ${PUBLIC_URL:?set PUBLIC_URL}
       # At least 12 characters
@@ -44,6 +42,9 @@ services:
       NTFY_TYPES: ${NTFY_TYPES:-}
       NTFY_APPS_BLOCK: ${NTFY_APPS_BLOCK:-}
       NTFY_INCLUDE_BODY: ${NTFY_INCLUDE_BODY:-}
-    # Lets DATABASE_URL use host.docker.internal when PostgreSQL runs on this same machine.
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+    volumes:
+      # The whole database is one file in here. Keep this volume: it is all your messages.
+      - notiforwarder-data:/data
+
+volumes:
+  notiforwarder-data:

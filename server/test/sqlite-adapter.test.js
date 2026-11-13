@@ -308,3 +308,31 @@ describe('a database file', () => {
     await server.end();
   });
 });
+
+describe('backup', () => {
+  it('writes a complete, separate copy while the database is in use', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'nf-db-'));
+    db = openDatabase(join(dir, 'data.db'));
+    await db.query('CREATE TABLE t (n integer)');
+    await db.query('INSERT INTO t VALUES (1), (2), (3)');
+
+    const copy = join(dir, 'copy.db');
+    await db.backup(copy);
+
+    const restored = openDatabase(copy);
+    expect((await restored.query('SELECT count(*) AS c FROM t')).rows[0].c).toBe(3);
+    await restored.end();
+    // The original keeps working and is not affected.
+    await db.query('INSERT INTO t VALUES (4)');
+    expect((await db.query('SELECT count(*) AS c FROM t')).rows[0].c).toBe(4);
+  });
+
+  it('refuses to overwrite a file that is already there', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'nf-db-'));
+    db = openDatabase(join(dir, 'data.db'));
+    const existing = join(dir, 'existing.db');
+    openDatabase(existing).end();
+
+    await expect(db.backup(existing)).rejects.toThrow();
+  });
+});

@@ -63,7 +63,7 @@ The phone sends to a public domain (via Cloudflare tunnel), so it works from any
                 |
                 v
 [Ubuntu server, Docker Compose]
-  api (Node.js/Express) -> Postgres
+  api (Node.js/Express) -> SQLite (one file)
   -> WebSocket/SSE push to viewers
   -> optional publish to ntfy for real push alerts
                 |
@@ -75,7 +75,7 @@ The phone sends to a public domain (via Cloudflare tunnel), so it works from any
 
 ```
 /android     Kotlin Android app (sender)
-/server      Node.js API + Postgres migrations
+/server      Node.js API + SQLite migrations
 /web         React dashboard (PWA)
 /deploy      docker-compose.yml, env examples
 ```
@@ -83,7 +83,7 @@ The phone sends to a public domain (via Cloudflare tunnel), so it works from any
 ## Tech stack
 
 - Android: Kotlin, `NotificationListenerService`, `BroadcastReceiver` for `SMS_RECEIVED`, foreground service, Room for the offline queue, OkHttp/Retrofit.
-- Server: Node.js (Express), Postgres, WebSocket or SSE, Docker Compose.
+- Server: Node.js (Express), SQLite (`better-sqlite3`, one file in a Docker volume), SSE, Docker Compose. Chosen over Postgres for the easiest possible install: one fewer container, no password, one-file backup.
 - Web: React + Tailwind CSS + Radix UI (primitives, styled with Tailwind; shadcn/ui-style composition is fine). Built as a PWA (installable on the phone). Use Vite for the build. Plain JavaScript (JSX), no TypeScript; use ESLint and prop validation where helpful.
 - Deployment: Ubuntu server running Docker Compose, Cloudflare tunnel in front, Nginx Proxy Manager where applicable. Confirm the host CPU architecture (amd64 vs arm64) before pinning images.
 
@@ -175,7 +175,7 @@ All code is written test-first. No production code without a failing test that d
 - Bug fixes start with a failing test that reproduces the bug.
 - Do not write tests after the fact to match existing code, and do not edit a test just to make it pass unless the requirement itself changed.
 - Test layers:
-  - Server (Jest or Vitest + Supertest): unit tests for logic (dedupe hash, validation), API tests for every endpoint (auth, idempotency on retry, pagination, malformed payloads), and integration tests against a real Postgres (Testcontainers or a Compose test service), including migrations.
+  - Server (Jest or Vitest + Supertest): unit tests for logic (dedupe hash, validation), API tests for every endpoint (auth, idempotency on retry, pagination, malformed payloads), and integration tests against a real SQLite database (in memory, no Docker needed), including migrations.
   - Web (Vitest + React Testing Library): test behaviour the user sees, not implementation. Mock the API with MSW. Test live-update handling and filtering.
   - Android (JUnit + Robolectric/MockK for unit tests): the queue and retry logic, the dedupe logic, payload mapping and the notification-to-message parsing are all pure logic and must be unit tested. Use an in-memory Room database for queue tests. Keep Android framework classes behind thin wrappers so the logic can be tested on the JVM. Instrumented tests (Espresso/AndroidX Test) for the listener service and permissions flow, run on the 7T Pro or an emulator.
   - End to end: one test that sends a message through the real API and sees it in the dashboard, run in CI against the Compose stack.
@@ -194,11 +194,12 @@ Current setup (decided during Milestone 0; the earlier plan for release-please, 
 - Deploy is manual: on the Ubuntu server set `VERSION` in `.env` to an explicit tag (a SHA tag, or `latest` for the newest) and run `docker compose pull && docker compose up -d`. Roll back by changing `VERSION`. See `deploy/README.md`. A push publishing an image does not by itself change what is running.
 - `deploy/docker-compose.yml` references images by `${VERSION}`, defaulting to `latest` only in the own-database file. The `web` container (nginx) is the single public entry point on `127.0.0.1:3000`; it serves the dashboard and proxies `/api` to the server, which is not published. Point the Cloudflare tunnel at it. Phones use the same public address.
 - Set `TRUST_PROXY` to the number of reverse-proxy hops in front of the server (2 = cloudflared + the web container) so per-IP rate limits see the real client address.
-- Own PostgreSQL and own cloudflared: `deploy/docker-compose.byo.yml` runs only `web` and `server` (with `.env.byo.example`, and `docker-compose.byo-network.yml` for a cloudflared container on its own network). Tested against a throwaway Postgres with a limited owner user; TLS to the database is untested. See `deploy/README.md`.
+- Own cloudflared: `deploy/docker-compose.byo.yml` runs only `web` and `server` (with `.env.byo.example`, and `docker-compose.byo-network.yml` for a cloudflared container on its own network). There is no database to set up. See `deploy/README.md`.
 - Every component reports its version: `GET /api/v1/health` returns `{ version, commit, buildTime }`, and the web dashboard shows the web and server versions in its footer. They are passed in as Docker build args (`APP_VERSION`, `GIT_COMMIT`, `BUILD_TIME`).
 - Versions: the `VERSION` file at the repo root holds `MAJOR.MINOR` (edit it by hand to bump). CI appends the workflow run number, giving `0.1.<run>`, and uses it for the server and web images (`APP_VERSION`), the Android `versionName`, and a GitHub Release tag `v0.1.<run>`. The Android `versionCode` is the run number, so it always rises. Local builds use `0.1.0-dev`, code 1.\n- Android release: on a push to `publish`, the `release-android` job builds a signed release APK and attaches it to that GitHub Release (sideload it). It signs with a keystore from the GitHub secrets `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` and `ANDROID_KEY_PASSWORD`; without them it falls back to the debug key with a warning, and a phone then cannot update the app in place. Never commit a keystore (`*.jks` is ignored). Not decided yet: changelog automation.
 - API compatibility: the API is versioned in the URL (`/api/v1`). Old phones must keep working after a server update, so never make a breaking change to `v1`. Add `v2` instead and support both until the phones are updated. The server records the phone app's version from each request (`X-App-Version` header).
 - Database: schema changes go through numbered SQL migrations in `server/migrations/` that run automatically on server start. Migrations must be backward compatible with the previous release so a rollback is safe.
+- SQLite rules (`server/src/db/sqlite.js`): the server keeps the Postgres-pool shape (`db.query(sql, [params])` with `$1` placeholders giving `{ rows, rowCount }`) on ONE connection. (1) Use `db.transaction(async (client) => ...)` for transactions and use the `client` inside it, never `db.query`: other queries wait for the connection the transaction holds, so mixing them deadlocks. (2) Times are UTC text `2026-11-11T10:00:05.123Z` (sorts in time order); columns named `*_at`, `*_until` or `last_seen` come back as `Date`, anything else is never converted (so a message body that looks like a time stays text). Pass `Date`s in, and use `ts_add_ms(now(), ms)` for expiries; `now()` and `gen_random_uuid()` are registered SQL functions. (3) Ids are stored lower case. (4) `LIKE` ignores case only for plain letters. (5) The first release on SQLite reset the migrations to a single baseline `001_initial.sql`; keep adding numbered, additive files after it. (6) The data folder must be on a local disk, not NFS/SMB. (7) Backups use `node src/backup.js` (`VACUUM INTO`), never a copy of the live file.
 
 ## Milestones
 
@@ -226,8 +227,8 @@ TOTP two-step login is built (optional; turned on in the dashboard Settings; `ot
 
 ## Commands
 
-- Server dev: `cd server && npm run dev` (needs `DATABASE_URL` and `PUBLIC_URL`; see `.env.example`)
-- Server tests: `cd server && npm test` (watch mode: `npm run test:watch`). Needs Docker running: integration tests start a real Postgres with Testcontainers.
+- Server dev: `cd server && npm run dev` (needs `PUBLIC_URL`; the database is `./data/notiforwarder.db` unless `DATABASE_PATH` is set; see `.env.example`)
+- Server tests: `cd server && npm test` (watch mode: `npm run test:watch`). No Docker needed: each test file gets its own in-memory SQLite database.
 - Server lint: `cd server && npm run lint`
 - Web dev: `cd web && npm run dev` (proxies `/api` to `localhost:3000`)
 - Web tests: `cd web && npm test`; lint: `npm run lint`; build: `npm run build`

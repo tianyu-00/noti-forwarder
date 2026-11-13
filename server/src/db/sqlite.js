@@ -122,6 +122,18 @@ export function openDatabase(path) {
         client.release();
       }
     },
+    /**
+     * Writes a complete copy of the database to a new file, safe while the server is running (a plain
+     * file copy could catch it half-written). Refuses to overwrite an existing file.
+     */
+    async backup(destination) {
+      const release = await acquire();
+      try {
+        raw.prepare('VACUUM INTO ?').run(destination);
+      } finally {
+        release();
+      }
+    },
     async end() {
       raw.close();
     },

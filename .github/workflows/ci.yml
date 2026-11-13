@@ -76,7 +76,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Build and start the stack (nginx, server, Postgres)
+      - name: Build and start the stack (nginx, server)
         run: docker compose -p notiforwarder-e2e -f e2e/docker-compose.yml up -d --build
       - name: Log in, pair a phone, send a message, see it arrive
         run: node e2e/run.mjs

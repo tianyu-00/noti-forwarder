@@ -7,7 +7,7 @@ Cloudflare tunnel, and every message is queued on the phone first, so nothing is
 | Folder | What it is |
 |---|---|
 | `android/` | The phone app (Kotlin) |
-| `server/` | The API (Node.js + Postgres) |
+| `server/` | The API (Node.js + SQLite) |
 | `web/` | The dashboard (React) |
 | `deploy/` | `docker-compose.yml` and example settings |
 
@@ -27,7 +27,7 @@ cd ~/github/noti-forwarder/deploy
 | **Start** everything (also after a reboot) | `docker compose up -d` |
 | **Stop** everything (your data is kept) | `docker compose down` |
 | **Restart** everything | `docker compose restart` |
-| Restart one part (`server`, `web`, `db`, `cloudflared`) | `docker compose restart server` |
+| Restart one part (`server`, `web`, `cloudflared`) | `docker compose restart server` |
 | See what is running | `docker compose ps` |
 | Watch the server's log (Ctrl+C stops watching) | `docker compose logs -f server` |
 | Check the tunnel | `docker compose logs --tail 30 cloudflared` |
@@ -80,16 +80,23 @@ To go back to an older build, set `VERSION` in `.env` to an older tag (a `sha-..
 `docker compose up -d` again.
 
 ### Back up and restore the database
-Messages live in a Docker volume. To make a backup file:
+Everything (messages, phones, your login) is one file, `notiforwarder.db`, in the `data` Docker
+volume. To make a backup file while it is running:
 
 ```bash
-docker compose exec -T db pg_dump -U notiforwarder notiforwarder > backup-$(date +%F).sql
+docker compose exec -T server node src/backup.js > backup-$(date +%F).db
 ```
 
-To restore one into a fresh, empty database:
+Do not copy the file out of the volume by hand while the server runs: it can be caught half-written.
+Keep the backup somewhere safe. Anyone who has it has your messages.
+
+To restore one, stop the server, put the file in place and start it again:
 
 ```bash
-docker compose exec -T db psql -U notiforwarder notiforwarder < backup-2026-11-12.sql
+docker compose stop server
+docker compose run --rm --no-deps -v "$PWD/backup-2026-11-12.db:/restore.db:ro" server \
+  sh -c 'rm -f /data/notiforwarder.db-wal /data/notiforwarder.db-shm && cp /restore.db /data/notiforwarder.db'
+docker compose start server
 ```
 
 ### Careful
