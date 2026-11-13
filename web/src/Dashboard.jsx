@@ -4,7 +4,11 @@ import clsx from "clsx";
 import { api } from "./api.js";
 import ConversationList from "./ConversationList.jsx";
 import Thread from "./Thread.jsx";
-import { groupConversations } from "./conversations.js";
+import {
+  conversationDevice,
+  conversationKey,
+  groupConversations,
+} from "./conversations.js";
 import Footer from "./Footer.jsx";
 import AddPhoneDialog from "./AddPhoneDialog.jsx";
 import ManagePhoneDialog from "./ManagePhoneDialog.jsx";
@@ -21,17 +25,28 @@ import { useE2eKey } from "./keyStore.js";
 import { readMessage } from "./readable.js";
 import { useNow } from "./useNow.js";
 
+function withoutDevice(unread, deviceId) {
+  return Object.fromEntries(
+    Object.entries(unread).filter(
+      ([id]) => conversationDevice(id) !== deviceId,
+    ),
+  );
+}
+
 export default function Dashboard({ username, onLogout, pairingTiming }) {
   const [devices, setDevices] = useState([]);
   const [silentAfterMinutes, setSilentAfterMinutes] = useState(0);
   const now = useNow();
   const [messages, setMessages] = useState([]);
   const [selected, setSelected] = useState(null);
-  // The conversation the user picked. Without one the newest is open on a wide screen, and a
-  // narrow screen shows the list.
+  // The open conversation: the one the user picked, or the newest until they pick. It stays put
+  // when a message starts another conversation. On a narrow screen the thread only shows after
+  // a pick (threadShown); otherwise the list does.
   const [openId, setOpenId] = useState(null);
+  const [threadShown, setThreadShown] = useState(false);
   const [filters, setFilters] = useState({ type: "", app: "", q: "" });
   const [apps, setApps] = useState([]);
+  // Messages that arrived while their conversation was not open: conversation id -> count.
   const [unread, setUnread] = useState({});
   const e2eKey = useE2eKey();
   const [nextBefore, setNextBefore] = useState(null);
@@ -55,6 +70,7 @@ export default function Dashboard({ username, onLogout, pairingTiming }) {
     () => (searchHere ? { ...filters, q: "" } : filters),
     [filters, searchHere],
   );
+  const openRef = useRef(null); // the open conversation, for the stream handler
   const view = useRef({ selected, filters: serverFilters });
   useEffect(() => {
     view.current = { selected, filters: serverFilters };
@@ -63,14 +79,26 @@ export default function Dashboard({ username, onLogout, pairingTiming }) {
   const select = useCallback((deviceId) => {
     setSelected(deviceId);
     setOpenId(null);
-    // Opening a phone reads its messages; All phones shows (so reads) everything.
-    setUnread((u) => (deviceId ? { ...u, [deviceId]: 0 } : {}));
+    setThreadShown(false);
+    // Opening a phone reads its messages. All phones keeps what is unread: those conversations
+    // have not been opened.
+    if (deviceId) setUnread((u) => withoutDevice(u, deviceId));
+  }, []);
+
+  const openConversationById = useCallback((id) => {
+    setOpenId(id);
+    setThreadShown(true);
+    setUnread((u) => {
+      const rest = { ...u };
+      delete rest[id];
+      return rest;
+    });
   }, []);
 
   // A phone's messages were cleared (here or on another dashboard): the phone itself stays.
   const clearMessagesOf = useCallback((deviceId) => {
     setMessages((list) => list.filter((m) => m.deviceId !== deviceId));
-    setUnread((u) => ({ ...u, [deviceId]: 0 }));
+    setUnread((u) => withoutDevice(u, deviceId));
   }, []);
 
   const clearAllMessages = useCallback(() => {
@@ -82,11 +110,7 @@ export default function Dashboard({ username, onLogout, pairingTiming }) {
   const removeDevice = useCallback((deviceId) => {
     setDevices((list) => list.filter((x) => x.deviceId !== deviceId));
     setMessages((list) => list.filter((m) => m.deviceId !== deviceId));
-    setUnread((u) => {
-      const rest = { ...u };
-      delete rest[deviceId];
-      return rest;
-    });
+    setUnread((u) => withoutDevice(u, deviceId));
     setSelected((current) => (current === deviceId ? null : current));
   }, []);
 
@@ -119,12 +143,17 @@ export default function Dashboard({ username, onLogout, pairingTiming }) {
         setApps((known) =>
           known.includes(m.app) ? known : [...known, m.app].sort(),
         );
-      } else if (
-        view.current.selected &&
-        m.deviceId !== view.current.selected
-      ) {
-        setUnread((u) => ({ ...u, [m.deviceId]: (u[m.deviceId] ?? 0) + 1 }));
       }
+      // Unread unless its conversation is the one open. A message from a phone that is not the
+      // one being viewed has no row here, but it still counts for that phone.
+      const key = conversationKey(m);
+      const elsewhere =
+        view.current.selected && m.deviceId !== view.current.selected;
+      if (
+        key !== openRef.current &&
+        (matchesView(m, view.current) || elsewhere)
+      )
+        setUnread((u) => ({ ...u, [key]: (u[key] ?? 0) + 1 }));
     },
     device_deleted: (d) => removeDevice(d.deviceId),
     messages_cleared: (d) => clearMessagesOf(d.deviceId),
@@ -256,8 +285,22 @@ export default function Dashboard({ username, onLogout, pairingTiming }) {
     [devices],
   );
   const conversations = useMemo(() => groupConversations(shown), [shown]);
-  const openConversation =
-    conversations.find((c) => c.id === openId) ?? conversations[0];
+  // Nothing valid open yet (first load, new filter): open the newest conversation.
+  if (conversations.length > 0 && !conversations.some((c) => c.id === openId))
+    setOpenId(conversations[0].id);
+  const openConversation = conversations.find((c) => c.id === openId);
+  useEffect(() => {
+    openRef.current = openConversation?.id ?? null;
+  });
+  const unreadByDevice = useMemo(() => {
+    const byDevice = {};
+    for (const [id, count] of Object.entries(unread)) {
+      const device = conversationDevice(id);
+      byDevice[device] = (byDevice[device] ?? 0) + count;
+    }
+    return byDevice;
+  }, [unread]);
+  const unreadTotal = Object.values(unread).reduce((a, b) => a + b, 0);
   const selectedDevice = devices.find((d) => d.deviceId === selected);
   const title = selected ? (deviceNames[selected] ?? "Phone") : "All phones";
 
@@ -288,7 +331,8 @@ export default function Dashboard({ username, onLogout, pairingTiming }) {
           <Sidebar
             devices={devices}
             selected={selected}
-            unread={unread}
+            unread={unreadByDevice}
+            unreadTotal={unreadTotal}
             onSelect={select}
             silentAfterMinutes={silentAfterMinutes}
             now={now}
@@ -327,14 +371,15 @@ export default function Dashboard({ username, onLogout, pairingTiming }) {
             <div
               className={clsx(
                 "md:block md:w-80 md:shrink-0 md:border-r md:border-line",
-                openId !== null && "hidden",
+                threadShown && "hidden",
               )}
             >
               <ConversationList
                 conversations={conversations}
                 deviceNames={deviceNames}
                 openId={openConversation?.id}
-                onOpen={setOpenId}
+                onOpen={openConversationById}
+                unread={unread}
                 now={now}
               />
             </div>
@@ -342,13 +387,13 @@ export default function Dashboard({ username, onLogout, pairingTiming }) {
               <div
                 className={clsx(
                   "min-w-0 flex-1 md:flex md:h-[70vh]",
-                  openId === null && "hidden",
+                  !threadShown && "hidden",
                 )}
               >
                 <Thread
                   conversation={openConversation}
                   deviceName={deviceNames[openConversation.deviceId]}
-                  onBack={openId === null ? undefined : () => setOpenId(null)}
+                  onBack={threadShown ? () => setThreadShown(false) : undefined}
                 />
               </div>
             )}

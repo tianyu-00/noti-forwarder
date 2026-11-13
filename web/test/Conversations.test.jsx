@@ -1,7 +1,8 @@
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import Dashboard from "../src/Dashboard.jsx";
-import { device, message, mockApi } from "./fixtures.js";
+import { device, message, mockApi, phonesNav } from "./fixtures.js";
+import { FakeEventSource } from "./fake-event-source.js";
 
 const phones = [
   device({ deviceId: "a", name: "Kitchen phone" }),
@@ -196,5 +197,88 @@ describe("one pane at a time on a narrow screen", () => {
     expect(
       screen.queryByRole("button", { name: /back to conversations/i }),
     ).toBeNull();
+  });
+});
+
+describe("unread conversations", () => {
+  const push = (m) =>
+    act(() => FakeEventSource.current.emit("message", message(m)));
+  const rowOf = async (name) =>
+    (await conversations()).getByRole("button", { name: new RegExp(name) });
+
+  it("marks a conversation that got a message while another was open", async () => {
+    setup();
+    await conversations();
+
+    push({ deviceId: "b", app: "com.parcels", body: "Second parcel" });
+
+    const row = await rowOf("com.parcels");
+    expect(within(row).getByLabelText("1 unread")).toBeInTheDocument();
+    expect(
+      within(await rowOf("NORTHWIND")).queryByLabelText(/unread/),
+    ).toBeNull();
+  });
+
+  it("does not count a message that lands in the open conversation", async () => {
+    setup();
+    await conversations();
+
+    push({
+      deviceId: "a",
+      type: "sms",
+      app: "sms",
+      sender: "NORTHWIND",
+      body: "One more",
+    });
+
+    const thread = await screen.findByRole("region", { name: "NORTHWIND" });
+    await within(thread).findByText("One more");
+    expect(
+      within(await rowOf("NORTHWIND")).queryByLabelText(/unread/),
+    ).toBeNull();
+  });
+
+  it("clears the mark when the conversation is opened", async () => {
+    const user = userEvent.setup();
+    setup();
+    await conversations();
+    push({ deviceId: "b", app: "com.parcels", body: "Second parcel" });
+
+    await user.click(await rowOf("com.parcels"));
+
+    expect(
+      within(await rowOf("com.parcels")).queryByLabelText(/unread/),
+    ).toBeNull();
+  });
+
+  it("keeps the open thread when a message starts a new conversation", async () => {
+    setup();
+    await screen.findByRole("region", { name: "NORTHWIND" });
+
+    push({ deviceId: "a", app: "com.new", body: "Hello from a new app" });
+
+    const rows = (await conversations()).getAllByRole("button");
+    await within(rows[0]).findByText("Hello from a new app");
+    expect(
+      screen.getByRole("region", { name: "NORTHWIND" }),
+    ).toBeInTheDocument();
+    expect(within(rows[0]).getByLabelText("1 unread")).toBeInTheDocument();
+  });
+
+  it("adds the unread messages up on the phone and on All phones", async () => {
+    setup();
+    await conversations();
+
+    push({ deviceId: "b", app: "com.parcels", body: "Two" });
+    push({ deviceId: "b", app: "com.other", body: "Three" });
+
+    const nav = within(phonesNav());
+    const spare = await nav.findByRole("button", { name: /spare phone/i });
+    expect(within(spare).getByLabelText("2 unread")).toBeInTheDocument();
+    expect(
+      within(nav.getByRole("button", { name: /all phones/i })).getByLabelText(
+        "2 unread",
+      ),
+    ).toBeInTheDocument();
   });
 });

@@ -12,6 +12,7 @@ export default function ConversationList({
   deviceNames,
   openId,
   onOpen,
+  unread = {},
   now,
 }) {
   if (conversations.length === 0) {
@@ -40,8 +41,18 @@ export default function ConversationList({
                 {timeAgo(c.latest.receivedAt, now)}
               </span>
             </span>
-            <span className="truncate text-sm text-muted">
-              {preview(c.latest)}
+            <span className="flex items-center justify-between gap-3">
+              <span className="truncate text-sm text-muted">
+                {preview(c.latest)}
+              </span>
+              {unread[c.id] > 0 && (
+                <span
+                  aria-label={`${unread[c.id]} unread`}
+                  className="shrink-0 rounded-full bg-accent px-2 text-xs font-semibold text-on-accent"
+                >
+                  {unread[c.id]}
+                </span>
+              )}
             </span>
             <span className="text-xs text-faint">
               {deviceNames[c.deviceId] ?? "Unknown phone"}
@@ -65,5 +76,6 @@ ConversationList.propTypes = {
   deviceNames: PropTypes.objectOf(PropTypes.string).isRequired,
   openId: PropTypes.string,
   onOpen: PropTypes.func.isRequired,
+  unread: PropTypes.objectOf(PropTypes.number),
   now: PropTypes.number.isRequired,
 };

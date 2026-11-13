@@ -1,4 +1,7 @@
-import { groupConversations } from "../src/conversations.js";
+import {
+  conversationDevice,
+  groupConversations,
+} from "../src/conversations.js";
 import { message } from "./fixtures.js";
 
 // Messages arrive newest first, as the server returns them.
@@ -108,5 +111,15 @@ describe("groupConversations", () => {
 
   it("returns nothing for no messages", () => {
     expect(groupConversations([])).toEqual([]);
+  });
+});
+
+describe("conversationDevice", () => {
+  it("tells which phone a conversation id belongs to", () => {
+    const [c] = groupConversations([
+      message({ deviceId: "phone-7", type: "sms", app: "sms", sender: "X" }),
+    ]);
+
+    expect(conversationDevice(c.id)).toBe("phone-7");
   });
 });

@@ -109,6 +109,7 @@ export default function Sidebar({
   devices,
   selected,
   unread,
+  unreadTotal = 0,
   onSelect,
   silentAfterMinutes = 0,
   now,
@@ -119,7 +120,17 @@ export default function Sidebar({
       className="flex w-full gap-2 overflow-x-auto p-3 md:block md:w-64 md:space-y-0.5 md:overflow-visible"
     >
       <Item active={selected === null} onClick={() => onSelect(null)}>
-        <span className="font-medium text-fg">All phones</span>
+        <span className="flex items-center justify-between gap-2 font-medium text-fg">
+          All phones
+          {unreadTotal > 0 && (
+            <span
+              aria-label={`${unreadTotal} unread`}
+              className="rounded-full bg-primary px-2 text-xs font-medium text-on-primary"
+            >
+              {unreadTotal}
+            </span>
+          )}
+        </span>
       </Item>
       {devices.map((d) => (
         <Item
@@ -153,6 +164,8 @@ Sidebar.propTypes = {
   devices: PropTypes.arrayOf(deviceShape).isRequired,
   selected: PropTypes.string,
   unread: PropTypes.objectOf(PropTypes.number).isRequired,
+  // Unread messages across all phones, shown on "All phones".
+  unreadTotal: PropTypes.number,
   onSelect: PropTypes.func.isRequired,
   silentAfterMinutes: PropTypes.number,
   now: PropTypes.number.isRequired,

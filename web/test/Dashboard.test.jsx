@@ -431,7 +431,11 @@ describe("live updates", () => {
     act(() => stream.emit("message", m));
     act(() => stream.emit("message", m));
 
-    expect(await screen.findAllByText("only once", inThread)).toHaveLength(1);
+    // It starts a conversation of its own, so it shows in the list, once.
+    const list = within(
+      await screen.findByRole("list", { name: "Conversations" }),
+    );
+    expect(await list.findAllByText("only once")).toHaveLength(1);
   });
 
   it("does not show a pushed message that fails the current filters", async () => {
@@ -452,7 +456,10 @@ describe("live updates", () => {
       ),
     );
 
-    expect(await screen.findByText("right type", inThread)).toBeInTheDocument();
+    const list = within(
+      await screen.findByRole("list", { name: "Conversations" }),
+    );
+    expect(await list.findByText("right type")).toBeInTheDocument();
     expect(screen.queryByText("wrong type")).not.toBeInTheDocument();
   });
 

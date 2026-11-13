@@ -6,6 +6,11 @@ export function conversationKey(m) {
   return JSON.stringify([m.deviceId, m.type, who]);
 }
 
+/** The phone a conversation id (from conversationKey) belongs to. */
+export function conversationDevice(id) {
+  return JSON.parse(id)[0];
+}
+
 function conversationName(m) {
   if (m.type === "sms") return m.sender || "Unknown sender";
   return m.app;
