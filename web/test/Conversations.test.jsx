@@ -166,6 +166,16 @@ describe("thread", () => {
     expect(thread).toHaveTextContent("Kitchen phone");
   });
 
+  it("has a send button drawn as an icon, not a text arrow", async () => {
+    setup();
+
+    const thread = await screen.findByRole("region", { name: "NORTHWIND" });
+    const send = within(thread).getByRole("button", { name: "Send reply" });
+    expect(send).toBeDisabled();
+    expect(send.querySelector("svg")).not.toBeNull();
+    expect(send).not.toHaveTextContent("→");
+  });
+
   it("has a reply box that is switched off for now", async () => {
     setup();
 

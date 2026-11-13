@@ -229,13 +229,28 @@ export default function Thread({ conversation, deviceName, onBack, actions }) {
           placeholder="Replying from this PC is not available yet"
           className="min-w-0 flex-1 rounded-full border border-line bg-surface px-5 py-3 text-sm placeholder:text-faint"
         />
-        <Button
+        {/* A plain button, not Button: its own rounded-md would win over rounded-full. */}
+        <button
+          type="button"
           disabled
           aria-label="Send reply"
-          className="h-11 w-11 rounded-full p-0"
+          className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent text-on-accent disabled:opacity-50"
         >
-          →
-        </Button>
+          <svg
+            viewBox="0 0 24 24"
+            width="20"
+            height="20"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M22 2 11 13" />
+            <path d="M22 2 15 22l-4-9-9-4 20-7z" />
+          </svg>
+        </button>
       </div>
     </section>
   );
