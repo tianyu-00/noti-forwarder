@@ -353,17 +353,31 @@ describe("kind badge", () => {
     expect(within(rows[0]).queryByText("App")).toBeNull();
   });
 
+  it("tags every message in the thread with it", async () => {
+    setup();
+
+    const thread = await screen.findByRole("region", { name: "NORTHWIND" });
+    const articles = within(thread).getAllByRole("article");
+    expect(articles).toHaveLength(2);
+    for (const article of articles)
+      expect(within(article).getByText("SMS")).toBeInTheDocument();
+  });
+
   it("shows it in the thread header too", async () => {
     const user = userEvent.setup();
     setup();
 
     const sms = await screen.findByRole("region", { name: "NORTHWIND" });
-    expect(within(sms).getByText("SMS")).toBeInTheDocument();
+    expect(
+      within(within(sms).getByRole("banner")).getByText("SMS"),
+    ).toBeInTheDocument();
 
     await user.click(
       (await conversations()).getByRole("button", { name: /com\.parcels/ }),
     );
     const app = screen.getByRole("region", { name: "com.parcels" });
-    expect(within(app).getByText("App")).toBeInTheDocument();
+    expect(
+      within(within(app).getByRole("banner")).getByText("App"),
+    ).toBeInTheDocument();
   });
 });

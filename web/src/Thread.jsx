@@ -149,6 +149,7 @@ function Bubble({ message: m }) {
         )}
       </div>
       <div className="flex items-center gap-3 px-1">
+        <KindBadge type={m.type} />
         <time dateTime={m.receivedAt} className="text-xs text-muted">
           {new Date(m.receivedAt).toLocaleTimeString([], {
             hour: "2-digit",
