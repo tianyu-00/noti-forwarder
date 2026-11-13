@@ -342,3 +342,28 @@ describe("long messages", () => {
     expect(within(thread).queryByRole("button", { name: /show/i })).toBeNull();
   });
 });
+
+describe("kind badge", () => {
+  it("tells an SMS conversation from an app one in the list", async () => {
+    setup();
+
+    const rows = (await conversations()).getAllByRole("button");
+    expect(within(rows[0]).getByText("SMS")).toBeInTheDocument();
+    expect(within(rows[1]).getByText("App")).toBeInTheDocument();
+    expect(within(rows[0]).queryByText("App")).toBeNull();
+  });
+
+  it("shows it in the thread header too", async () => {
+    const user = userEvent.setup();
+    setup();
+
+    const sms = await screen.findByRole("region", { name: "NORTHWIND" });
+    expect(within(sms).getByText("SMS")).toBeInTheDocument();
+
+    await user.click(
+      (await conversations()).getByRole("button", { name: /com\.parcels/ }),
+    );
+    const app = screen.getByRole("region", { name: "com.parcels" });
+    expect(within(app).getByText("App")).toBeInTheDocument();
+  });
+});

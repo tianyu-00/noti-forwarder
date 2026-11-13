@@ -4,6 +4,7 @@ import clsx from "clsx";
 import { splitAroundCode } from "./code.js";
 import { Button } from "./ui.jsx";
 import Avatar from "./Avatar.jsx";
+import KindBadge from "./KindBadge.jsx";
 
 const messageShape = PropTypes.shape({
   id: PropTypes.string.isRequired,
@@ -187,8 +188,8 @@ export default function Thread({ conversation, deviceName, onBack, actions }) {
             <h2 className="truncate text-[17px] font-bold">
               {conversation.name}
             </h2>
-            <p className="text-xs text-muted">
-              {conversation.type === "sms" ? "SMS" : "Notifications"} ·{" "}
+            <p className="mt-0.5 flex items-center gap-2 text-xs text-muted">
+              <KindBadge type={conversation.type} />
               {deviceName ?? "Unknown phone"}
             </p>
           </div>

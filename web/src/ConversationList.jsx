@@ -2,6 +2,7 @@ import PropTypes from "prop-types";
 import clsx from "clsx";
 import { timeAgo } from "./time.js";
 import Avatar from "./Avatar.jsx";
+import KindBadge from "./KindBadge.jsx";
 
 function preview(m) {
   if (m.locked) return "Encrypted message";
@@ -59,7 +60,8 @@ export default function ConversationList({
                   </span>
                 )}
               </span>
-              <span className="text-xs text-faint">
+              <span className="flex items-center gap-2 text-xs text-faint">
+                <KindBadge type={c.type} />
                 {deviceNames[c.deviceId] ?? "Unknown phone"}
               </span>
             </span>
@@ -76,6 +78,7 @@ ConversationList.propTypes = {
       id: PropTypes.string.isRequired,
       deviceId: PropTypes.string.isRequired,
       name: PropTypes.string.isRequired,
+      type: PropTypes.string.isRequired,
       latest: PropTypes.object.isRequired,
     }),
   ).isRequired,
