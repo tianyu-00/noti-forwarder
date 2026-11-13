@@ -50,11 +50,11 @@ export function messagesRouter({
           receivedAt: m.receivedAt,
         });
         const result = await db.query(
-          `INSERT INTO messages (id, device_id, type, app, sender, body, received_at, dedupe_hash)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+          `INSERT INTO messages (id, device_id, type, app, app_label, sender, body, received_at, dedupe_hash)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
            ON CONFLICT DO NOTHING
            RETURNING *`,
-          [m.id, req.deviceId, m.type, m.app, m.sender, m.body, m.receivedAt, hash],
+          [m.id, req.deviceId, m.type, m.app, m.appLabel ?? null, m.sender, m.body, m.receivedAt, hash],
         );
         stored += result.rowCount;
         // Only newly stored messages are pushed; duplicates stay silent.

@@ -11,6 +11,8 @@ const messageSchema = z.object({
   id: z.string().uuid(),
   type: z.enum(['sms', 'notification']),
   app: z.string().min(1).max(255),
+  // The app's real name as the phone shows it. Optional: older phones do not send it.
+  appLabel: z.string().max(255).optional(),
   sender: z
     .string()
     .max(SENDER_ENCRYPTED_MAX)

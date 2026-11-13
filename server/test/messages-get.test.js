@@ -37,6 +37,7 @@ describe('GET /api/v1/messages', () => {
       deviceId: d.deviceId,
       type: 'notification',
       app: 'com.bank',
+      appLabel: null,
       sender: 'Bank',
       body: 'newest',
       receivedAt: '2026-01-03T10:00:00.000Z',

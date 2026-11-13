@@ -7,6 +7,7 @@ export function messageToApi(row) {
     deviceId: row.device_id,
     type: row.type,
     app: row.app,
+    appLabel: row.app_label ?? null,
     sender: row.sender,
     body: row.body,
     receivedAt: row.received_at.toISOString(),
