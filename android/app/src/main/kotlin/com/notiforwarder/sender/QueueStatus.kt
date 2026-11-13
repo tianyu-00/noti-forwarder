@@ -21,3 +21,15 @@ fun describeAgo(thenMillis: Long?, nowMillis: Long): String {
 }
 
 private fun plural(count: Long, unit: String) = "$count $unit${if (count == 1L) "" else "s"} ago"
+
+/** The same as [describeAgo] but short enough for a small tile: "24 min ago". */
+fun describeAgoShort(thenMillis: Long?, nowMillis: Long): String {
+    if (thenMillis == null) return "never"
+    val minutes = ((nowMillis - thenMillis) / 60_000).coerceAtLeast(0)
+    return when {
+        minutes < 1 -> "just now"
+        minutes < 60 -> "$minutes min ago"
+        minutes < 24 * 60 -> "${minutes / 60} h ago"
+        else -> "${minutes / (24 * 60)} d ago"
+    }
+}

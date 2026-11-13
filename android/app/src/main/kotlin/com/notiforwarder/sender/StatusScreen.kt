@@ -85,7 +85,7 @@ internal fun StatusScreen(
 
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             StatTile("Waiting to send", queue?.queued?.toString() ?: "…", Modifier.weight(1f))
-            StatTile("Last send", queue?.let { describeAgo(it.lastSuccessAt, now) } ?: "…", Modifier.weight(1f))
+            StatTile("Last send", queue?.let { describeAgoShort(it.lastSuccessAt, now) } ?: "…", Modifier.weight(1f))
         }
 
         if (queue != null && queue.quarantined > 0) {
