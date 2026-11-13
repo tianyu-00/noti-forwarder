@@ -195,8 +195,9 @@ const second = await (
 ).json();
 const unpair = await fetch(`${BASE}/api/v1/unpair`, { method: 'POST', headers: { Authorization: `Bearer ${second.token}` } });
 assert.equal(unpair.status, 204);
-for (let i = 0; i < 50 && !streamText.includes(`"deviceId":"${second.deviceId}"`) ; i++) await new Promise((r) => setTimeout(r, 100));
-assert.match(streamText, new RegExp(`"deviceId":"${second.deviceId}"[^}]*"revokedAt":"`), 'dashboard hears the phone unpaired');
+const revokedEvent = new RegExp(`"deviceId":"${second.deviceId}"[^}]*"revokedAt":"`);
+for (let i = 0; i < 50 && !revokedEvent.test(streamText); i++) await new Promise((r) => setTimeout(r, 100));
+assert.match(streamText, revokedEvent, 'dashboard hears the phone unpaired');
 step('a phone that unpairs itself is shown as revoked at once');
 
 streamAbort.abort();
