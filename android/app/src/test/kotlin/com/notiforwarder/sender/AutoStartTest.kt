@@ -6,20 +6,21 @@ import org.junit.Test
 
 class AutoStartTest {
     @Test
-    fun `OnePlus, Oppo and Realme phones are told the two taps that reach the switch`() {
-        for (maker in listOf("OnePlus", "OPPO", "realme", "oneplus")) {
-            val help = autoStartHelp(maker)
-            assertTrue(maker, "Battery usage" in help)
-            assertTrue(maker, "Allow auto-launch" in help)
-        }
+    fun `says the steps differ from phone to phone`() {
+        assertTrue("differ" in autoStartHelp())
     }
 
     @Test
-    fun `other makers get a general hint, not OnePlus wording`() {
-        for (maker in listOf("samsung", "")) {
-            val help = autoStartHelp(maker)
-            assertTrue(maker, help.isNotBlank())
-            assertFalse(maker, "Allow auto-launch" in help)
-        }
+    fun `points at what to look for in the app's settings`() {
+        val help = autoStartHelp()
+
+        assertTrue("auto-launch" in help.lowercase())
+        assertTrue("background" in help.lowercase())
+    }
+
+    @Test
+    fun `does not name one maker's menus`() {
+        assertFalse("OnePlus" in autoStartHelp())
+        assertFalse("Battery usage" in autoStartHelp())
     }
 }
