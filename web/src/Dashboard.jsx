@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import PropTypes from "prop-types";
+import clsx from "clsx";
 import { api } from "./api.js";
-import MessageList from "./MessageList.jsx";
+import ConversationList from "./ConversationList.jsx";
+import Thread from "./Thread.jsx";
+import { groupConversations } from "./conversations.js";
 import Footer from "./Footer.jsx";
 import AddPhoneDialog from "./AddPhoneDialog.jsx";
 import ManagePhoneDialog from "./ManagePhoneDialog.jsx";
@@ -24,6 +27,9 @@ export default function Dashboard({ username, onLogout, pairingTiming }) {
   const now = useNow();
   const [messages, setMessages] = useState([]);
   const [selected, setSelected] = useState(null);
+  // The conversation the user picked. Without one the newest is open on a wide screen, and a
+  // narrow screen shows the list.
+  const [openId, setOpenId] = useState(null);
   const [filters, setFilters] = useState({ type: "", app: "", q: "" });
   const [apps, setApps] = useState([]);
   const [unread, setUnread] = useState({});
@@ -56,6 +62,7 @@ export default function Dashboard({ username, onLogout, pairingTiming }) {
 
   const select = useCallback((deviceId) => {
     setSelected(deviceId);
+    setOpenId(null);
     // Opening a phone reads its messages; All phones shows (so reads) everything.
     setUnread((u) => (deviceId ? { ...u, [deviceId]: 0 } : {}));
   }, []);
@@ -248,6 +255,9 @@ export default function Dashboard({ username, onLogout, pairingTiming }) {
     () => Object.fromEntries(devices.map((d) => [d.deviceId, d.name])),
     [devices],
   );
+  const conversations = useMemo(() => groupConversations(shown), [shown]);
+  const openConversation =
+    conversations.find((c) => c.id === openId) ?? conversations[0];
   const selectedDevice = devices.find((d) => d.deviceId === selected);
   const title = selected ? (deviceNames[selected] ?? "Phone") : "All phones";
 
@@ -313,7 +323,36 @@ export default function Dashboard({ username, onLogout, pairingTiming }) {
               {loadError}
             </p>
           )}
-          <MessageList messages={shown} deviceNames={deviceNames} />
+          <div className="md:flex">
+            <div
+              className={clsx(
+                "md:block md:w-80 md:shrink-0 md:border-r md:border-line",
+                openId !== null && "hidden",
+              )}
+            >
+              <ConversationList
+                conversations={conversations}
+                deviceNames={deviceNames}
+                openId={openConversation?.id}
+                onOpen={setOpenId}
+                now={now}
+              />
+            </div>
+            {openConversation && (
+              <div
+                className={clsx(
+                  "min-w-0 flex-1 md:flex md:h-[70vh]",
+                  openId === null && "hidden",
+                )}
+              >
+                <Thread
+                  conversation={openConversation}
+                  deviceName={deviceNames[openConversation.deviceId]}
+                  onBack={openId === null ? undefined : () => setOpenId(null)}
+                />
+              </div>
+            )}
+          </div>
           {nextBefore && (
             <div className="p-4 text-center">
               <div ref={endRef} className="h-px" />

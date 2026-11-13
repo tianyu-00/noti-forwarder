@@ -1,7 +1,7 @@
 import { render, screen, within, waitFor, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import Dashboard from "../src/Dashboard.jsx";
-import { device, message, mockApi } from "./fixtures.js";
+import { device, message, mockApi, inThread } from "./fixtures.js";
 import { FakeEventSource } from "./fake-event-source.js";
 import { generateKey } from "../src/e2e.js";
 import { clearKey, setKey } from "../src/keyStore.js";
@@ -74,7 +74,7 @@ describe("end-to-end encrypted messages in the dashboard", () => {
       message({ deviceId: "a", sender: "Old phone", body: "plain hello" }),
     ]);
 
-    expect(screen.getByText("plain hello")).toBeInTheDocument();
+    expect(screen.getByText("plain hello", inThread)).toBeInTheDocument();
   });
 
   it("decrypts a message that arrives live", async () => {
@@ -92,7 +92,9 @@ describe("end-to-end encrypted messages in the dashboard", () => {
       ),
     );
 
-    expect(await screen.findByText("Parcel on its way")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Parcel on its way", inThread),
+    ).toBeInTheDocument();
     expect(screen.getByText("Courier")).toBeInTheDocument();
   });
 
@@ -114,7 +116,9 @@ describe("end-to-end encrypted messages in the dashboard", () => {
         screen.queryByText("Your bank balance is low"),
       ).not.toBeInTheDocument(),
     );
-    expect(screen.getByText("Your parcel has shipped")).toBeInTheDocument();
+    expect(
+      screen.getByText("Your parcel has shipped", inThread),
+    ).toBeInTheDocument();
     expect(requests.messages.every((p) => !p.has("q"))).toBe(true);
   });
 });

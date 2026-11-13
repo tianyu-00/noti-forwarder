@@ -1,4 +1,5 @@
 import { http, HttpResponse } from "msw";
+import { screen } from "@testing-library/react";
 import { server } from "./server.js";
 
 let counter = 0;
@@ -59,3 +60,9 @@ export function mockApi({
   );
   return requests;
 }
+
+// Where to look: a message's text is in the open thread and again, shortened, in the
+// conversation list, and a phone's name is in the sidebar and again in the thread header.
+export const inThread = { selector: "article p" };
+export const phonesNav = () =>
+  screen.getByRole("navigation", { name: "Phones" });

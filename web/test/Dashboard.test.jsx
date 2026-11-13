@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { server } from "./server.js";
 import Dashboard from "../src/Dashboard.jsx";
-import { device, message, mockApi } from "./fixtures.js";
+import { device, message, mockApi, inThread, phonesNav } from "./fixtures.js";
 import { FakeEventSource } from "./fake-event-source.js";
 import { FakeIntersectionObserver } from "./fake-intersection-observer.js";
 
@@ -26,12 +26,15 @@ describe("message list", () => {
 
     render(<Dashboard username="admin" onLogout={() => {}} />);
 
-    const items = await screen.findAllByRole("article");
-    expect(items).toHaveLength(2);
-    expect(within(items[0]).getByText("newest from B")).toBeInTheDocument();
-    expect(within(items[0]).getByText("Spare phone")).toBeInTheDocument();
-    expect(within(items[0]).getByText("Bank")).toBeInTheDocument();
-    expect(within(items[1]).getByText("older from A")).toBeInTheDocument();
+    const list = within(
+      await screen.findByRole("list", { name: "Conversations" }),
+    );
+    const rows = list.getAllByRole("button");
+    expect(rows).toHaveLength(2);
+    expect(within(rows[0]).getByText("newest from B")).toBeInTheDocument();
+    expect(within(rows[0]).getByText("Spare phone")).toBeInTheDocument();
+    expect(within(rows[0]).getByText("com.bank")).toBeInTheDocument();
+    expect(within(rows[1]).getByText("older from A")).toBeInTheDocument();
     expect(
       screen.getByRole("heading", { name: /all phones/i }),
     ).toBeInTheDocument();
@@ -48,7 +51,7 @@ describe("message list", () => {
       <Dashboard username="admin" onLogout={() => {}} />,
     );
 
-    expect(await screen.findByText(evil)).toBeInTheDocument();
+    expect(await screen.findByText(evil, inThread)).toBeInTheDocument();
     expect(container.querySelector("img")).toBeNull();
     expect(container.querySelector("b")).toBeNull();
   });
@@ -260,7 +263,7 @@ describe("sidebar", () => {
     render(<Dashboard username="admin" onLogout={() => {}} />);
 
     await user.click(
-      await screen.findByRole("button", { name: /spare phone/i }),
+      await within(phonesNav()).findByRole("button", { name: /spare phone/i }),
     );
 
     expect(
@@ -362,7 +365,9 @@ describe("filters", () => {
     await screen.findAllByRole("article");
 
     await user.click(screen.getByRole("tab", { name: /^sms$/i }));
-    await user.click(screen.getByRole("button", { name: /kitchen phone/i }));
+    await user.click(
+      within(phonesNav()).getByRole("button", { name: /kitchen phone/i }),
+    );
 
     await waitFor(() => {
       expect(lastParams(requests).get("device")).toBe("a");
@@ -412,9 +417,11 @@ describe("live updates", () => {
       stream.emit("message", message({ deviceId: "b", body: "brand new" })),
     );
 
-    const items = await screen.findAllByRole("article");
-    expect(within(items[0]).getByText("brand new")).toBeInTheDocument();
-    expect(items).toHaveLength(2);
+    const rows = within(
+      await screen.findByRole("list", { name: "Conversations" }),
+    ).getAllByRole("button");
+    await waitFor(() => expect(rows[0]).toHaveTextContent("brand new"));
+    expect(rows).toHaveLength(2);
   });
 
   it("ignores a pushed message it already has", async () => {
@@ -424,7 +431,7 @@ describe("live updates", () => {
     act(() => stream.emit("message", m));
     act(() => stream.emit("message", m));
 
-    expect(await screen.findAllByText("only once")).toHaveLength(1);
+    expect(await screen.findAllByText("only once", inThread)).toHaveLength(1);
   });
 
   it("does not show a pushed message that fails the current filters", async () => {
@@ -445,13 +452,15 @@ describe("live updates", () => {
       ),
     );
 
-    expect(await screen.findByText("right type")).toBeInTheDocument();
+    expect(await screen.findByText("right type", inThread)).toBeInTheDocument();
     expect(screen.queryByText("wrong type")).not.toBeInTheDocument();
   });
 
   it("counts unread messages per phone and clears them when the phone is opened", async () => {
     const { stream, user } = await setup();
-    await user.click(screen.getByRole("button", { name: /kitchen phone/i }));
+    await user.click(
+      within(phonesNav()).getByRole("button", { name: /kitchen phone/i }),
+    );
     await screen.findByRole("heading", { name: "Kitchen phone" });
 
     act(() => stream.emit("message", message({ deviceId: "b", body: "one" })));
@@ -463,11 +472,13 @@ describe("live updates", () => {
       ),
     );
 
-    const spare = screen.getByRole("button", { name: /spare phone/i });
+    const spare = within(phonesNav()).getByRole("button", {
+      name: /spare phone/i,
+    });
     expect(within(spare).getByLabelText("2 unread")).toBeInTheDocument();
     expect(
       within(
-        screen.getByRole("button", { name: /kitchen phone/i }),
+        within(phonesNav()).getByRole("button", { name: /kitchen phone/i }),
       ).queryByLabelText(/unread/),
     ).toBeNull();
     expect(screen.queryByText("one")).not.toBeInTheDocument();
@@ -476,7 +487,7 @@ describe("live updates", () => {
     await waitFor(() =>
       expect(
         within(
-          screen.getByRole("button", { name: /spare phone/i }),
+          within(phonesNav()).getByRole("button", { name: /spare phone/i }),
         ).queryByLabelText(/unread/),
       ).toBeNull(),
     );
@@ -536,7 +547,7 @@ describe("older messages load as you scroll", () => {
       messagesResponse: byCursor,
     });
     render(<Dashboard username="admin" onLogout={() => {}} />);
-    await screen.findByText("page one");
+    await screen.findByText("page one", inThread);
     return requests;
   };
   const reachEnd = () =>
@@ -551,7 +562,7 @@ describe("older messages load as you scroll", () => {
     reachEnd();
 
     expect(await screen.findByText("page two")).toBeInTheDocument();
-    expect(screen.getByText("page one")).toBeInTheDocument();
+    expect(screen.getByText("page one", inThread)).toBeInTheDocument();
     expect(olderRequests(requests).map((p) => p.get("before"))).toEqual([
       "cursor-1",
     ]);
@@ -576,7 +587,7 @@ describe("older messages load as you scroll", () => {
       ),
     );
     render(<Dashboard username="admin" onLogout={() => {}} />);
-    await screen.findByText("page one");
+    await screen.findByText("page one", inThread);
 
     reachEnd();
     reachEnd();
@@ -592,7 +603,7 @@ describe("older messages load as you scroll", () => {
     await open();
 
     expect(await screen.findByText("page three")).toBeInTheDocument();
-    expect(screen.getByText("page one")).toBeInTheDocument();
+    expect(screen.getByText("page one", inThread)).toBeInTheDocument();
     expect(screen.getByText("page two")).toBeInTheDocument();
   });
 
@@ -626,7 +637,7 @@ describe("older messages load as you scroll", () => {
     );
     const user = userEvent.setup();
     render(<Dashboard username="admin" onLogout={() => {}} />);
-    await screen.findByText("page one");
+    await screen.findByText("page one", inThread);
 
     reachEnd();
     expect(await screen.findByRole("alert")).toHaveTextContent(
@@ -673,16 +684,16 @@ describe("older messages load as you scroll", () => {
     );
     const user = userEvent.setup();
     render(<Dashboard username="admin" onLogout={() => {}} />);
-    await screen.findByText("page one");
+    await screen.findByText("page one", inThread);
 
     reachEnd(); // an older page starts loading...
     await user.click(screen.getByRole("tab", { name: "SMS" })); // ...then the user changes the view
-    expect(await screen.findByText("only texts")).toBeInTheDocument();
+    expect(await screen.findByText("only texts", inThread)).toBeInTheDocument();
     release();
     await new Promise((r) => setTimeout(r, 50));
 
     expect(screen.queryByText("stale page")).not.toBeInTheDocument();
-    expect(screen.getByText("only texts")).toBeInTheDocument();
+    expect(screen.getByText("only texts", inThread)).toBeInTheDocument();
   });
 
   it("falls back to a Load older button when the browser cannot watch scrolling", async () => {
@@ -693,7 +704,7 @@ describe("older messages load as you scroll", () => {
       messagesResponse: byCursor,
     });
     render(<Dashboard username="admin" onLogout={() => {}} />);
-    await screen.findByText("page one");
+    await screen.findByText("page one", inThread);
 
     await user.click(screen.getByRole("button", { name: /load older/i }));
 
@@ -883,7 +894,9 @@ describe("add phone", () => {
 describe("manage a phone", () => {
   const openManage = async (user) => {
     await user.click(
-      await screen.findByRole("button", { name: /kitchen phone/i }),
+      await within(phonesNav()).findByRole("button", {
+        name: /kitchen phone/i,
+      }),
     );
     await user.click(
       await screen.findByRole("button", { name: /manage phone/i }),
@@ -898,12 +911,14 @@ describe("manage a phone", () => {
 
   it("only offers management when a single phone is selected", async () => {
     const user = setup();
-    await screen.findByRole("button", { name: /kitchen phone/i });
+    await within(phonesNav()).findByRole("button", { name: /kitchen phone/i });
     expect(
       screen.queryByRole("button", { name: /manage phone/i }),
     ).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: /kitchen phone/i }));
+    await user.click(
+      within(phonesNav()).getByRole("button", { name: /kitchen phone/i }),
+    );
     expect(
       await screen.findByRole("button", { name: /manage phone/i }),
     ).toBeInTheDocument();
@@ -1003,7 +1018,9 @@ describe("manage a phone", () => {
 describe("erasing a revoked phone", () => {
   const revokedAt = new Date(Date.now() - 60000).toISOString();
   const open = async (user) => {
-    await user.click(await screen.findByRole("button", { name: /old phone/i }));
+    await user.click(
+      await within(phonesNav()).findByRole("button", { name: /old phone/i }),
+    );
     await user.click(
       await screen.findByRole("button", { name: /manage phone/i }),
     );
@@ -1057,7 +1074,7 @@ describe("erasing a revoked phone", () => {
     await waitFor(() => expect(erased).toBe(1));
     await waitFor(() =>
       expect(
-        screen.queryByRole("button", { name: /old phone/i }),
+        within(phonesNav()).queryByRole("button", { name: /old phone/i }),
       ).not.toBeInTheDocument(),
     );
     expect(
@@ -1069,7 +1086,7 @@ describe("erasing a revoked phone", () => {
   it("removes a phone another dashboard erased", async () => {
     mockApi({ devices: [device({ deviceId: "a", name: "Old phone" })] });
     render(<Dashboard username="admin" onLogout={() => {}} />);
-    await screen.findByRole("button", { name: /old phone/i });
+    await within(phonesNav()).findByRole("button", { name: /old phone/i });
 
     act(() =>
       FakeEventSource.current.emit("device_deleted", { deviceId: "a" }),
@@ -1077,7 +1094,7 @@ describe("erasing a revoked phone", () => {
 
     await waitFor(() =>
       expect(
-        screen.queryByRole("button", { name: /old phone/i }),
+        within(phonesNav()).queryByRole("button", { name: /old phone/i }),
       ).not.toBeInTheDocument(),
     );
   });
@@ -1378,7 +1395,9 @@ describe("clearing a phone's messages", () => {
     const user = userEvent.setup();
     render(<Dashboard username="admin" onLogout={() => {}} />);
     await user.click(
-      await screen.findByRole("button", { name: /kitchen phone/i }),
+      await within(phonesNav()).findByRole("button", {
+        name: /kitchen phone/i,
+      }),
     );
     await user.click(
       await screen.findByRole("button", { name: /manage phone/i }),
@@ -1426,10 +1445,12 @@ describe("clearing a phone's messages", () => {
 
     await waitFor(() => expect(cleared).toBe(1));
     await waitFor(() =>
-      expect(screen.queryByText("from the kitchen")).not.toBeInTheDocument(),
+      expect(
+        screen.queryByText("from the kitchen", inThread),
+      ).not.toBeInTheDocument(),
     );
     expect(
-      screen.getByRole("button", { name: /kitchen phone/i }),
+      within(phonesNav()).getByRole("button", { name: /kitchen phone/i }),
     ).toBeInTheDocument();
     expect(screen.queryByText("Revoked")).not.toBeInTheDocument();
   });
@@ -1477,7 +1498,7 @@ describe("clearing a phone's messages", () => {
     expect(await within(dialog).findByRole("alert")).toHaveTextContent(
       /could not clear/i,
     );
-    expect(screen.getByText("from the kitchen")).toBeInTheDocument();
+    expect(screen.getByText("from the kitchen", inThread)).toBeInTheDocument();
   });
 
   it("drops a phone's messages when another dashboard clears them", async () => {
@@ -1486,16 +1507,18 @@ describe("clearing a phone's messages", () => {
       messages: both,
     });
     render(<Dashboard username="admin" onLogout={() => {}} />);
-    await screen.findByText("from the kitchen");
+    await screen.findByText("from the kitchen", inThread);
 
     act(() =>
       FakeEventSource.current.emit("messages_cleared", { deviceId: "a" }),
     );
 
     await waitFor(() =>
-      expect(screen.queryByText("from the kitchen")).not.toBeInTheDocument(),
+      expect(
+        screen.queryByText("from the kitchen", inThread),
+      ).not.toBeInTheDocument(),
     );
-    expect(screen.getByText("from the spare")).toBeInTheDocument();
+    expect(screen.getByText("from the spare", inThread)).toBeInTheDocument();
   });
 });
 
@@ -1662,9 +1685,11 @@ describe("clear all messages (All phones page)", () => {
     });
     const user = userEvent.setup();
     render(<Dashboard username="admin" onLogout={() => {}} />);
-    await screen.findByText("keep me maybe");
+    await screen.findByText("keep me maybe", inThread);
     if (selectPhone)
-      await user.click(await screen.findByRole("button", { name: /kitchen/i }));
+      await user.click(
+        await within(phonesNav()).findByRole("button", { name: /kitchen/i }),
+      );
     return user;
   };
   const openDialog = async (user) => {
@@ -1715,7 +1740,7 @@ describe("clear all messages (All phones page)", () => {
     await user.click(within(dialog).getByRole("button", { name: /cancel/i }));
 
     expect(called).toBe(false);
-    expect(screen.getByText("keep me maybe")).toBeInTheDocument();
+    expect(screen.getByText("keep me maybe", inThread)).toBeInTheDocument();
   });
 
   it("deletes everything once confirmed, closes and empties the list", async () => {
@@ -1730,7 +1755,9 @@ describe("clear all messages (All phones page)", () => {
     );
 
     await waitFor(() =>
-      expect(screen.queryByText("keep me maybe")).not.toBeInTheDocument(),
+      expect(
+        screen.queryByText("keep me maybe", inThread),
+      ).not.toBeInTheDocument(),
     );
     expect(
       screen.queryByRole("dialog", { name: /clear all messages/i }),
@@ -1753,7 +1780,7 @@ describe("clear all messages (All phones page)", () => {
     expect(
       await within(dialog).findByText(/could not clear the messages/i),
     ).toBeInTheDocument();
-    expect(screen.getByText("keep me maybe")).toBeInTheDocument();
+    expect(screen.getByText("keep me maybe", inThread)).toBeInTheDocument();
   });
 
   it("empties the list when another dashboard clears everything", async () => {
@@ -1762,7 +1789,9 @@ describe("clear all messages (All phones page)", () => {
     act(() => FakeEventSource.current.emit("messages_cleared_all", {}));
 
     await waitFor(() =>
-      expect(screen.queryByText("keep me maybe")).not.toBeInTheDocument(),
+      expect(
+        screen.queryByText("keep me maybe", inThread),
+      ).not.toBeInTheDocument(),
     );
   });
 });
