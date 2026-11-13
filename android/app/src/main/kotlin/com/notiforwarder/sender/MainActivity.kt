@@ -1,7 +1,6 @@
 package com.notiforwarder.sender
 
 import android.Manifest
-import android.content.ComponentName
 import android.graphics.Color
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -124,22 +123,11 @@ class MainActivity : ComponentActivity() {
     }
 
     /**
-     * Opens the page where this phone's maker keeps the "start by itself" list, if we know it. Names
-     * differ between versions, so each is tried and the app's own settings page is the fallback.
+     * Opens this app's info page. No app can open the maker's own auto-start list (OnePlus keeps it
+     * behind a permission), so the screen next to the button says which taps to make from here.
      */
     private fun openAutoStart() {
-        val pages = autoStartPages(Build.MANUFACTURER).map { page ->
-            Intent().setComponent(ComponentName(page.packageName, page.className))
-        }
-        val own = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName"))
-        for (intent in pages + own) {
-            try {
-                startActivity(intent)
-                return
-            } catch (_: RuntimeException) {
-                // not on this phone: try the next page
-            }
-        }
+        startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName")))
     }
 
     private fun scanQr(onResult: (String) -> Unit) {

@@ -140,7 +140,7 @@ internal fun StatusScreen(
             CheckRow(
                 text = "Auto-start",
                 ok = false,
-                detail = "Make sure it is allowed for this app",
+                detail = autoStartHelp(android.os.Build.MANUFACTURER),
                 action = "Open",
                 onAction = onOpenAutoStart,
             )

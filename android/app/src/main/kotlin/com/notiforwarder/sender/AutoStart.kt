@@ -1,19 +1,13 @@
 package com.notiforwarder.sender
 
-/** An activity (package, class) that holds a maker's "allow this app to start by itself" list. */
-data class SettingsPage(val packageName: String, val className: String)
-
 /**
- * Where OnePlus, Oppo and Realme phones keep the auto-start list. Android has no standard page for
- * it and the names change between versions, so the caller tries each and falls back to the app's
- * own settings page when none opens. Other makers have no such list.
+ * What to tell the user about letting this app start by itself. Android has no standard page for
+ * it, and OnePlus/Oppo/Realme keep theirs behind a permission and an unexported screen that no
+ * other app can open. The one page we can open is this app's own info page, and on those phones
+ * the switch is two taps from there.
  */
-fun autoStartPages(manufacturer: String): List<SettingsPage> = when (manufacturer.lowercase()) {
-    "oneplus", "oppo", "realme" -> listOf(
-        SettingsPage("com.oplus.battery", "com.oplus.startupapp.StartupAppListActivity"),
-        SettingsPage("com.coloros.safecenter", "com.coloros.safecenter.startupapp.StartupAppListActivity"),
-        SettingsPage("com.coloros.safecenter", "com.coloros.safecenter.permission.startup.StartupAppListActivity"),
-        SettingsPage("com.oneplus.security", "com.oneplus.security.chainlaunch.view.ChainLaunchAppListActivity"),
-    )
-    else -> emptyList()
+fun autoStartHelp(manufacturer: String): String = when (manufacturer.lowercase()) {
+    "oneplus", "oppo", "realme" ->
+        "Tap Battery usage, then switch on Allow auto-launch and Allow background activity"
+    else -> "Allow this app to run in the background and to start by itself in your phone's settings"
 }
