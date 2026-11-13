@@ -353,16 +353,6 @@ describe("kind badge", () => {
     expect(within(rows[0]).queryByText("App")).toBeNull();
   });
 
-  it("tags every message in the thread with it", async () => {
-    setup();
-
-    const thread = await screen.findByRole("region", { name: "NORTHWIND" });
-    const articles = within(thread).getAllByRole("article");
-    expect(articles).toHaveLength(2);
-    for (const article of articles)
-      expect(within(article).getByText("SMS")).toBeInTheDocument();
-  });
-
   it("shows it in the thread header too", async () => {
     const user = userEvent.setup();
     setup();

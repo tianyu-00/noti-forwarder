@@ -8,7 +8,9 @@ export default function KindBadge({ type }) {
     <span
       className={clsx(
         "inline-block rounded-full px-2 py-px text-[11px] font-semibold",
-        sms ? "bg-accent-soft text-accent-ink" : "bg-raised text-muted",
+        sms
+          ? "bg-accent-soft text-accent-ink"
+          : "bg-surface text-muted ring-1 ring-faint/40",
       )}
     >
       {sms ? "SMS" : "App"}
