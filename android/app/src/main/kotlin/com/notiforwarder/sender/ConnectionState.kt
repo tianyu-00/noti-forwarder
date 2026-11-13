@@ -12,3 +12,15 @@ fun describeConnection(state: ConnectionState): ConnectionLabel = when (state) {
     ConnectionState.Reconnecting -> ConnectionLabel("Reconnecting…", good = false)
     ConnectionState.Stopped -> ConnectionLabel("Not connected", good = false)
 }
+
+/** The big word on the status card. */
+fun connectionHeadline(state: ConnectionState): String = when (state) {
+    ConnectionState.Connected -> "Connected"
+    ConnectionState.Connecting -> "Connecting…"
+    ConnectionState.Reconnecting -> "Reconnecting…"
+    ConnectionState.Stopped -> "Not connected"
+}
+
+/** "https://notify.example.com/" -> "notify.example.com", for "Sending to …". */
+fun serverName(serverUrl: String): String =
+    if ("://" in serverUrl) serverUrl.substringAfter("://").trimEnd('/') else serverUrl
