@@ -5,7 +5,12 @@ export function matchesView(message, { selected, filters }) {
   if (filters.app && message.app !== filters.app) return false;
   if (filters.q) {
     const q = filters.q.toLowerCase();
-    const haystack = [message.body, message.sender, message.app]
+    const haystack = [
+      message.body,
+      message.sender,
+      message.app,
+      message.appLabel ?? "",
+    ]
       .join("\n")
       .toLowerCase();
     if (!haystack.includes(q)) return false;

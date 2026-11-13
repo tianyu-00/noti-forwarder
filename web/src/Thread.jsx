@@ -14,6 +14,8 @@ const messageShape = PropTypes.shape({
   sender: PropTypes.string,
   body: PropTypes.string.isRequired,
   receivedAt: PropTypes.string.isRequired,
+  // The app's real name as the phone shows it, or null.
+  appLabel: PropTypes.string,
   // The one-time (2FA) code found in the text, digits only, or null.
   code: PropTypes.string,
   // Set by the dashboard when an encrypted message cannot be shown: 'no-key' or 'wrong-key'.
@@ -191,6 +193,12 @@ export default function Thread({ conversation, deviceName, onBack, actions }) {
             <p className="mt-0.5 flex items-center gap-2 text-xs text-muted">
               <KindBadge type={conversation.type} />
               {deviceName ?? "Unknown phone"}
+              {conversation.type === "notification" &&
+                conversation.app !== conversation.name && (
+                  <span className="truncate text-faint">
+                    · {conversation.app}
+                  </span>
+                )}
             </p>
           </div>
         </div>
@@ -237,6 +245,7 @@ Thread.propTypes = {
   conversation: PropTypes.shape({
     name: PropTypes.string.isRequired,
     type: PropTypes.string.isRequired,
+    app: PropTypes.string,
     messages: PropTypes.arrayOf(messageShape).isRequired,
   }).isRequired,
   deviceName: PropTypes.string,

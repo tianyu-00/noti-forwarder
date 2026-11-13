@@ -371,3 +371,42 @@ describe("kind badge", () => {
     ).toBeInTheDocument();
   });
 });
+
+describe("app names", () => {
+  function openGmail() {
+    mockApi({
+      devices: phones,
+      messages: [
+        message({
+          deviceId: "a",
+          type: "notification",
+          app: "com.google.android.gm",
+          appLabel: "Gmail",
+          sender: "Tian",
+          body: "Run failed",
+        }),
+      ],
+    });
+    render(<Dashboard username="admin" onLogout={() => {}} />);
+  }
+
+  it("shows the real name in the list and the thread, and the package in the header", async () => {
+    openGmail();
+
+    const thread = await screen.findByRole("region", { name: "Gmail" });
+    expect(
+      (await conversations()).getByRole("button", { name: /Gmail/ }),
+    ).toBeInTheDocument();
+    expect(within(thread).getByRole("banner")).toHaveTextContent(
+      "com.google.android.gm",
+    );
+  });
+
+  it("lists the app by its real name in the app filter", async () => {
+    openGmail();
+    await screen.findByRole("region", { name: "Gmail" });
+
+    const option = await screen.findByRole("option", { name: "Gmail" });
+    expect(option).toHaveValue("com.google.android.gm");
+  });
+});

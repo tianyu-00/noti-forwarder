@@ -11,9 +11,11 @@ export function conversationDevice(id) {
   return JSON.parse(id)[0];
 }
 
-function conversationName(m) {
+// A notification conversation is named after the app as the phone shows it ("Gmail"). Any
+// message of the conversation may know that name, since older ones were sent without it.
+function conversationName(m, label) {
   if (m.type === "sms") return m.sender || "Unknown sender";
-  return m.app;
+  return label ?? m.app;
 }
 
 export function groupConversations(messages) {
@@ -27,13 +29,16 @@ export function groupConversations(messages) {
         id: key,
         deviceId: m.deviceId,
         type: m.type,
-        name: conversationName(m),
+        app: m.app,
+        name: conversationName(m, null),
         latest: m,
         messages: [],
       };
       byKey.set(key, conversation);
     }
     conversation.messages.push(m);
+    if (m.type !== "sms" && m.appLabel && conversation.name === m.app)
+      conversation.name = m.appLabel;
   }
   // Map keeps insertion order, which is already newest conversation first.
   return [...byKey.values()];

@@ -10,7 +10,7 @@ const TYPES = [
 
 const SEARCH_DEBOUNCE_MS = 250;
 
-export default function Filters({ filters, apps, onChange }) {
+export default function Filters({ filters, apps, appNames = {}, onChange }) {
   const [text, setText] = useState(filters.q);
 
   // Debounce typing so each keystroke does not trigger a request.
@@ -65,7 +65,7 @@ export default function Filters({ filters, apps, onChange }) {
           <option value="">All apps</option>
           {apps.map((a) => (
             <option key={a} value={a}>
-              {a}
+              {appNames[a] ?? a}
             </option>
           ))}
         </select>
@@ -81,5 +81,7 @@ Filters.propTypes = {
     q: PropTypes.string.isRequired,
   }).isRequired,
   apps: PropTypes.arrayOf(PropTypes.string).isRequired,
+  // Real app names by package name, where the phones have sent them.
+  appNames: PropTypes.objectOf(PropTypes.string),
   onChange: PropTypes.func.isRequired,
 };

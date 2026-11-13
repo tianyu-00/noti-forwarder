@@ -123,3 +123,47 @@ describe("conversationDevice", () => {
     expect(conversationDevice(c.id)).toBe("phone-7");
   });
 });
+
+describe("app names", () => {
+  const gmail = {
+    deviceId: "a",
+    type: "notification",
+    app: "com.google.android.gm",
+  };
+
+  it("names a notification conversation after the app's real name", () => {
+    const [c] = groupConversations([message({ ...gmail, appLabel: "Gmail" })]);
+
+    expect(c.name).toBe("Gmail");
+    expect(c.app).toBe("com.google.android.gm");
+  });
+
+  it("finds the name on an older message when the newest has none", () => {
+    const [c] = groupConversations([
+      message({ ...gmail, appLabel: null }),
+      message({ ...gmail, appLabel: "Gmail" }),
+    ]);
+
+    expect(c.name).toBe("Gmail");
+  });
+
+  it("keeps the package name when no message knows the app's name", () => {
+    const [c] = groupConversations([message({ ...gmail, appLabel: null })]);
+
+    expect(c.name).toBe("com.google.android.gm");
+  });
+
+  it("never renames a text conversation, which belongs to a sender", () => {
+    const [c] = groupConversations([
+      message({
+        deviceId: "a",
+        type: "sms",
+        app: "sms",
+        sender: "NORTHWIND",
+        appLabel: "Messages",
+      }),
+    ]);
+
+    expect(c.name).toBe("NORTHWIND");
+  });
+});

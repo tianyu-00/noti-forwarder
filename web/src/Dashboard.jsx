@@ -25,6 +25,13 @@ import { useE2eKey } from "./keyStore.js";
 import { readMessage } from "./readable.js";
 import { useNow } from "./useNow.js";
 
+// Package name -> real app name, for the messages that carry one.
+function namesOf(list) {
+  const names = {};
+  for (const m of list) if (m.appLabel) names[m.app] = m.appLabel;
+  return names;
+}
+
 function withoutDevice(unread, deviceId) {
   return Object.fromEntries(
     Object.entries(unread).filter(
@@ -74,6 +81,8 @@ export default function Dashboard({ username, onLogout, pairingTiming }) {
   const [threadShown, setThreadShown] = useState(false);
   const [filters, setFilters] = useState({ type: "", app: "", q: "" });
   const [apps, setApps] = useState([]);
+  // Real app names by package name. Accumulated like `apps`, so they outlive a filter change.
+  const [appNames, setAppNames] = useState({});
   // Messages that arrived while their conversation was not open: conversation id -> count.
   const [unread, setUnread] = useState({});
   const e2eKey = useE2eKey();
@@ -171,6 +180,7 @@ export default function Dashboard({ username, onLogout, pairingTiming }) {
         setApps((known) =>
           known.includes(m.app) ? known : [...known, m.app].sort(),
         );
+        setAppNames((known) => ({ ...known, ...namesOf([m]) }));
       }
       // Unread unless its conversation is the one open. A message from a phone that is not the
       // one being viewed has no row here, but it still counts for that phone.
@@ -220,6 +230,7 @@ export default function Dashboard({ username, onLogout, pairingTiming }) {
         setLoadError(null);
         setOlderFailed(false);
         setMessages(m.messages);
+        setAppNames((known) => ({ ...known, ...namesOf(m.messages) }));
         setNextBefore(m.nextBefore);
         // Accumulate so the app choices do not shrink to the filtered result.
         setApps((known) =>
@@ -255,6 +266,7 @@ export default function Dashboard({ username, onLogout, pairingTiming }) {
       if (JSON.stringify(view.current) !== viewAtStart) return;
       setLoadError(null);
       setOlderFailed(false);
+      setAppNames((known) => ({ ...known, ...namesOf(page.messages) }));
       setMessages((list) => [
         ...list,
         ...page.messages.filter((m) => !list.some((x) => x.id === m.id)),
@@ -403,7 +415,12 @@ export default function Dashboard({ username, onLogout, pairingTiming }) {
               )
             )}
           </div>
-          <Filters filters={filters} apps={apps} onChange={setFilters} />
+          <Filters
+            filters={filters}
+            apps={apps}
+            appNames={appNames}
+            onChange={setFilters}
+          />
           {loadError && (
             <p role="alert" className="px-5 pb-3 text-sm text-danger">
               {loadError}
