@@ -59,6 +59,12 @@ function replyBlock(conversation, device, key) {
     return "Add the encryption key in Settings to reply";
   if (latest.encrypted && !key)
     return "Add the encryption key in Settings to reply";
+  // Practice mode receives and checks replies but never sends, so nothing below can stop it.
+  if (device?.replies?.practice) return null;
+  if (device?.replies && !device.replies.on)
+    return "Replies are off on this phone. Turn on \u201cReply from the dashboard\u201d in the app, under Forward.";
+  if (device?.replies && !device.replies.permission)
+    return "This phone may not send texts. In the app, switch \u201cReply from the dashboard\u201d off and on again to allow it.";
   if (device?.sims?.length === 0)
     return "This phone shares no SIMs. In the app, allow phone access, then allow a SIM under Forward.";
   if (device?.sims?.length > 0 && !device.sims.some((s) => s.allowed))
@@ -197,7 +203,9 @@ export default function Dashboard({ username, onLogout, pairingTiming }) {
     device_sims: (d) =>
       setDevices((list) =>
         list.map((x) =>
-          x.deviceId === d.deviceId ? { ...x, sims: d.sims } : x,
+          x.deviceId === d.deviceId
+            ? { ...x, sims: d.sims, replies: d.replies ?? null }
+            : x,
         ),
       ),
     // The phone's connection opened or closed: the green dot follows it exactly.
@@ -541,6 +549,10 @@ export default function Dashboard({ username, onLogout, pairingTiming }) {
               onBack={threadShown ? () => setThreadShown(false) : undefined}
               replies={threadReplies}
               onReply={sendReply}
+              simOptional={
+                devices.find((d) => d.deviceId === openConversation.deviceId)
+                  ?.replies?.practice === true
+              }
               sims={
                 devices.find((d) => d.deviceId === openConversation.deviceId)
                   ?.sims ?? null

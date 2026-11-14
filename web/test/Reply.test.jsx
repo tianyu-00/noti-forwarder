@@ -166,7 +166,7 @@ describe("replying to a text from the dashboard", () => {
       }),
     );
     await waitFor(() => expect(mine).toHaveTextContent(/not sent/i));
-    expect(mine).toHaveTextContent(/allow the phone to send texts/i);
+    expect(mine).toHaveTextContent(/may not send texts/i);
 
     act(() =>
       FakeEventSource.current.emit("outbox", {

@@ -21,10 +21,14 @@ const text = (o) =>
     ...o,
   });
 
-async function open({ sims, messages = [text({ sim: 3 })] } = {}) {
+async function open({
+  sims,
+  replies = null,
+  messages = [text({ sim: 3 })],
+} = {}) {
   const posted = [];
   mockApi({
-    devices: [device({ deviceId: "a", name: "Kitchen", sims })],
+    devices: [device({ deviceId: "a", name: "Kitchen", sims, replies })],
     messages,
   });
   server.use(
@@ -203,5 +207,91 @@ describe("choosing the SIM for a reply", () => {
     expect(
       within(simBox(thread)).getByRole("option", { name: /China Mobile/ }),
     ).toBeDisabled();
+  });
+});
+
+describe("when the phone does not take replies", () => {
+  const ON = { on: true, permission: true, practice: false };
+
+  it("leaves the reply box on for a phone that has not said (or an older phone)", async () => {
+    const { thread } = await open({ sims: [CHINA], replies: null });
+
+    expect(box(thread)).toBeEnabled();
+  });
+
+  it("leaves the reply box on when replies are on and allowed", async () => {
+    const { thread } = await open({ sims: [CHINA], replies: ON });
+
+    expect(box(thread)).toBeEnabled();
+  });
+
+  it("switches the box off, with the reason, when replies are off on the phone", async () => {
+    const { thread } = await open({
+      sims: [CHINA],
+      replies: { ...ON, on: false },
+    });
+
+    expect(box(thread)).toBeDisabled();
+    expect(box(thread)).toHaveAttribute(
+      "placeholder",
+      "Replies are off on this phone. Turn on \u201cReply from the dashboard\u201d in the app, under Forward.",
+    );
+  });
+
+  it("switches the box off when the phone may not send texts", async () => {
+    const { thread } = await open({
+      sims: [CHINA],
+      replies: { ...ON, permission: false },
+    });
+
+    expect(box(thread)).toBeDisabled();
+    expect(box(thread)).toHaveAttribute(
+      "placeholder",
+      "This phone may not send texts. In the app, switch \u201cReply from the dashboard\u201d off and on again to allow it.",
+    );
+  });
+
+  it("says replies are off before it says anything about SIMs", async () => {
+    const { thread } = await open({ sims: [], replies: { ...ON, on: false } });
+
+    expect(box(thread)).toHaveAttribute(
+      "placeholder",
+      expect.stringMatching(/^Replies are off/),
+    );
+  });
+
+  it("keeps the box on in practice mode, which never sends, even with replies off and no SIM allowed", async () => {
+    const user = userEvent.setup();
+    const { posted, thread } = await open({
+      sims: [{ ...CHINA, allowed: false }],
+      replies: { on: false, permission: false, practice: true },
+    });
+
+    expect(box(thread)).toBeEnabled();
+    await user.type(box(thread), "just trying");
+    await user.click(send(thread));
+    await waitFor(() =>
+      expect(posted).toEqual([
+        { deviceId: "a", to: NUMBER, body: "just trying" },
+      ]),
+    );
+  });
+
+  it("follows the phone when it switches replies on or off", async () => {
+    const { thread } = await open({
+      sims: [CHINA],
+      replies: { ...ON, on: false },
+    });
+    expect(box(thread)).toBeDisabled();
+
+    act(() =>
+      FakeEventSource.current.emit("device_sims", {
+        deviceId: "a",
+        sims: [CHINA],
+        replies: ON,
+      }),
+    );
+
+    await waitFor(() => expect(box(thread)).toBeEnabled());
   });
 });

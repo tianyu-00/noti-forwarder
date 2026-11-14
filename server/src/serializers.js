@@ -20,6 +20,13 @@ export function messageToApi(row) {
   };
 }
 
+// `devices.sims` holds {sims, replies}. Rows written before replies were reported hold just the SIM array.
+function simsOf(text) {
+  if (!text) return { sims: null, replies: null };
+  const stored = JSON.parse(text);
+  return Array.isArray(stored) ? { sims: stored, replies: null } : { sims: stored.sims, replies: stored.replies ?? null };
+}
+
 // token_hash is never part of the API shape.
 export function deviceToApi(row) {
   return {
@@ -30,8 +37,8 @@ export function deviceToApi(row) {
     pairedAt: row.paired_at.toISOString(),
     lastSeen: row.last_seen ? row.last_seen.toISOString() : null,
     revokedAt: row.revoked_at ? row.revoked_at.toISOString() : null,
-    // null until the phone reports its SIMs.
-    sims: row.sims ? JSON.parse(row.sims) : null,
+    // null until the phone reports its SIMs and whether it takes replies.
+    ...simsOf(row.sims),
   };
 }
 

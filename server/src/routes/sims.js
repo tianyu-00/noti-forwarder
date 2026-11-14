@@ -15,9 +15,12 @@ const simsSchema = z.object({
       }),
     )
     .max(8),
+  // Whether the phone takes replies: the switch is on, it may send texts, and practice mode (which
+  // receives and checks replies but never sends). Optional: older phones report SIMs only.
+  replies: z.object({ on: z.boolean(), permission: z.boolean(), practice: z.boolean() }).optional(),
 });
 
-/** The phone lists its SIMs and which of them it allows for replies, so the dashboard can offer a choice. */
+/** The phone lists its SIMs (and which it allows for replies) and whether it takes replies at all, so the dashboard can offer a choice or say why not. */
 export function simsRouter({ db, events, preAuthRateLimit = { limit: 600, windowMs: 60000 } }) {
   const router = Router();
   const perIp = rateLimit({ ...preAuthRateLimit, key: (req) => req.ip });
@@ -26,9 +29,9 @@ export function simsRouter({ db, events, preAuthRateLimit = { limit: 600, window
     try {
       const parsed = simsSchema.safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ error: 'invalid_payload' });
-      const { sims } = parsed.data;
-      await db.query('UPDATE devices SET sims = $2 WHERE device_id = $1', [req.deviceId, JSON.stringify(sims)]);
-      events?.publish('device_sims', { deviceId: req.deviceId, sims });
+      const { sims, replies = null } = parsed.data;
+      await db.query('UPDATE devices SET sims = $2 WHERE device_id = $1', [req.deviceId, JSON.stringify({ sims, replies })]);
+      events?.publish('device_sims', { deviceId: req.deviceId, sims, replies });
       res.status(204).end();
     } catch (err) {
       next(err);

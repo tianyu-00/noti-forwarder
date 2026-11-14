@@ -21,7 +21,8 @@ beforeAll(async () => {
 afterAll(() => ctx.pool.end());
 
 const bearer = (token) => ({ Authorization: `Bearer ${token}` });
-const putSims = (token, sims) => request(ctx.app).put('/api/v1/sims').set(bearer(token)).send({ sims });
+const putSims = (token, sims, replies) =>
+  request(ctx.app).put('/api/v1/sims').set(bearer(token)).send(replies === undefined ? { sims } : { sims, replies });
 const device = async (id) => (await agent.get('/api/v1/devices')).body.devices.find((d) => d.deviceId === id);
 const SIMS = [
   { id: 3, slot: 1, name: 'China Mobile', allowed: false },
@@ -69,7 +70,7 @@ describe('PUT /api/v1/sims (the phone lists its SIMs)', () => {
     let event;
     for (let i = 0; i < 10 && event?.event !== 'device_sims'; i++) event = await stream.next();
     expect(event.event).toBe('device_sims');
-    expect(event.data).toEqual({ deviceId: d.deviceId, sims: SIMS });
+    expect(event.data).toEqual({ deviceId: d.deviceId, sims: SIMS, replies: null });
     stream.close();
   });
 
@@ -84,6 +85,67 @@ describe('PUT /api/v1/sims (the phone lists its SIMs)', () => {
       [{ id: 1, slot: 1, name: 'A', allowed: 'yes' }],
     ];
     for (const sims of bad) expect((await putSims(d.token, sims)).status).toBe(400);
+  });
+});
+
+describe('the phone also says whether it accepts replies', () => {
+  const REPLIES = { on: true, permission: true, practice: false };
+
+  it('is null until the phone reports, and also for a phone that reports SIMs only', async () => {
+    const d = await ctx.addDevice();
+    expect((await device(d.deviceId)).replies).toBeNull();
+
+    await putSims(d.token, SIMS);
+
+    expect((await device(d.deviceId)).replies).toBeNull();
+  });
+
+  it('is stored and shown with the phone, next to its SIMs', async () => {
+    const d = await ctx.addDevice();
+
+    expect((await putSims(d.token, SIMS, REPLIES)).status).toBe(204);
+
+    const shown = await device(d.deviceId);
+    expect(shown.replies).toEqual(REPLIES);
+    expect(shown.sims).toEqual(SIMS);
+  });
+
+  it('follows the latest report', async () => {
+    const d = await ctx.addDevice();
+    await putSims(d.token, SIMS, REPLIES);
+
+    await putSims(d.token, SIMS, { on: false, permission: true, practice: true });
+
+    expect((await device(d.deviceId)).replies).toEqual({ on: false, permission: true, practice: true });
+  });
+
+  it('is sent to open dashboards with the SIMs', async () => {
+    const d = await ctx.addDevice();
+    const stream = await openStream(ctx.app, { cookie });
+
+    await putSims(d.token, SIMS, REPLIES);
+
+    let event;
+    for (let i = 0; i < 10 && event?.event !== 'device_sims'; i++) event = await stream.next();
+    expect(event.data).toEqual({ deviceId: d.deviceId, sims: SIMS, replies: REPLIES });
+    stream.close();
+  });
+
+  it('still reads a SIM list stored before replies were reported', async () => {
+    const d = await ctx.addDevice();
+    await ctx.pool.query('UPDATE devices SET sims = $2 WHERE device_id = $1', [d.deviceId, JSON.stringify(SIMS)]);
+
+    const shown = await device(d.deviceId);
+
+    expect(shown.sims).toEqual(SIMS);
+    expect(shown.replies).toBeNull();
+  });
+
+  it('refuses a malformed report', async () => {
+    const d = await ctx.addDevice();
+    for (const replies of [{ on: true }, { on: 'yes', permission: true, practice: false }, 'on', []]) {
+      expect((await putSims(d.token, SIMS, replies)).status).toBe(400);
+    }
   });
 });
 

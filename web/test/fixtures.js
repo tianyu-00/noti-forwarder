@@ -15,6 +15,7 @@ export function device(overrides = {}) {
     lastSeen: new Date().toISOString(),
     revokedAt: null,
     sims: null,
+    replies: null,
     ...overrides,
   };
 }

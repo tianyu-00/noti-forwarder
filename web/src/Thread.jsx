@@ -184,9 +184,9 @@ const replyShape = PropTypes.shape({
 // What the phone reports when it cannot send, in plain words.
 const FAILURES = {
   no_permission:
-    "Allow the phone to send texts: turn on Replies in the Notiforwarder app.",
+    "The phone may not send texts. In the app, switch \u201cReply from the dashboard\u201d off and on again to allow it.",
   replies_off:
-    "Allow the phone to send texts: turn on Replies in the Notiforwarder app.",
+    "Replies are off on the phone. Turn on \u201cReply from the dashboard\u201d in the app, under Forward.",
   expired: "The phone was offline too long, so it was not sent.",
   no_key: "The phone does not have the encryption key for this reply.",
   practice:
@@ -246,7 +246,7 @@ function ReplyBubble({ reply }) {
 ReplyBubble.propTypes = { reply: replyShape.isRequired };
 
 // The box under a thread. `blockedReason` is the placeholder shown while replying is not possible.
-function Composer({ onSend, blockedReason, sims, receivedSim }) {
+function Composer({ onSend, blockedReason, sims, receivedSim, simOptional }) {
   const [text, setText] = useState("");
   const [picked, setPicked] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -260,7 +260,10 @@ function Composer({ onSend, blockedReason, sims, receivedSim }) {
       ? picked
       : defaultSim(sims, receivedSim);
   const ready =
-    !blocked && !busy && text.trim() !== "" && (!choosable || chosen != null);
+    !blocked &&
+    !busy &&
+    text.trim() !== "" &&
+    (!choosable || chosen != null || simOptional);
 
   async function send() {
     if (!ready) return;
@@ -356,6 +359,8 @@ Composer.propTypes = {
   blockedReason: PropTypes.string,
   sims: PropTypes.arrayOf(simShape),
   receivedSim: PropTypes.number,
+  // Practice mode never sends, so no SIM has to be chosen.
+  simOptional: PropTypes.bool,
 };
 
 /** One conversation: a header, its messages and replies oldest first, and a reply box. */
@@ -368,6 +373,7 @@ export default function Thread({
   onReply,
   replyBlockedReason = null,
   sims = null,
+  simOptional = false,
 }) {
   // Messages and our replies in one timeline, oldest first (a tie keeps the message first).
   const timeline = [
@@ -441,6 +447,7 @@ export default function Thread({
         blockedReason={replyBlockedReason}
         sims={sims}
         receivedSim={conversation.latest?.sim ?? undefined}
+        simOptional={simOptional}
       />
     </section>
   );
@@ -468,4 +475,5 @@ Thread.propTypes = {
   replyBlockedReason: PropTypes.string,
   // The phone's SIMs, or null until it has listed them.
   sims: PropTypes.arrayOf(simShape),
+  simOptional: PropTypes.bool,
 };
