@@ -50,6 +50,18 @@ class OutboxClientTest {
     }
 
     @Test
+    fun `reads the SIM the dashboard chose, and none when it chose none`() {
+        json(
+            200,
+            """{"replies":[{"id":"r1","to":"+1555","body":"a","sim":5},{"id":"r2","to":"+1555","body":"b","sim":null},{"id":"r3","to":"+1555","body":"c"}]}""",
+        )
+
+        val outcome = client().pending() as PendingOutcome.Replies
+
+        assertEquals(listOf<Int?>(5, null, null), outcome.replies.map { it.sim })
+    }
+
+    @Test
     fun `an empty list is fine`() {
         json(200, """{"replies":[]}""")
 

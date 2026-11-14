@@ -18,6 +18,7 @@ class HeartbeatWorker(context: Context, params: WorkerParameters) : Worker(conte
     override fun doWork(): Result {
         val app = applicationContext as NotiApp
         app.heartbeat.send()
+        app.reportSims()
         app.sendReplies() // a phone whose live connection was cut still collects replies now and then
         return Result.success()
     }

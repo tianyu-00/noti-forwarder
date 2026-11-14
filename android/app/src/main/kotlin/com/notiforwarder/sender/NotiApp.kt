@@ -51,6 +51,20 @@ class NotiApp : Application() {
     }
     private val replyThread = Executors.newSingleThreadExecutor { r -> Thread(r, "replies").apply { isDaemon = true } }
 
+    // Tells the server which SIMs this phone has and allows, so the dashboard can offer them.
+    private val simReporter by lazy {
+        SimReporter(
+            SimsClient(store, appVersion = BuildConfig.VERSION_NAME, onRevoked = { controller.refresh() }),
+            installed = simLookup::activeSims,
+            allowed = { settingsStore.load().allowedSims },
+        )
+    }
+
+    /** Sends the SIM list if it changed (or [force], for a fresh pairing). Returns at once. */
+    fun reportSims(force: Boolean = false) {
+        replyThread.execute { runCatching { simReporter.report(force) } }
+    }
+
     /** Looks for replies waiting on the server and sends them. Returns at once. */
     fun sendReplies() {
         replyThread.execute { runCatching { replyProcessor.process() } }
@@ -67,7 +81,7 @@ class NotiApp : Application() {
     val deviceStream: DeviceStreamRunner by lazy {
         DeviceStreamRunner(
             // Each time it connects, collect replies that were queued while the phone was away.
-            connect = { onConnected -> streamClient.run { onConnected(); sendReplies() } },
+            connect = { onConnected -> streamClient.run { onConnected(); sendReplies(); reportSims() } },
             store = store,
             onRevoked = { controller.refresh() },
             cancel = streamClient::cancel,
@@ -111,6 +125,7 @@ class NotiApp : Application() {
             onPaired = {
                 scheduler.flushSoon()
                 deviceStream.start()
+                reportSims(force = true) // a new pairing: the server has not seen this phone's SIMs
             },
             // No point keeping a "running" notice on screen for a phone that is not paired.
             onUnpaired = {

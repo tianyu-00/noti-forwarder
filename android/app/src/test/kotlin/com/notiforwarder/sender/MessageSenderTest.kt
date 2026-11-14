@@ -207,6 +207,26 @@ class MessageSenderTest {
     }
 
     @Test
+    fun `sends which SIM received a text, readable even when the text is encrypted`() {
+        store.save(Credentials(store.load()!!.serverUrl, "dev-1", "device-token", e2eKey = "A".repeat(43)))
+        reply(201, """{"stored":1,"duplicates":0}""")
+        sender = MessageSender(store, appVersion = "0.1.0")
+
+        sender.send(listOf(message.copy(type = "sms", app = "sms", sim = 5)))
+
+        assertEquals(5, sentFirst()["sim"]!!.jsonPrimitive.content.toInt())
+    }
+
+    @Test
+    fun `leaves the SIM out when there is none`() {
+        reply(201, """{"stored":1,"duplicates":0}""")
+
+        sender.send(listOf(message))
+
+        assertFalse(sentFirst().containsKey("sim"))
+    }
+
+    @Test
     fun `leaves the name out when the phone does not know the app`() {
         reply(201, """{"stored":1,"duplicates":0}""")
         sender = MessageSender(store, appVersion = "0.1.0", appLabel = { null })

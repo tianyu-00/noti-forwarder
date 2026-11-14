@@ -95,6 +95,7 @@ Table `messages`:
 - `device_id` (text, which phone sent it)
 - `type` (`sms` | `notification`)
 - `app` (package name, or `sms`)
+- `sim` (nullable integer; the phone's subscription id of the SIM that received a text, sent by the phone as `sim` on SMS only, never encrypted; notifications and older phones have none)
 - `app_label` (nullable; the app's real name as the phone shows it, e.g. `Gmail`, sent by the phone as `appLabel` on notifications only, never encrypted; older phones and older rows have none and the dashboard falls back to the package name)
 - `sender` / `title`
 - `body`
@@ -102,7 +103,7 @@ Table `messages`:
 - `created_at` (timestamptz, server)
 - `dedupe_hash` (hash of device + app + sender + body + the phone's exact timestamp to the millisecond; so only the same notification delivered twice is dropped, and the same text arriving later is kept)
 
-Table `devices`: `device_id`, `name`, `model`, `app_version`, `token_hash`, `paired_at`, `last_seen`, `revoked_at`.
+Table `devices`: `device_id`, `name`, `model`, `app_version`, `token_hash`, `paired_at`, `last_seen`, `revoked_at`, `sims` (JSON text, null until the phone reports: `{id, slot, name, allowed}` per SIM; migration 003).
 
 Table `pairing_codes`: `code_hash`, `created_at`, `expires_at`, `used_at`, `device_id` (set when used).
 
@@ -129,6 +130,7 @@ Table `audit_log`: `id`, `event` (login, pair, revoke, ...), `actor`, `device_id
 - `GET /api/v1/device-stream` (device token, SSE) : the phone's open connection. While it is open the phone is `connected` (in `GET /devices` and in `device_presence` events to dashboards); the server sends `revoked` down it. Presence is in memory (`server/src/presence.js`). One connection per phone; a new one replaces the old. A phone that loses its network never closes the connection and the server cannot tell from its side for many minutes (the 25 s pings only reach a socket buffer), so the app sends `POST /heartbeat` every 25 s while connected (`DeviceStreamClient`), `presence.touch` records it, and a sweep drops connections silent for 60 s (`presence.dropStale`). The dashboard shows "Online" only while `connected`.
 - `POST /api/v1/outbox` (dashboard session + CSRF), `GET /api/v1/outbox?device=` (dashboard session): SMS replies typed on the dashboard. A reply is `{deviceId, to, body}`, queued as `queued`, then `sent` or `failed` with a short reason code (`replies_off`, `no_permission`, `no_service`, `expired`, ... never text). The number and text are plain, or `e2e:v1:` text the browser encrypted (fields `reply-to` and `reply-body`, random nonce) when the conversation's own messages were encrypted; the server only size-checks them. A new reply is pushed to the target phone down `device-stream` as an `outbox` event and to dashboards as an `outbox` event.
 - `GET /api/v1/outbox/pending` and `POST /api/v1/outbox/:id/result` (device token): the phone fetches its queued replies (also on every reconnect and heartbeat), sends each with `SmsManager` and reports `{status: sent|failed, error?}`. Replies not collected within an hour (`outboxMaxAgeMs`) fail as `expired` instead of going out late. Clearing messages or erasing a phone also removes its replies.
+- `PUT /api/v1/sims` (device token): the phone lists its SIMs (`id` = subscription id, `slot` from 1, carrier `name`, never a number, `allowed`). Stored on the device, shown in `GET /devices` as `sims`, and pushed to dashboards as a `device_sims` event. The phone sends it when the list changes (settings change, new stream connection, heartbeat, pairing) and not at all when it cannot read its SIMs. The dashboard picks the SIM per reply (`sim` on `POST /outbox`, also on the pending list): it starts on the SIM that received the text if the phone allows it, else the only allowed SIM, else the user must choose; SIMs the phone does not allow are shown greyed out. The phone only limits (`allowedSims`, empty until the user ticks one): it fails a reply as `sim_not_allowed`, `sim_missing`, `sim_unknown` or `choose_sim` and never swaps SIM.
 - `POST /api/v1/unpair` (device token) : the phone unpairs itself; same effect as revoking it in the dashboard, shown there at once.
 - `POST /api/v1/heartbeat` (device token) : "this phone is alive", no body. Updates last-seen and app version, and open dashboards get a `device_seen` event. The phone sends it about every 15 minutes (WorkManager).
 - Later: `GET /api/v1/outbox` and `POST /api/v1/outbox` for queued SMS replies.

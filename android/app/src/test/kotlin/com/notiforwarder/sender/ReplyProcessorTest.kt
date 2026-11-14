@@ -44,11 +44,11 @@ class ReplyProcessorTest {
     private val outbox = FakeOutbox()
     private val sms = FakeSms()
     private val ledger = MemoryLedger()
-    private var settings = CaptureSettings(allowReplies = true)
+    private var settings = CaptureSettings(allowReplies = true, allowedSims = setOf(3))
     private var permitted = true
     private var credentials: Credentials? = Credentials("https://x", "dev-1", "t", e2eKey = null)
     // The SIMs in the phone, or null when the app is not allowed to look.
-    private var sims: List<SimOption>? = listOf(SimOption(3, "SIM 1 · China Mobile"))
+    private var sims: List<SimOption>? = listOf(SimOption(3, 1, "China Mobile"))
 
     private fun processor() = ReplyProcessor(
         outbox = outbox,
@@ -281,7 +281,7 @@ class ReplyProcessorTest {
 
     @Test
     fun `practice mode wins over everything, even replies being off, a missing permission or a chosen SIM`() {
-        settings = CaptureSettings(allowReplies = false, practiceReplies = true, replySim = 3)
+        settings = CaptureSettings(allowReplies = false, practiceReplies = true, allowedSims = setOf(3))
         permitted = false
         outbox.replies = listOf(reply)
 
@@ -320,13 +320,16 @@ class ReplyProcessorTest {
         assertEquals(listOf(Triple("r1", false, "no_key")), outbox.reports)
     }
 
-    // --- Which SIM sends the text ---
+    // --- Which SIM sends the text: the dashboard chooses, the phone only allows ---
+
+    private val china = SimOption(3, 1, "China Mobile")
+    private val giffgaff = SimOption(5, 2, "Giffgaff")
 
     @Test
-    fun `sends from the SIM the user chose`() {
-        sims = listOf(SimOption(3, "SIM 1 · China Mobile"), SimOption(5, "SIM 2 · Giffgaff"))
-        settings = CaptureSettings(allowReplies = true, replySim = 5)
-        outbox.replies = listOf(reply)
+    fun `sends from the SIM the dashboard chose, when the phone allows it`() {
+        sims = listOf(china, giffgaff)
+        settings = CaptureSettings(allowReplies = true, allowedSims = setOf(3, 5))
+        outbox.replies = listOf(reply.copy(sim = 5))
 
         processor().process()
 
@@ -335,10 +338,22 @@ class ReplyProcessorTest {
     }
 
     @Test
+    fun `a SIM the phone does not allow is refused, even when the dashboard chose it`() {
+        sims = listOf(china, giffgaff)
+        settings = CaptureSettings(allowReplies = true, allowedSims = setOf(5))
+        outbox.replies = listOf(reply.copy(sim = 3))
+
+        processor().process()
+
+        assertTrue(sms.texts.isEmpty())
+        assertEquals(listOf(Triple("r1", false, "sim_not_allowed")), outbox.reports)
+    }
+
+    @Test
     fun `a chosen SIM that is no longer in the phone is never swapped for another, the reply fails`() {
-        sims = listOf(SimOption(3, "SIM 1 · China Mobile"))
-        settings = CaptureSettings(allowReplies = true, replySim = 5)
-        outbox.replies = listOf(reply)
+        sims = listOf(china)
+        settings = CaptureSettings(allowReplies = true, allowedSims = setOf(3, 5))
+        outbox.replies = listOf(reply.copy(sim = 5))
 
         processor().process()
 
@@ -349,8 +364,8 @@ class ReplyProcessorTest {
     @Test
     fun `a chosen SIM that cannot be checked fails, because guessing could send on the wrong SIM`() {
         sims = null
-        settings = CaptureSettings(allowReplies = true, replySim = 5)
-        outbox.replies = listOf(reply)
+        settings = CaptureSettings(allowReplies = true, allowedSims = setOf(5))
+        outbox.replies = listOf(reply.copy(sim = 5))
 
         processor().process()
 
@@ -359,9 +374,20 @@ class ReplyProcessorTest {
     }
 
     @Test
-    fun `with two SIMs and none chosen nothing is sent, because the phone will not pick one for the user`() {
-        sims = listOf(SimOption(3, "SIM 1"), SimOption(5, "SIM 2"))
-        settings = CaptureSettings(allowReplies = true, replySim = null)
+    fun `a reply that names no SIM uses the one allowed SIM`() {
+        sims = listOf(china, giffgaff)
+        settings = CaptureSettings(allowReplies = true, allowedSims = setOf(5))
+        outbox.replies = listOf(reply)
+
+        processor().process()
+
+        assertEquals(listOf<Int?>(5), sms.sims)
+    }
+
+    @Test
+    fun `a reply that names no SIM is not sent when two SIMs are allowed, the phone will not pick one`() {
+        sims = listOf(china, giffgaff)
+        settings = CaptureSettings(allowReplies = true, allowedSims = setOf(3, 5))
         outbox.replies = listOf(reply)
 
         processor().process()
@@ -371,21 +397,21 @@ class ReplyProcessorTest {
     }
 
     @Test
-    fun `with one SIM and none chosen it just uses that SIM's default`() {
-        sims = listOf(SimOption(3, "SIM 1"))
-        settings = CaptureSettings(allowReplies = true, replySim = null)
+    fun `nothing is sent until the user has allowed a SIM, even on a phone with one SIM`() {
+        sims = listOf(china)
+        settings = CaptureSettings(allowReplies = true, allowedSims = emptySet())
         outbox.replies = listOf(reply)
 
         processor().process()
 
-        assertEquals(listOf<Int?>(null), sms.sims)
-        assertEquals(listOf(Triple("r1", true, null)), outbox.reports)
+        assertTrue(sms.texts.isEmpty())
+        assertEquals(listOf(Triple("r1", false, "sim_not_allowed")), outbox.reports)
     }
 
     @Test
-    fun `when the SIMs cannot be listed and none was chosen nothing is sent, because it could be the wrong SIM`() {
+    fun `when the SIMs cannot be listed and none was named nothing is sent, because it could be the wrong SIM`() {
         sims = null
-        settings = CaptureSettings(allowReplies = true, replySim = null)
+        settings = CaptureSettings(allowReplies = true, allowedSims = setOf(3))
         outbox.replies = listOf(reply)
 
         processor().process()

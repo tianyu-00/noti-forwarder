@@ -13,5 +13,8 @@ interface SmsSender {
     fun send(to: String, text: String, subscriptionId: Int? = null): SmsResult
 }
 
-/** One SIM in the phone, as the user sees it ("SIM 1 · China Mobile"). */
-data class SimOption(val id: Int, val label: String)
+/** One SIM in the phone: its id (subscription id), slot number from 1, and carrier name (never a number). */
+data class SimOption(val id: Int, val slot: Int, val name: String) {
+    /** How the user sees it: "SIM 1 · China Mobile". */
+    val label: String get() = if (name.isBlank()) "SIM $slot" else "SIM $slot · $name"
+}

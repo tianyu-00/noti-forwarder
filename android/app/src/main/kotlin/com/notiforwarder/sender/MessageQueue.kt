@@ -44,12 +44,13 @@ class MessageQueue(
             receivedAt = message.receivedAt,
             enqueuedAt = clock(),
             nextAttemptAt = notBefore,
+            sim = message.sim,
         ),
     ) != -1L
 
     /** The oldest messages that are due now, oldest first. */
     fun nextBatch(limit: Int): List<Queued> = dao.due(clock(), limit).map {
-        Queued(Message(it.id, it.type, it.app, it.sender, it.body, it.receivedAt), it.attempts)
+        Queued(Message(it.id, it.type, it.app, it.sender, it.body, it.receivedAt, sim = it.sim), it.attempts)
     }
 
     /**

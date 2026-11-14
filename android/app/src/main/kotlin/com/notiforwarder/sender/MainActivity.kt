@@ -163,6 +163,7 @@ private fun MainScreen(
     val changeSettings = { updated: CaptureSettings ->
         settings = updated
         app.settingsStore.save(updated)
+        app.reportSims() // the allowed SIMs may have changed; does nothing if the list is the same
     }
     // Replies are only switched on once the user has allowed this app to send texts.
     val askSendSms = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -175,6 +176,7 @@ private fun MainScreen(
     var sims by remember { mutableStateOf(app.simLookup.activeSims()) }
     val askPhoneState = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
         sims = app.simLookup.activeSims()
+        app.reportSims()
     }
     val changeReplies = { on: Boolean ->
         val allowed = ContextCompat.checkSelfPermission(app, Manifest.permission.SEND_SMS) == PackageManager.PERMISSION_GRANTED

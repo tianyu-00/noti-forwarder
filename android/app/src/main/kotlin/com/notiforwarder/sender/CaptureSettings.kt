@@ -29,11 +29,11 @@ data class CaptureSettings(
      */
     val practiceReplies: Boolean = false,
     /**
-     * The SIM (subscription id) that sends replies, or null for the phone's own default. With two
-     * SIMs a reply refuses to go until one is chosen, so it can never leave on the wrong (say
-     * roaming) one by accident.
+     * The SIMs (subscription ids) that may send replies. The dashboard chooses which one to use for each
+     * reply; the phone only decides what is allowed, so a roaming SIM can be kept out. Empty until the
+     * user allows one: a reply never goes out on a SIM nobody allowed.
      */
-    val replySim: Int? = null,
+    val allowedSims: Set<Int> = emptySet(),
     /** Unlocked by tapping the version number in Settings. Shows options meant for testing, like practice mode. */
     val developerMode: Boolean = false,
 ) {
@@ -60,7 +60,7 @@ class PrefsSettingsStore(context: Context, name: String = "capture_settings") : 
         clearAfterForwarding = prefs.getBoolean(CLEAR, false),
         allowReplies = prefs.getBoolean(REPLIES, false),
         practiceReplies = prefs.getBoolean(PRACTICE, false),
-        replySim = prefs.getInt(REPLY_SIM, NO_SIM).takeIf { it != NO_SIM },
+        allowedSims = prefs.getStringSet(ALLOWED_SIMS, emptySet())?.mapNotNull { it.toIntOrNull() }?.toSet().orEmpty(),
         developerMode = prefs.getBoolean(DEVELOPER, false),
     )
 
@@ -71,7 +71,7 @@ class PrefsSettingsStore(context: Context, name: String = "capture_settings") : 
         putBoolean(CLEAR, settings.clearAfterForwarding)
         putBoolean(REPLIES, settings.allowReplies)
         putBoolean(PRACTICE, settings.practiceReplies)
-        putInt(REPLY_SIM, settings.replySim ?: NO_SIM)
+        putStringSet(ALLOWED_SIMS, settings.allowedSims.map { it.toString() }.toSet())
         putBoolean(DEVELOPER, settings.developerMode)
     }
 
@@ -82,8 +82,7 @@ class PrefsSettingsStore(context: Context, name: String = "capture_settings") : 
         const val CLEAR = "clearAfterForwarding"
         const val REPLIES = "allowReplies"
         const val PRACTICE = "practiceReplies"
-        const val REPLY_SIM = "replySim"
+        const val ALLOWED_SIMS = "allowedSims"
         const val DEVELOPER = "developerMode"
-        const val NO_SIM = -1
     }
 }

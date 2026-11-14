@@ -35,6 +35,8 @@ data class QueuedMessage(
      * with its text erased, and is never sent again.
      */
     val sentAt: Long? = null,
+    /** The SIM that received a text, so the dashboard can answer on the same one. */
+    val sim: Int? = null,
 )
 
 @Dao
@@ -89,12 +91,12 @@ interface QueueDao {
     fun nextDueAt(now: Long): Long?
 }
 
-// Version 2 adds the nullable sentAt column; Room writes the migration from the two schema files.
+// Version 2 adds the nullable sentAt column and version 3 the nullable sim column; Room writes the migration from the two schema files.
 @Database(
     entities = [QueuedMessage::class],
-    version = 2,
+    version = 3,
     exportSchema = true,
-    autoMigrations = [AutoMigration(from = 1, to = 2)],
+    autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3)],
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun queueDao(): QueueDao

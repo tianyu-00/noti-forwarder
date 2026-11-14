@@ -51,7 +51,7 @@ class ReplyProcessor(
         // Opened and checked as for real; this is the point where a real send would happen.
         if (current.practiceReplies) return finish(reply.id, LedgerState.FAILED, "practice")
 
-        val sim = when (val chosen = chooseSim(current)) {
+        val sim = when (val chosen = chooseSim(current, reply.sim)) {
             is SimChoice.Use -> chosen.subscriptionId
             is SimChoice.Refuse -> return finish(reply.id, LedgerState.FAILED, chosen.code)
         }
@@ -73,19 +73,22 @@ class ReplyProcessor(
         data class Refuse(val code: String) : SimChoice
     }
 
-    // Which SIM sends. The SIMs must be checkable, a chosen SIM that is gone is never swapped for
-    // another, and with two SIMs and no choice the phone will not guess, because one may be roaming.
-    private fun chooseSim(current: CaptureSettings): SimChoice {
-        val installed = sims()
-        val chosen = current.replySim
+    // Which SIM sends. The dashboard names one; the phone only checks it. The SIMs must be checkable, the
+    // SIM must be in the phone and allowed by the user, and it is never swapped for another. A reply that
+    // names none (an older dashboard) goes out only when exactly one SIM is allowed: the phone will not
+    // guess between two, because one may be roaming.
+    private fun chooseSim(current: CaptureSettings, wanted: Int?): SimChoice {
+        val installed = sims() ?: return SimChoice.Refuse("sim_unknown")
+        val allowed = installed.filter { it.id in current.allowedSims }
         return when {
-            // Without phone access the app cannot tell how many SIMs there are, so it cannot know
-            // that the default is safe to use.
-            installed == null -> SimChoice.Refuse("sim_unknown")
-            chosen != null ->
-                if (installed.none { it.id == chosen }) SimChoice.Refuse("sim_missing") else SimChoice.Use(chosen)
-            installed.size > 1 -> SimChoice.Refuse("choose_sim")
-            else -> SimChoice.Use(null)
+            wanted != null -> when {
+                installed.none { it.id == wanted } -> SimChoice.Refuse("sim_missing")
+                wanted !in current.allowedSims -> SimChoice.Refuse("sim_not_allowed")
+                else -> SimChoice.Use(wanted)
+            }
+            allowed.isEmpty() -> SimChoice.Refuse("sim_not_allowed")
+            allowed.size > 1 -> SimChoice.Refuse("choose_sim")
+            else -> SimChoice.Use(allowed.single().id)
         }
     }
 

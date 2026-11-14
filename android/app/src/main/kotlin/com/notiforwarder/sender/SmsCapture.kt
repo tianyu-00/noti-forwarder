@@ -12,9 +12,9 @@ class SmsCapture(
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
     /** Returns how many texts were queued. Blocking: call it off the main thread. */
-    fun onSms(parts: List<RawSmsPart>): Int {
+    fun onSms(parts: List<RawSmsPart>, sim: Int? = null): Int {
         if (!settings().sendSms) return 0
-        val messages = parser.parse(parts)
+        val messages = parser.parse(parts).map { it.copy(sim = sim) }
         for (message in messages) {
             // Remember it first, so the messaging app's notification copy is recognised.
             dedupe.recordSms(message.body)

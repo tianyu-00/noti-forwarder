@@ -30,6 +30,8 @@ data class Message(
     val receivedAt: String,
     /** The app's real name ("Gmail"), added just before sending. Null (and left out) when unknown. */
     val appLabel: String? = null,
+    /** The SIM (its subscription id) that received a text. Null for notifications and when Android did not say. */
+    val sim: Int? = null,
 )
 
 class NotificationParser(

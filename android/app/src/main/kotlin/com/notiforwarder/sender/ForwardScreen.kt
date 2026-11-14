@@ -18,7 +18,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Switch
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
@@ -86,7 +86,7 @@ internal fun ForwardScreen(
                         onRepliesChange,
                     )
                     RowDivider()
-                    SimRow(settings.replySim, sims, onAllowSimAccess) { onChange(settings.copy(replySim = it)) }
+                    SimRow(settings.allowedSims, sims, onAllowSimAccess) { onChange(settings.copy(allowedSims = it)) }
                     // Practice mode is a testing tool: hidden until developer mode is unlocked (or while it is
                     // still on, so it can never be left on out of sight).
                     if (showPracticeMode(settings)) {
@@ -202,17 +202,19 @@ internal fun SwitchRow(title: String, detail: String, checked: Boolean, onChecke
     }
 }
 
-/** Which SIM sends replies. Picking is needed with two SIMs: the phone never chooses one for you. */
+/**
+ * Which SIMs may send replies. The dashboard picks one of these for each reply; the phone only limits the
+ * choice, so a roaming SIM can be kept out. Nothing is allowed until the user ticks a SIM.
+ */
 @Composable
-private fun SimRow(chosen: Int?, sims: List<SimOption>?, onAllowAccess: () -> Unit, onChoose: (Int) -> Unit) {
+private fun SimRow(allowed: Set<Int>, sims: List<SimOption>?, onAllowAccess: () -> Unit, onChange: (Set<Int>) -> Unit) {
     var open by remember { mutableStateOf(false) }
-    val current = sims?.firstOrNull { it.id == chosen }
+    val allowedHere = sims?.filter { it.id in allowed }.orEmpty()
     val detail = when {
         sims == null -> "Allow phone access so the app can list your SIMs."
-        chosen != null && current == null -> "The chosen SIM is not in the phone. Choose again."
-        current != null -> current.label
-        sims.size > 1 -> "Not chosen yet. Replies will not send until you choose."
-        else -> "The phone's only SIM"
+        sims.isEmpty() -> "No SIM found in this phone."
+        allowedHere.isEmpty() -> "None allowed. Replies will not send until you allow a SIM."
+        else -> allowedHere.joinToString(", ") { it.label }
     }
     Row(
         modifier = Modifier.fillMaxWidth().clickable { if (sims == null) onAllowAccess() else open = true }.padding(vertical = 8.dp),
@@ -220,7 +222,7 @@ private fun SimRow(chosen: Int?, sims: List<SimOption>?, onAllowAccess: () -> Un
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text("SIM for replies", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            Text("SIMs allowed for replies", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
             Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Text(
@@ -232,18 +234,23 @@ private fun SimRow(chosen: Int?, sims: List<SimOption>?, onAllowAccess: () -> Un
     if (open && sims != null) {
         AlertDialog(
             onDismissRequest = { open = false },
-            title = { Text("SIM for replies") },
+            title = { Text("SIMs allowed for replies") },
             text = {
                 Column {
+                    Text(
+                        "The dashboard picks which of these sends each reply. A SIM you leave out is shown there greyed out.",
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(bottom = 8.dp),
+                    )
                     sims.forEach { sim ->
+                        val on = sim.id in allowed
                         Row(
                             modifier = Modifier.fillMaxWidth().clickable {
-                                onChoose(sim.id)
-                                open = false
+                                onChange(if (on) allowed - sim.id else allowed + sim.id)
                             }.padding(vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            RadioButton(selected = sim.id == chosen, onClick = null)
+                            Checkbox(checked = on, onCheckedChange = null)
                             Text(sim.label, modifier = Modifier.padding(start = 12.dp))
                         }
                     }

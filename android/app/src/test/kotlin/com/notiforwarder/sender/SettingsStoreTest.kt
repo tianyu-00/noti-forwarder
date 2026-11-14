@@ -64,18 +64,25 @@ class SettingsStoreTest {
     }
 
     @Test
-    fun `practice mode and the chosen SIM start empty and are kept`() {
+    fun `practice mode starts off and is kept`() {
         assertFalse(CaptureSettings().practiceReplies)
-        assertEquals(null, CaptureSettings().replySim)
-        val name = "sim-${System.nanoTime()}"
-        PrefsSettingsStore(context, name).save(CaptureSettings(practiceReplies = true, replySim = 5))
+        val name = "practice-${System.nanoTime()}"
+        PrefsSettingsStore(context, name).save(CaptureSettings(practiceReplies = true))
+
+        assertTrue(PrefsSettingsStore(context, name).load().practiceReplies)
+    }
+
+    @Test
+    fun `no SIM is allowed for replies until the user allows one, and the choice is kept`() {
+        assertEquals(emptySet<Int>(), CaptureSettings().allowedSims)
+        val name = "sims-${System.nanoTime()}"
+        PrefsSettingsStore(context, name).save(CaptureSettings(allowedSims = setOf(3, 5)))
 
         val reloaded = PrefsSettingsStore(context, name).load()
 
-        assertTrue(reloaded.practiceReplies)
-        assertEquals(5, reloaded.replySim)
-        PrefsSettingsStore(context, name).save(reloaded.copy(replySim = null))
-        assertEquals(null, PrefsSettingsStore(context, name).load().replySim)
+        assertEquals(setOf(3, 5), reloaded.allowedSims)
+        PrefsSettingsStore(context, name).save(reloaded.copy(allowedSims = emptySet()))
+        assertEquals(emptySet<Int>(), PrefsSettingsStore(context, name).load().allowedSims)
     }
 
     @Test

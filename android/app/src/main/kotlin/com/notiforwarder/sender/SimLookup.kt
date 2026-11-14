@@ -22,7 +22,7 @@ class SimLookup(private val context: Context) {
                 .sortedBy { it.simSlotIndex }
                 .map { info ->
                     val name = info.carrierName?.toString()?.takeIf { it.isNotBlank() } ?: info.displayName?.toString().orEmpty()
-                    SimOption(info.subscriptionId, "SIM ${info.simSlotIndex + 1} · $name".trimEnd(' ', '·'))
+                    SimOption(info.subscriptionId, info.simSlotIndex + 1, name)
                 }
         } catch (e: SecurityException) {
             null

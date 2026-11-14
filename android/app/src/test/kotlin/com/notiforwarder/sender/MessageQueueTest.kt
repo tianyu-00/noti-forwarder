@@ -38,6 +38,14 @@ class MessageQueueTest {
     private fun ids(limit: Int = 100) = queue.nextBatch(limit).map { it.message.id }
 
     @Test
+    fun `keeps the SIM that received a text until it is sent`() {
+        queue.enqueue(msg("a").copy(type = "sms", app = "sms", sim = 5))
+        queue.enqueue(msg("b"))
+
+        assertEquals(listOf<Int?>(5, null), queue.nextBatch(10).map { it.message.sim })
+    }
+
+    @Test
     fun `enqueue stores the message so it can be sent later`() {
         assertTrue(queue.enqueue(msg("a", body = "Your code is 123456")))
 

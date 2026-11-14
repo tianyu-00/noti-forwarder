@@ -50,6 +50,20 @@ class SmsCaptureTest {
     private fun part(address: String, body: String) = RawSmsPart(address, body, 1_762_855_205_000L)
 
     @Test
+    fun `remembers which SIM received the text`() {
+        capture().onSms(listOf(part("BANK", "Your code is 123456")), sim = 5)
+
+        assertEquals(5, queue.nextBatch(10).single().message.sim)
+    }
+
+    @Test
+    fun `leaves the SIM empty when Android did not say`() {
+        capture().onSms(listOf(part("BANK", "Your code is 123456")))
+
+        assertEquals(null, queue.nextBatch(10).single().message.sim)
+    }
+
+    @Test
     fun `queues an incoming text first, then asks for a flush`() {
         val count = capture().onSms(listOf(part("BANK", "Your code is 123456")))
 

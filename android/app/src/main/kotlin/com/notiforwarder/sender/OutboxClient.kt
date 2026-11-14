@@ -9,7 +9,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 
 /** A reply typed on the dashboard, waiting to be sent as an SMS. Number and text may be encrypted. */
 @Serializable
-data class OutboxReply(val id: String, val to: String, val body: String)
+data class OutboxReply(val id: String, val to: String, val body: String, val sim: Int? = null)
 
 @Serializable
 private data class PendingResponse(val replies: List<OutboxReply>)
