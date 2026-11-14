@@ -10,6 +10,10 @@ import android.os.Bundle
 import android.os.PowerManager
 import android.provider.Settings
 import android.widget.Toast
+import androidx.core.app.ActivityCompat
+import androidx.activity.compose.LocalActivity
+import androidx.activity.compose.ManagedActivityResultLauncher
+import android.content.Context
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
@@ -44,6 +48,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.codescanner.GmsBarcodeScannerOptions
@@ -157,6 +163,29 @@ private fun MainScreen(
     var queueStatus by remember { mutableStateOf<QueueStatus?>(null) }
     var activity by remember { mutableStateOf<ActivityView?>(null) }
     var now by remember { mutableStateOf(System.currentTimeMillis()) }
+    val hostActivity = LocalActivity.current!!
+    // Asks for a permission with the system dialog, or, when Android no longer shows it (refused too often),
+    // opens this app's permission page so the button is never dead.
+    val ask = { permission: String, launcher: ManagedActivityResultLauncher<String, Boolean> ->
+        val prefs = app.getSharedPreferences("permission_asks", Context.MODE_PRIVATE)
+        val step = nextAskStep(
+            askedBefore = prefs.getBoolean(permission, false),
+            canShowRationale = ActivityCompat.shouldShowRequestPermissionRationale(hostActivity, permission),
+        )
+        when (step) {
+            AskStep.Prompt -> {
+                prefs.edit().putBoolean(permission, true).apply()
+                launcher.launch(permission)
+            }
+            AskStep.OpenSettings -> {
+                Toast.makeText(app, "Turn this permission on in the page that opens", Toast.LENGTH_LONG).show()
+                app.startActivity(
+                    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${app.packageName}"))
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                )
+            }
+        }
+    }
     val askNotifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
     val askSms = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
     var settings by remember { mutableStateOf(app.settingsStore.load()) }
@@ -178,6 +207,11 @@ private fun MainScreen(
         sims = app.simLookup.activeSims()
         app.reportSims()
     }
+    // Back from the app's permission page: the user may have switched the permission on there.
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        sims = app.simLookup.activeSims()
+        app.reportSims()
+    }
     val changeReplies = { on: Boolean ->
         val allowed = ContextCompat.checkSelfPermission(app, Manifest.permission.SEND_SMS) == PackageManager.PERMISSION_GRANTED
         when {
@@ -186,7 +220,7 @@ private fun MainScreen(
                 changeSettings(settings.copy(allowReplies = true))
                 app.sendReplies()
             }
-            else -> askSendSms.launch(Manifest.permission.SEND_SMS)
+            else -> ask(Manifest.permission.SEND_SMS, askSendSms)
         }
     }
     var tab by rememberSaveable { mutableStateOf(Tab.Status) }
@@ -225,8 +259,8 @@ private fun MainScreen(
                             ready = ready,
                             onOpenAccessSettings = onOpenAccessSettings,
                             onRequestBatteryExemption = onRequestBatteryExemption,
-                            onAllowNotifications = { askNotifications.launch(Manifest.permission.POST_NOTIFICATIONS) },
-                            onAllowSms = { askSms.launch(Manifest.permission.RECEIVE_SMS) },
+                            onAllowNotifications = { ask(Manifest.permission.POST_NOTIFICATIONS, askNotifications) },
+                            onAllowSms = { ask(Manifest.permission.RECEIVE_SMS, askSms) },
                             onOpenAutoStart = onOpenAutoStart,
                         )
                     }
@@ -235,7 +269,7 @@ private fun MainScreen(
                     onChange = changeSettings,
                     onRepliesChange = changeReplies,
                     sims = sims,
-                    onAllowSimAccess = { askPhoneState.launch(Manifest.permission.READ_PHONE_STATE) },
+                    onAllowSimAccess = { ask(Manifest.permission.READ_PHONE_STATE, askPhoneState) },
                 )
                     Tab.Activity -> ActivityScreen(activity)
                     Tab.Settings -> SettingsScreen(
