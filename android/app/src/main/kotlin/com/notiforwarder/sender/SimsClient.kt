@@ -11,12 +11,16 @@ import okhttp3.RequestBody.Companion.toRequestBody
 @Serializable
 data class ReportedSim(val id: Int, val slot: Int, val name: String, val allowed: Boolean)
 
+/** Whether this phone takes replies: the switch is on, it may send texts, and practice mode (never sends). */
 @Serializable
-private data class SimsBody(val sims: List<ReportedSim>)
+data class ReportedReplies(val on: Boolean, val permission: Boolean, val practice: Boolean)
 
-/** What the SIM reporting needs from the server. A seam so the logic is tested without a network. */
+@Serializable
+private data class SimsBody(val sims: List<ReportedSim>, val replies: ReportedReplies)
+
+/** What the SIM and reply-state reporting needs from the server. A seam so the logic is tested without a network. */
 interface SimsApi {
-    fun put(sims: List<ReportedSim>): ReportOutcome
+    fun put(sims: List<ReportedSim>, replies: ReportedReplies): ReportOutcome
 }
 
 /** Blocking: call it off the main thread. */
@@ -27,9 +31,9 @@ class SimsClient(
     /** Called after the credentials are cleared because the server revoked this phone. */
     private val onRevoked: () -> Unit = {},
 ) : SimsApi {
-    override fun put(sims: List<ReportedSim>): ReportOutcome {
+    override fun put(sims: List<ReportedSim>, replies: ReportedReplies): ReportOutcome {
         val credentials = store.load() ?: return ReportOutcome.NotPaired
-        val body = Json.encodeToString(SimsBody.serializer(), SimsBody(sims))
+        val body = Json.encodeToString(SimsBody.serializer(), SimsBody(sims, replies))
         val call = Request.Builder()
             .url("${credentials.serverUrl}/api/v1/sims")
             .header("Authorization", "Bearer ${credentials.token}")
@@ -55,16 +59,17 @@ class SimsClient(
 }
 
 /**
- * Tells the server which SIMs the phone has and allows, so the dashboard can offer them. Sends only
- * when the list changed (or [force]d, for a new connection). When the SIMs cannot be listed it reports an
+ * Tells the server which SIMs the phone has and allows, and whether it takes replies, so the dashboard can
+ * offer a choice or say why not. Sends only when something changed (or [force]d, for a new connection). When the SIMs cannot be listed it reports an
  * empty list. Safe to call from any thread.
  */
 class SimReporter(
     private val api: SimsApi,
     private val installed: () -> List<SimOption>?,
     private val allowed: () -> Set<Int>,
+    private val replies: () -> ReportedReplies,
 ) {
-    private var last: List<ReportedSim>? = null
+    private var last: Pair<List<ReportedSim>, ReportedReplies>? = null
 
     @Synchronized
     fun report(force: Boolean = false) {
@@ -72,7 +77,8 @@ class SimReporter(
         val sims = installed().orEmpty()
         val allow = allowed()
         val list = sims.map { ReportedSim(it.id, it.slot, it.name, it.id in allow) }
-        if (!force && list == last) return
-        if (api.put(list) == ReportOutcome.Reported) last = list
+        val state = replies()
+        if (!force && list to state == last) return
+        if (api.put(list, state) == ReportOutcome.Reported) last = list to state
     }
 }

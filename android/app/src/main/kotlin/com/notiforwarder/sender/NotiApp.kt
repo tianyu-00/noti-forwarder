@@ -57,6 +57,15 @@ class NotiApp : Application() {
             SimsClient(store, appVersion = BuildConfig.VERSION_NAME, onRevoked = { controller.refresh() }),
             installed = simLookup::activeSims,
             allowed = { settingsStore.load().allowedSims },
+            replies = {
+                val s = settingsStore.load()
+                ReportedReplies(
+                    on = s.allowReplies,
+                    permission = ContextCompat.checkSelfPermission(this, android.Manifest.permission.SEND_SMS) ==
+                        android.content.pm.PackageManager.PERMISSION_GRANTED,
+                    practice = s.practiceReplies,
+                )
+            },
         )
     }
 

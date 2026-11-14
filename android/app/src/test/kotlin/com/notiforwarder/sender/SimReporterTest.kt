@@ -6,8 +6,10 @@ import org.junit.Test
 class SimReporterTest {
     private class FakeSims(var outcome: ReportOutcome = ReportOutcome.Reported) : SimsApi {
         val puts = mutableListOf<List<ReportedSim>>()
-        override fun put(sims: List<ReportedSim>): ReportOutcome {
+        val replyStates = mutableListOf<ReportedReplies>()
+        override fun put(sims: List<ReportedSim>, replies: ReportedReplies): ReportOutcome {
             puts += sims
+            replyStates += replies
             return outcome
         }
     }
@@ -15,7 +17,8 @@ class SimReporterTest {
     private val api = FakeSims()
     private var installed: List<SimOption>? = listOf(SimOption(3, 1, "China Mobile"), SimOption(5, 2, "Giffgaff"))
     private var allowed = setOf(5)
-    private fun reporter() = SimReporter(api, installed = { installed }, allowed = { allowed })
+    private var replies = ReportedReplies(on = true, permission = true, practice = false)
+    private fun reporter() = SimReporter(api, installed = { installed }, allowed = { allowed }, replies = { replies })
 
     @Test
     fun `tells the server each SIM and whether the phone allows replies on it`() {
@@ -87,5 +90,26 @@ class SimReporterTest {
         reporter().report()
 
         assertEquals(listOf(emptyList<ReportedSim>()), api.puts)
+    }
+
+    @Test
+    fun `tells the server whether replies are on, allowed and in practice`() {
+        replies = ReportedReplies(on = false, permission = true, practice = true)
+
+        reporter().report()
+
+        assertEquals(listOf(ReportedReplies(on = false, permission = true, practice = true)), api.replyStates)
+    }
+
+    @Test
+    fun `reports again when only the reply state changes`() {
+        val r = reporter()
+        r.report()
+
+        replies = replies.copy(on = false)
+        r.report()
+
+        assertEquals(2, api.puts.size)
+        assertEquals(false, api.replyStates.last().on)
     }
 }
