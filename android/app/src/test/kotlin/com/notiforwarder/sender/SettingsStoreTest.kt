@@ -79,6 +79,15 @@ class SettingsStoreTest {
     }
 
     @Test
+    fun `developer mode is hidden until it is unlocked, and stays unlocked`() {
+        assertFalse(CaptureSettings().developerMode)
+        val name = "dev-${System.nanoTime()}"
+        PrefsSettingsStore(context, name).save(CaptureSettings(developerMode = true))
+
+        assertTrue(PrefsSettingsStore(context, name).load().developerMode)
+    }
+
+    @Test
     fun `notifications are left in the shade unless clearing is switched on`() {
         assertFalse(CaptureSettings().clearAfterForwarding)
     }

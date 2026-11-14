@@ -245,6 +245,8 @@ private fun MainScreen(
                         onOpenAccessSettings = onOpenAccessSettings,
                         onRequestBatteryExemption = onRequestBatteryExemption,
                         onOpenAutoStart = onOpenAutoStart,
+                        developerMode = settings.developerMode,
+                        onDeveloperUnlocked = { changeSettings(settings.copy(developerMode = true)) },
                     )
                 }
             }

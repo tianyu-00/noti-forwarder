@@ -7,8 +7,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import android.widget.Toast
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
@@ -23,7 +26,11 @@ internal fun SettingsScreen(
     onOpenAccessSettings: () -> Unit,
     onRequestBatteryExemption: () -> Unit,
     onOpenAutoStart: () -> Unit,
+    developerMode: Boolean,
+    onDeveloperUnlocked: () -> Unit,
 ) {
+    val context = LocalContext.current
+    val taps = remember { DeveloperTaps() }
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp, vertical = 20.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
@@ -70,7 +77,28 @@ internal fun SettingsScreen(
             RowDivider()
             KeyValueRow("Auto-start", "Open settings", onClick = onOpenAutoStart)
             RowDivider()
-            KeyValueRow("Version", BuildConfig.VERSION_NAME)
+            KeyValueRow(
+                "Version",
+                BuildConfig.VERSION_NAME,
+                onClick = {
+                    if (developerMode) {
+                        Toast.makeText(context, "Developer mode is already on", Toast.LENGTH_SHORT).show()
+                    } else {
+                        when (val r = taps.tap(System.currentTimeMillis())) {
+                            TapResult.Nothing -> {}
+                            is TapResult.Remaining -> Toast.makeText(
+                                context,
+                                "${r.taps} more ${if (r.taps == 1) "tap" else "taps"} to turn on developer mode",
+                                Toast.LENGTH_SHORT,
+                            ).show()
+                            TapResult.Unlocked -> {
+                                onDeveloperUnlocked()
+                                Toast.makeText(context, "Developer mode is on", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    }
+                },
+            )
         }
     }
 }

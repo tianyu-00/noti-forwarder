@@ -34,6 +34,8 @@ data class CaptureSettings(
      * roaming) one by accident.
      */
     val replySim: Int? = null,
+    /** Unlocked by tapping the version number in Settings. Shows options meant for testing, like practice mode. */
+    val developerMode: Boolean = false,
 ) {
     fun shouldDismiss(outcome: CaptureOutcome) = clearAfterForwarding && outcome != CaptureOutcome.IGNORED
 
@@ -59,6 +61,7 @@ class PrefsSettingsStore(context: Context, name: String = "capture_settings") : 
         allowReplies = prefs.getBoolean(REPLIES, false),
         practiceReplies = prefs.getBoolean(PRACTICE, false),
         replySim = prefs.getInt(REPLY_SIM, NO_SIM).takeIf { it != NO_SIM },
+        developerMode = prefs.getBoolean(DEVELOPER, false),
     )
 
     override fun save(settings: CaptureSettings) = prefs.edit {
@@ -69,6 +72,7 @@ class PrefsSettingsStore(context: Context, name: String = "capture_settings") : 
         putBoolean(REPLIES, settings.allowReplies)
         putBoolean(PRACTICE, settings.practiceReplies)
         putInt(REPLY_SIM, settings.replySim ?: NO_SIM)
+        putBoolean(DEVELOPER, settings.developerMode)
     }
 
     private companion object {
@@ -79,6 +83,7 @@ class PrefsSettingsStore(context: Context, name: String = "capture_settings") : 
         const val REPLIES = "allowReplies"
         const val PRACTICE = "practiceReplies"
         const val REPLY_SIM = "replySim"
+        const val DEVELOPER = "developerMode"
         const val NO_SIM = -1
     }
 }
