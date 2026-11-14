@@ -89,7 +89,7 @@ internal fun ForwardScreen(
                     SimRow(settings.replySim, sims, onAllowSimAccess) { onChange(settings.copy(replySim = it)) }
                     // Practice mode is a testing tool: hidden until developer mode is unlocked (or while it is
                     // still on, so it can never be left on out of sight).
-                    if (settings.developerMode || settings.practiceReplies) {
+                    if (showPracticeMode(settings)) {
                         RowDivider()
                         SwitchRow(
                             "Practice mode",
@@ -188,7 +188,7 @@ internal fun ForwardScreen(
 }
 
 @Composable
-private fun SwitchRow(title: String, detail: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+internal fun SwitchRow(title: String, detail: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,

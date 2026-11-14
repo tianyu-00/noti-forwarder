@@ -28,6 +28,7 @@ internal fun SettingsScreen(
     onOpenAutoStart: () -> Unit,
     developerMode: Boolean,
     onDeveloperUnlocked: () -> Unit,
+    onDeveloperChange: (Boolean) -> Unit,
 ) {
     val context = LocalContext.current
     val taps = remember { DeveloperTaps() }
@@ -57,6 +58,17 @@ internal fun SettingsScreen(
                     options = listOf(ThemeMode.SYSTEM to "System", ThemeMode.LIGHT to "Light", ThemeMode.DARK to "Dark"),
                     selected = themeMode,
                     onSelect = onThemeChange,
+                )
+            }
+        }
+
+        if (developerMode) {
+            NotiCard(padding = androidx.compose.foundation.layout.PaddingValues(horizontal = 18.dp, vertical = 10.dp)) {
+                SwitchRow(
+                    "Developer mode",
+                    "Shows options meant for testing, like practice mode on the Forward tab. Switch off to hide them.",
+                    true,
+                    onDeveloperChange,
                 )
             }
         }

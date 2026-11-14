@@ -247,6 +247,7 @@ private fun MainScreen(
                         onOpenAutoStart = onOpenAutoStart,
                         developerMode = settings.developerMode,
                         onDeveloperUnlocked = { changeSettings(settings.copy(developerMode = true)) },
+                        onDeveloperChange = { changeSettings(settings.copy(developerMode = it)) },
                     )
                 }
             }
