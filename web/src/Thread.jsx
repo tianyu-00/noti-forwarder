@@ -294,7 +294,10 @@ function Composer({ onSend, blockedReason, sims, receivedSim }) {
           >
             {chosen == null && (
               <option value="" disabled>
-                Choose a SIM
+                {/* Nothing to choose when the phone allows none: say that instead. */}
+                {sims.some((s) => s.allowed)
+                  ? "Choose a SIM"
+                  : "No SIM allowed"}
               </option>
             )}
             {sims.map((s) => (

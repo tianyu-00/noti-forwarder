@@ -59,8 +59,10 @@ function replyBlock(conversation, device, key) {
     return "Add the encryption key in Settings to reply";
   if (latest.encrypted && !key)
     return "Add the encryption key in Settings to reply";
+  if (device?.sims?.length === 0)
+    return "This phone shares no SIMs. In the app, allow phone access, then allow a SIM under Forward.";
   if (device?.sims?.length > 0 && !device.sims.some((s) => s.allowed))
-    return "This phone allows no SIM for replies";
+    return "This phone allows no SIM for replies. Allow one in the app, under Forward.";
   return null;
 }
 

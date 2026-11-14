@@ -56,8 +56,8 @@ class SimsClient(
 
 /**
  * Tells the server which SIMs the phone has and allows, so the dashboard can offer them. Sends only
- * when the list changed (or [force]d, for a new connection), and says nothing when the SIMs cannot be
- * listed. Safe to call from any thread.
+ * when the list changed (or [force]d, for a new connection). When the SIMs cannot be listed it reports an
+ * empty list. Safe to call from any thread.
  */
 class SimReporter(
     private val api: SimsApi,
@@ -68,7 +68,8 @@ class SimReporter(
 
     @Synchronized
     fun report(force: Boolean = false) {
-        val sims = installed() ?: return
+        // Cannot list them (no phone access): say "none", so the dashboard can explain why replies are off.
+        val sims = installed().orEmpty()
         val allow = allowed()
         val list = sims.map { ReportedSim(it.id, it.slot, it.name, it.id in allow) }
         if (!force && list == last) return

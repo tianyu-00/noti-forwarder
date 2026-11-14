@@ -157,7 +157,7 @@ describe("choosing the SIM for a reply", () => {
     await waitFor(() => expect(posted[0].sim).toBe(3));
   });
 
-  it("switches the reply box off when the phone allows no SIM at all", async () => {
+  it("says so when the phone allows no SIM, instead of asking to choose one", async () => {
     const { thread } = await open({
       sims: [
         { ...CHINA, allowed: false },
@@ -168,7 +168,20 @@ describe("choosing the SIM for a reply", () => {
     expect(box(thread)).toBeDisabled();
     expect(box(thread)).toHaveAttribute(
       "placeholder",
-      "This phone allows no SIM for replies",
+      "This phone allows no SIM for replies. Allow one in the app, under Forward.",
+    );
+    expect(simBox(thread)).toHaveDisplayValue("No SIM allowed");
+    expect(within(thread).queryByText("Choose a SIM")).toBeNull();
+  });
+
+  it("says so when the phone shares no SIMs at all (phone access not allowed, or no SIM)", async () => {
+    const { thread } = await open({ sims: [] });
+
+    expect(simBox(thread)).toBeNull();
+    expect(box(thread)).toBeDisabled();
+    expect(box(thread)).toHaveAttribute(
+      "placeholder",
+      "This phone shares no SIMs. In the app, allow phone access, then allow a SIM under Forward.",
     );
   });
 

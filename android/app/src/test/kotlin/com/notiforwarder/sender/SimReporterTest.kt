@@ -28,12 +28,12 @@ class SimReporterTest {
     }
 
     @Test
-    fun `says nothing when the SIMs cannot be listed, so the dashboard does not show a wrong list`() {
+    fun `reports an empty list when the SIMs cannot be listed, so the dashboard can say why replies are off`() {
         installed = null
 
         reporter().report()
 
-        assertEquals(emptyList<List<ReportedSim>>(), api.puts)
+        assertEquals(listOf(emptyList<ReportedSim>()), api.puts)
     }
 
     @Test
