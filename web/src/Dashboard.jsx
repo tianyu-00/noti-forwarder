@@ -59,6 +59,8 @@ function replyBlock(conversation, device, key) {
     return "Add the encryption key in Settings to reply";
   if (latest.encrypted && !key)
     return "Add the encryption key in Settings to reply";
+  if (device?.sims?.length > 0 && !device.sims.some((s) => s.allowed))
+    return "This phone allows no SIM for replies";
   return null;
 }
 
@@ -189,6 +191,13 @@ export default function Dashboard({ username, onLogout, pairingTiming }) {
 
   useStream({
     device_seen: (d) => markSeen(d.deviceId, d.lastSeen),
+    // The phone listed its SIMs again (a SIM was swapped, or it changed which ones it allows).
+    device_sims: (d) =>
+      setDevices((list) =>
+        list.map((x) =>
+          x.deviceId === d.deviceId ? { ...x, sims: d.sims } : x,
+        ),
+      ),
     // The phone's connection opened or closed: the green dot follows it exactly.
     device_presence: (d) =>
       setDevices((list) =>
@@ -377,7 +386,7 @@ export default function Dashboard({ username, onLogout, pairingTiming }) {
 
   // Queues a reply for the phone to send. Encrypted here when the conversation is, so the server
   // only ever holds scrambled text. Throws when the server refuses, so the box keeps the text.
-  async function sendReply(text) {
+  async function sendReply(text, sim) {
     const latest = openConversation.latest;
     const seal = latest.encrypted && e2eKey;
     const item = await api("/outbox", {
@@ -388,6 +397,8 @@ export default function Dashboard({ username, onLogout, pairingTiming }) {
           ? encryptField(e2eKey, "reply-to", latest.sender)
           : latest.sender,
         body: seal ? encryptField(e2eKey, "reply-body", text) : text,
+        // Only when the phone listed its SIMs and one is chosen; otherwise the phone decides.
+        ...(sim != null && { sim }),
       },
     });
     setReplies((list) => upsertReply(list, item));
@@ -528,6 +539,10 @@ export default function Dashboard({ username, onLogout, pairingTiming }) {
               onBack={threadShown ? () => setThreadShown(false) : undefined}
               replies={threadReplies}
               onReply={sendReply}
+              sims={
+                devices.find((d) => d.deviceId === openConversation.deviceId)
+                  ?.sims ?? null
+              }
               replyBlockedReason={replyBlock(
                 openConversation,
                 devices.find((d) => d.deviceId === openConversation.deviceId),

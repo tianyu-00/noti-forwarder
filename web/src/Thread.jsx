@@ -5,6 +5,7 @@ import { splitAroundCode } from "./code.js";
 import { Button } from "./ui.jsx";
 import Avatar from "./Avatar.jsx";
 import KindBadge from "./KindBadge.jsx";
+import { defaultSim, simLabel } from "./sims.js";
 
 const messageShape = PropTypes.shape({
   id: PropTypes.string.isRequired,
@@ -165,6 +166,13 @@ function Bubble({ message: m }) {
 
 Bubble.propTypes = { message: messageShape.isRequired };
 
+export const simShape = PropTypes.shape({
+  id: PropTypes.number.isRequired,
+  slot: PropTypes.number.isRequired,
+  name: PropTypes.string.isRequired,
+  allowed: PropTypes.bool.isRequired,
+});
+
 const replyShape = PropTypes.shape({
   id: PropTypes.string.isRequired,
   body: PropTypes.string.isRequired,
@@ -238,19 +246,28 @@ function ReplyBubble({ reply }) {
 ReplyBubble.propTypes = { reply: replyShape.isRequired };
 
 // The box under a thread. `blockedReason` is the placeholder shown while replying is not possible.
-function Composer({ onSend, blockedReason }) {
+function Composer({ onSend, blockedReason, sims, receivedSim }) {
   const [text, setText] = useState("");
+  const [picked, setPicked] = useState(null);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
   const blocked = blockedReason != null;
-  const ready = !blocked && !busy && text.trim() !== "";
+  // The phone's SIMs, when it has listed them. The user's pick counts only while the phone still allows it.
+  const choosable = sims != null && sims.length > 0;
+  const chosen = !choosable
+    ? null
+    : sims.some((s) => s.allowed && s.id === picked)
+      ? picked
+      : defaultSim(sims, receivedSim);
+  const ready =
+    !blocked && !busy && text.trim() !== "" && (!choosable || chosen != null);
 
   async function send() {
     if (!ready) return;
     setBusy(true);
     setFailed(false);
     try {
-      await onSend(text.trim());
+      await onSend(text.trim(), chosen);
       setText("");
     } catch {
       setFailed(true);
@@ -267,6 +284,27 @@ function Composer({ onSend, blockedReason }) {
         </p>
       )}
       <div className="flex items-end gap-3">
+        {choosable && (
+          <select
+            aria-label="Send from SIM"
+            disabled={blocked}
+            value={chosen ?? ""}
+            onChange={(e) => setPicked(Number(e.target.value))}
+            className="h-11 max-w-[11rem] shrink-0 rounded-full border border-line bg-surface px-3 text-sm disabled:opacity-70"
+          >
+            {chosen == null && (
+              <option value="" disabled>
+                Choose a SIM
+              </option>
+            )}
+            {sims.map((s) => (
+              <option key={s.id} value={s.id} disabled={!s.allowed}>
+                {simLabel(s)}
+                {s.allowed ? "" : " (not allowed on the phone)"}
+              </option>
+            ))}
+          </select>
+        )}
         <textarea
           rows={1}
           disabled={blocked}
@@ -313,6 +351,8 @@ function Composer({ onSend, blockedReason }) {
 Composer.propTypes = {
   onSend: PropTypes.func.isRequired,
   blockedReason: PropTypes.string,
+  sims: PropTypes.arrayOf(simShape),
+  receivedSim: PropTypes.number,
 };
 
 /** One conversation: a header, its messages and replies oldest first, and a reply box. */
@@ -324,6 +364,7 @@ export default function Thread({
   replies = [],
   onReply,
   replyBlockedReason = null,
+  sims = null,
 }) {
   // Messages and our replies in one timeline, oldest first (a tie keeps the message first).
   const timeline = [
@@ -395,6 +436,8 @@ export default function Thread({
         key={conversation.id}
         onSend={onReply}
         blockedReason={replyBlockedReason}
+        sims={sims}
+        receivedSim={conversation.latest?.sim ?? undefined}
       />
     </section>
   );
@@ -407,6 +450,8 @@ Thread.propTypes = {
     type: PropTypes.string.isRequired,
     app: PropTypes.string,
     messages: PropTypes.arrayOf(messageShape).isRequired,
+    // The newest message; its `sim` is the SIM that received it.
+    latest: PropTypes.shape({ sim: PropTypes.number }),
   }).isRequired,
   deviceName: PropTypes.string,
   // Set only on a narrow screen, where the list and the thread take turns.
@@ -418,4 +463,6 @@ Thread.propTypes = {
   onReply: PropTypes.func.isRequired,
   // Why replying is not possible right now (shown in the box), or null when it is.
   replyBlockedReason: PropTypes.string,
+  // The phone's SIMs, or null until it has listed them.
+  sims: PropTypes.arrayOf(simShape),
 };

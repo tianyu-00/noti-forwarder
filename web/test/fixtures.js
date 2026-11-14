@@ -14,6 +14,7 @@ export function device(overrides = {}) {
     pairedAt: "2026-11-01T10:00:00.000Z",
     lastSeen: new Date().toISOString(),
     revokedAt: null,
+    sims: null,
     ...overrides,
   };
 }
@@ -30,6 +31,7 @@ export function message(overrides = {}) {
     receivedAt: "2026-11-11T10:00:00.000Z",
     createdAt: "2026-11-11T10:00:01.000Z",
     code: null,
+    sim: null,
     ...overrides,
   };
 }
@@ -80,6 +82,7 @@ export function reply(overrides = {}) {
     error: null,
     createdAt: "2026-11-11T10:05:00.000Z",
     sentAt: null,
+    sim: null,
     ...overrides,
   };
 }
