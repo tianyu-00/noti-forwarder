@@ -13,6 +13,8 @@ const messageSchema = z.object({
   app: z.string().min(1).max(255),
   // The app's real name as the phone shows it. Optional: older phones do not send it.
   appLabel: z.string().max(255).optional(),
+  // Which SIM received it (the phone's subscription id). Optional: older phones and notifications have none.
+  sim: z.number().int().min(0).optional(),
   sender: z
     .string()
     .max(SENDER_ENCRYPTED_MAX)

@@ -15,6 +15,8 @@ const MAX_SEALED = 4000;
 
 const createSchema = z.object({
   deviceId: z.string().uuid(),
+  // Which of the phone's SIMs sends it (chosen on the dashboard). Optional: the phone decides without one.
+  sim: z.number().int().min(0).optional(),
   to: z.string().max(300).refine((v) => isEncrypted(v) || PHONE_NUMBER.test(v)),
   body: z
     .string()
@@ -61,14 +63,14 @@ export function outboxRouter({
     try {
       const parsed = createSchema.safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ error: 'invalid_payload' });
-      const { deviceId, to, body } = parsed.data;
+      const { deviceId, to, body, sim } = parsed.data;
       const device = await db.query('SELECT revoked_at FROM devices WHERE device_id = $1', [deviceId]);
       if (device.rowCount === 0) return res.status(404).json({ error: 'not_found' });
       if (device.rows[0].revoked_at) return res.status(409).json({ error: 'device_revoked' });
 
       const { rows } = await db.query(
-        'INSERT INTO outbox (id, device_id, recipient, body) VALUES ($1, $2, $3, $4) RETURNING *',
-        [randomUUID(), deviceId, to, body],
+        'INSERT INTO outbox (id, device_id, recipient, body, sim) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+        [randomUUID(), deviceId, to, body, sim ?? null],
       );
       const item = outboxToApi(rows[0]);
       await audit(db, { event: 'reply', actor: req.session.username, deviceId, ip: req.ip });

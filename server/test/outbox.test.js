@@ -57,6 +57,7 @@ describe('POST /api/v1/outbox (the dashboard queues a reply)', () => {
       body: 'On my way',
       status: 'queued',
       error: null,
+      sim: null,
       createdAt: expect.any(String),
       sentAt: null,
     });

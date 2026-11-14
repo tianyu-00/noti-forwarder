@@ -3,6 +3,7 @@ import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import { messagesRouter } from './routes/messages.js';
 import { heartbeatRouter } from './routes/heartbeat.js';
+import { simsRouter } from './routes/sims.js';
 import { deviceStreamRouter } from './routes/device-stream.js';
 import { createPresence } from './presence.js';
 import { authRouter } from './routes/auth.js';
@@ -70,6 +71,7 @@ export function createApp({
     app.use('/api/v1', messagesRouter({ db, requireViewer: viewer, events, notifier, messageRateLimit, preAuthRateLimit }));
     app.use('/api/v1', outboxRouter({ db, requireViewer: viewer, events, presence, outboxRateLimit, outboxMaxAgeMs, preAuthRateLimit }));
     app.use('/api/v1', heartbeatRouter({ db, events, presence, preAuthRateLimit }));
+    app.use('/api/v1', simsRouter({ db, events, preAuthRateLimit }));
     app.use('/api/v1', deviceStreamRouter({ db, events, presence, preAuthRateLimit }));
     app.use('/api/v1', streamRouter({ requireViewer: viewer, events }));
   }

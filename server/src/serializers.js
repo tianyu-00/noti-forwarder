@@ -8,6 +8,8 @@ export function messageToApi(row) {
     type: row.type,
     app: row.app,
     appLabel: row.app_label ?? null,
+    // The SIM (the phone's subscription id) that received it; null for notifications and older phones.
+    sim: row.sim ?? null,
     sender: row.sender,
     body: row.body,
     receivedAt: row.received_at.toISOString(),
@@ -28,10 +30,12 @@ export function deviceToApi(row) {
     pairedAt: row.paired_at.toISOString(),
     lastSeen: row.last_seen ? row.last_seen.toISOString() : null,
     revokedAt: row.revoked_at ? row.revoked_at.toISOString() : null,
+    // null until the phone reports its SIMs.
+    sims: row.sims ? JSON.parse(row.sims) : null,
   };
 }
 
-export const DEVICE_COLUMNS = 'device_id, name, model, app_version, paired_at, last_seen, revoked_at';
+export const DEVICE_COLUMNS = 'device_id, name, model, app_version, paired_at, last_seen, revoked_at, sims';
 
 export function outboxToApi(row) {
   return {
@@ -41,6 +45,7 @@ export function outboxToApi(row) {
     body: row.body,
     status: row.status,
     error: row.error ?? null,
+    sim: row.sim ?? null,
     createdAt: row.created_at.toISOString(),
     sentAt: row.sent_at ? row.sent_at.toISOString() : null,
   };

@@ -50,13 +50,13 @@ export function messagesRouter({
           receivedAt: m.receivedAt,
         });
         const result = await db.query(
-          `INSERT INTO messages (id, device_id, type, app, app_label, sender, body, received_at, dedupe_hash)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+          `INSERT INTO messages (id, device_id, type, app, app_label, sender, body, received_at, dedupe_hash, sim)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
            ON CONFLICT DO NOTHING
            RETURNING *`,
           // Ids are kept lower case and times as UTC (Date), because SQLite stores exactly the text it is
           // given and the list sorts and pages on that text. Postgres did both by itself.
-          [m.id.toLowerCase(), req.deviceId, m.type, m.app, m.appLabel ?? null, m.sender, m.body, new Date(m.receivedAt), hash],
+          [m.id.toLowerCase(), req.deviceId, m.type, m.app, m.appLabel ?? null, m.sender, m.body, new Date(m.receivedAt), hash, m.sim ?? null],
         );
         stored += result.rowCount;
         // Only newly stored messages are pushed; duplicates stay silent.

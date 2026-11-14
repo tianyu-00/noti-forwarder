@@ -38,6 +38,7 @@ describe('GET /api/v1/messages', () => {
       type: 'notification',
       app: 'com.bank',
       appLabel: null,
+      sim: null,
       sender: 'Bank',
       body: 'newest',
       receivedAt: '2026-01-03T10:00:00.000Z',
