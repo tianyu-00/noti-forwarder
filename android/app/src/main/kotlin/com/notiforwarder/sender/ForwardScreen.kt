@@ -87,17 +87,6 @@ internal fun ForwardScreen(
                     )
                     RowDivider()
                     SimRow(settings.allowedSims, sims, onAllowSimAccess) { onChange(settings.copy(allowedSims = it)) }
-                    // Practice mode is a testing tool: hidden until developer mode is unlocked (or while it is
-                    // still on, so it can never be left on out of sight).
-                    if (showPracticeMode(settings)) {
-                        RowDivider()
-                        SwitchRow(
-                            "Practice mode",
-                            "Replies are received and checked, but never sent, so nothing is charged. The dashboard " +
-                                "shows them as practice.",
-                            settings.practiceReplies,
-                        ) { onChange(settings.copy(practiceReplies = it)) }
-                    }
                 }
                 OutlinedTextField(
                     value = query,

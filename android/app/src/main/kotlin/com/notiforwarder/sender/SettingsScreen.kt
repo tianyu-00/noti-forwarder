@@ -29,6 +29,8 @@ internal fun SettingsScreen(
     developerMode: Boolean,
     onDeveloperUnlocked: () -> Unit,
     onDeveloperChange: (Boolean) -> Unit,
+    practiceMode: Boolean,
+    onPracticeChange: (Boolean) -> Unit,
 ) {
     val context = LocalContext.current
     val taps = remember { DeveloperTaps() }
@@ -95,9 +97,17 @@ internal fun SettingsScreen(
             NotiCard(padding = androidx.compose.foundation.layout.PaddingValues(horizontal = 18.dp, vertical = 10.dp)) {
                 SwitchRow(
                     "Developer mode",
-                    "Shows options meant for testing, like practice mode on the Forward tab. Switch off to hide them.",
+                    "Shows options meant for testing. Switch off to hide them.",
                     true,
                     onDeveloperChange,
+                )
+                RowDivider()
+                SwitchRow(
+                    "Practice mode",
+                    "Replies from the dashboard are received and checked, but never sent, so nothing is charged. " +
+                        "The dashboard shows them as practice.",
+                    practiceMode,
+                    onPracticeChange,
                 )
             }
         }

@@ -17,5 +17,6 @@ class DeveloperTaps(private val needed: Int = 7, private val gapMs: Long = 2_000
     }
 }
 
-/** Practice mode is a testing tool: shown in developer mode, and while it is still on so it can be switched off. */
-fun showPracticeMode(settings: CaptureSettings) = settings.developerMode || settings.practiceReplies
+/** Developer mode shows testing tools like practice mode. Switching it off also switches them off, so none stays on unseen. */
+fun withDeveloperMode(settings: CaptureSettings, on: Boolean) =
+    settings.copy(developerMode = on, practiceReplies = settings.practiceReplies && on)
