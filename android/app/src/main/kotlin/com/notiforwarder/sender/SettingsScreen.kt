@@ -62,17 +62,6 @@ internal fun SettingsScreen(
             }
         }
 
-        if (developerMode) {
-            NotiCard(padding = androidx.compose.foundation.layout.PaddingValues(horizontal = 18.dp, vertical = 10.dp)) {
-                SwitchRow(
-                    "Developer mode",
-                    "Shows options meant for testing, like practice mode on the Forward tab. Switch off to hide them.",
-                    true,
-                    onDeveloperChange,
-                )
-            }
-        }
-
         NotiCard(padding = androidx.compose.foundation.layout.PaddingValues(horizontal = 18.dp, vertical = 8.dp)) {
             CardLabel("Phone setup")
             KeyValueRow(
@@ -100,6 +89,17 @@ internal fun SettingsScreen(
                     }
                 },
             )
+        }
+
+        if (developerMode) {
+            NotiCard(padding = androidx.compose.foundation.layout.PaddingValues(horizontal = 18.dp, vertical = 10.dp)) {
+                SwitchRow(
+                    "Developer mode",
+                    "Shows options meant for testing, like practice mode on the Forward tab. Switch off to hide them.",
+                    true,
+                    onDeveloperChange,
+                )
+            }
         }
     }
 }
