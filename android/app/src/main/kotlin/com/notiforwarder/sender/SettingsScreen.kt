@@ -92,22 +92,11 @@ internal fun SettingsScreen(
             KeyValueRow(
                 "Version",
                 BuildConfig.VERSION_NAME,
+                // Only the unlocking tap says anything: a message per tap queues up and lags behind the taps.
                 onClick = {
-                    if (developerMode) {
-                        Toast.makeText(context, "Developer mode is already on", Toast.LENGTH_SHORT).show()
-                    } else {
-                        when (val r = taps.tap(System.currentTimeMillis())) {
-                            TapResult.Nothing -> {}
-                            is TapResult.Remaining -> Toast.makeText(
-                                context,
-                                "${r.taps} more ${if (r.taps == 1) "tap" else "taps"} to turn on developer mode",
-                                Toast.LENGTH_SHORT,
-                            ).show()
-                            TapResult.Unlocked -> {
-                                onDeveloperUnlocked()
-                                Toast.makeText(context, "Developer mode is on", Toast.LENGTH_SHORT).show()
-                            }
-                        }
+                    if (!developerMode && taps.tap(System.currentTimeMillis())) {
+                        onDeveloperUnlocked()
+                        Toast.makeText(context, "Developer mode is on", Toast.LENGTH_SHORT).show()
                     }
                 },
             )
