@@ -26,11 +26,7 @@ internal fun SettingsScreen(
     paired: UiState.Paired,
     themeMode: ThemeMode,
     onThemeChange: (ThemeMode) -> Unit,
-    ready: Readiness,
     onUnpair: () -> Unit,
-    onOpenAccessSettings: () -> Unit,
-    onRequestBatteryExemption: () -> Unit,
-    onOpenAutoStart: () -> Unit,
     developerMode: Boolean,
     onDeveloperUnlocked: () -> Unit,
     onChangeRole: () -> Unit,
@@ -91,21 +87,7 @@ internal fun SettingsScreen(
         }
 
         NotiCard(padding = androidx.compose.foundation.layout.PaddingValues(horizontal = 18.dp, vertical = 8.dp)) {
-            CardLabel("Phone setup")
-            KeyValueRow(
-                "Notification access",
-                if (ready.accessGranted) "On" else "Off, tap to fix",
-                onClick = if (ready.accessGranted) null else onOpenAccessSettings,
-            )
-            RowDivider()
-            KeyValueRow(
-                "Battery optimisation",
-                if (ready.batteryExempt) "Off" else "On, tap to fix",
-                onClick = if (ready.batteryExempt) null else onRequestBatteryExemption,
-            )
-            RowDivider()
-            KeyValueRow("Auto-start", "Open settings", onClick = onOpenAutoStart)
-            RowDivider()
+            CardLabel("About")
             KeyValueRow(
                 "Version",
                 BuildConfig.VERSION_NAME,

@@ -73,7 +73,7 @@ internal fun ReceiverScreen(
 
     when (tab) {
         Tab.Alerts -> AlertsScreen(app, messages)
-        Tab.Settings -> ReceiverSettingsScreen(app, paired, ready, themeMode, updateState, actions, messages)
+        Tab.Settings -> ReceiverSettingsScreen(app, paired, themeMode, updateState, actions, messages)
         else -> {
             // Worked out again each time the list is re-read (every couple of seconds).
             val stats = remember(messages) {
@@ -236,7 +236,6 @@ private fun AlertsScreen(app: NotiApp, messages: List<ReceivedMessage>) {
 private fun ReceiverSettingsScreen(
     app: NotiApp,
     paired: UiState.Paired,
-    ready: Readiness,
     themeMode: ThemeMode,
     updateState: UpdateState,
     actions: ReceiverActions,
@@ -304,21 +303,6 @@ private fun ReceiverSettingsScreen(
             RowDivider()
             SecondaryButton(onClick = actions.onUnpair, danger = true, modifier = Modifier.fillMaxWidth().padding(top = 12.dp)) { Text("Unpair this phone") }
             SecondaryButton(onClick = { confirmRole = true }, modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)) { Text("Use as a sender instead") }
-        }
-
-        NotiCard(padding = androidx.compose.foundation.layout.PaddingValues(horizontal = 18.dp, vertical = 8.dp)) {
-            CardLabel("Phone setup")
-            KeyValueRow(
-                "Notifications",
-                if (ready.notificationsAllowed) "On" else "Off, tap to fix",
-                onClick = if (ready.notificationsAllowed) null else actions.onAllowNotifications,
-            )
-            RowDivider()
-            KeyValueRow(
-                "Battery optimisation",
-                if (ready.batteryExempt) "Off" else "On, tap to fix",
-                onClick = if (ready.batteryExempt) null else actions.onRequestBatteryExemption,
-            )
         }
 
         NotiCard(padding = androidx.compose.foundation.layout.PaddingValues(horizontal = 18.dp, vertical = 8.dp)) {
