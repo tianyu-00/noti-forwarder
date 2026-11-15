@@ -267,7 +267,28 @@ private fun MainScreen(
                     },
                 )
             } else if (role == AppRole.Receiver) {
-                ReceiverScreen(paired = paired, onUnpair = controller::unpair, onChangeRole = changeRole)
+                ReceiverScreen(
+                    app = app,
+                    paired = paired,
+                    ready = ready,
+                    themeMode = themeMode,
+                    updateState = updateState,
+                    actions = ReceiverActions(
+                        onUnpair = controller::unpair,
+                        onChangeRole = changeRole,
+                        onAllowNotifications = { ask(Manifest.permission.POST_NOTIFICATIONS, askNotifications) },
+                        onRequestBatteryExemption = onRequestBatteryExemption,
+                        onThemeChange = onThemeChange,
+                        onCheckUpdate = { scope.launch(Dispatchers.IO) { app.updater.check() } },
+                        onInstallUpdate = { scope.launch(Dispatchers.IO) { app.updater.downloadAndInstall() } },
+                        onAllowInstall = {
+                            app.startActivity(
+                                Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${app.packageName}"))
+                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                            )
+                        },
+                    ),
+                )
             } else {
                 when (currentTab(tab, paired = true)) {
                     Tab.Status -> {

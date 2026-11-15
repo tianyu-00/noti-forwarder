@@ -144,7 +144,7 @@ internal fun SettingsScreen(
 
 /** Check for a newer release and install it from inside the app. */
 @Composable
-private fun UpdateCard(state: UpdateState, onCheck: () -> Unit, onInstall: () -> Unit, onAllowInstall: () -> Unit) {
+internal fun UpdateCard(state: UpdateState, onCheck: () -> Unit, onInstall: () -> Unit, onAllowInstall: () -> Unit) {
     NotiCard(padding = androidx.compose.foundation.layout.PaddingValues(horizontal = 18.dp, vertical = 8.dp)) {
         CardLabel("App updates")
         KeyValueRow("Installed", BuildConfig.VERSION_NAME)
