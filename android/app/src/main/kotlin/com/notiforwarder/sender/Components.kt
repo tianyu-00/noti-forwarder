@@ -116,7 +116,7 @@ fun StatTile(label: String, value: String, modifier: Modifier = Modifier) {
     }
 }
 
-/** One line of a checklist: a tick (or "!") and a sentence, with an optional button on the right. */
+/** One line of a checklist: a tick (or an alert mark) and a sentence, with an optional button on the right. */
 @Composable
 fun CheckRow(
     text: String,
@@ -137,7 +137,7 @@ fun CheckRow(
             modifier = Modifier.size(24.dp).clip(CircleShape).background(tone.copy(alpha = 0.16f)),
             contentAlignment = Alignment.Center,
         ) {
-            Text(if (ok) "✓" else "!", color = tone, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            IconMark(if (ok) AppIcon.Check else AppIcon.Alert, tone, size = 14.dp)
         }
         Column(modifier = Modifier.weight(1f)) {
             Text(text, style = MaterialTheme.typography.bodyLarge)
@@ -162,7 +162,14 @@ fun CheckRow(
 
 /** "Server ........ notify.example.com" */
 @Composable
-fun KeyValueRow(key: String, value: String, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
+fun KeyValueRow(
+    key: String,
+    value: String,
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+    /** An arrow at the end, for a row that opens another page. */
+    chevron: Boolean = false,
+) {
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -172,14 +179,17 @@ fun KeyValueRow(key: String, value: String, modifier: Modifier = Modifier, onCli
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(key, style = MaterialTheme.typography.bodyLarge)
-        Text(
-            value,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(start = 16.dp),
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                value,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(start = 16.dp),
+            )
+            if (chevron) IconMark(AppIcon.ChevronRight, MaterialTheme.colorScheme.onSurfaceVariant, Modifier.padding(start = 6.dp), size = 18.dp)
+        }
     }
 }
 

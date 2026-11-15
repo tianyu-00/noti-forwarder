@@ -227,7 +227,12 @@ private fun AlertsScreen(app: NotiApp, messages: List<ReceivedMessage>) {
                                 }
                             }
                             TextButton(onClick = { clipboard.setText(AnnotatedString(code)); copied = true }) {
-                                Text(if (copied) "Copied ✓" else "Copy code")
+                                if (copied) {
+                                    IconMark(AppIcon.Check, MaterialTheme.colorScheme.primary, Modifier.padding(end = 6.dp))
+                                    Text("Copied")
+                                } else {
+                                    Text("Copy code")
+                                }
                             }
                         }
                         Box(Modifier.weight(1f))
@@ -280,7 +285,7 @@ private fun ReceiverSettingsScreen(
         }
 
         NotiCard(padding = androidx.compose.foundation.layout.PaddingValues(horizontal = 18.dp, vertical = 8.dp)) {
-            KeyValueRow("Alert settings", if (alertsOn) "On  ›" else "Off  ›", onClick = onOpenAlertSettings)
+            KeyValueRow("Alert settings", if (alertsOn) "On" else "Off", onClick = onOpenAlertSettings, chevron = true)
         }
 
         UpdateCard(updateState, actions.onCheckUpdate, actions.onInstallUpdate, actions.onAllowInstall)
@@ -301,7 +306,10 @@ private fun ReceiverAlertSettingsScreen(app: NotiApp, messages: List<ReceivedMes
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp, vertical = 20.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        TextButton(onClick = onBack) { Text("‹ Settings") }
+        TextButton(onClick = onBack) {
+            IconMark(AppIcon.ChevronLeft, MaterialTheme.colorScheme.primary, Modifier.padding(end = 4.dp), size = 18.dp)
+            Text("Settings")
+        }
         ScreenTitle("Alert settings")
 
         NotiCard(padding = androidx.compose.foundation.layout.PaddingValues(horizontal = 18.dp, vertical = 10.dp)) {
