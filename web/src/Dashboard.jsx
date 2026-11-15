@@ -1,3 +1,4 @@
+import Logo from "./Logo.jsx";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import PropTypes from "prop-types";
 import clsx from "clsx";
@@ -436,12 +437,7 @@ export default function Dashboard({ username, onLogout, pairingTiming }) {
           )}
         >
           <div className="flex items-center gap-2.5 px-2 pb-2 md:pb-4">
-            <span
-              aria-hidden="true"
-              className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-rail-accent text-sm font-extrabold text-on-rail-accent"
-            >
-              N
-            </span>
+            <Logo className="h-8 w-8 rounded-[10px]" />
             <span className="text-[15px] font-semibold">Notiforwarder</span>
           </div>
           <Sidebar
