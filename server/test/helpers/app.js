@@ -20,12 +20,12 @@ export async function buildTestApp({ realAuth = false, ...options } = {}) {
     ...options,
   });
 
-  async function addDevice({ revoked = false } = {}) {
+  async function addDevice({ revoked = false, role = 'sender' } = {}) {
     const token = randomBytes(32).toString('base64url');
     const deviceId = randomUUID();
     await pool.query(
-      'INSERT INTO devices (device_id, name, token_hash, revoked_at) VALUES ($1, $2, $3, $4)',
-      [deviceId, 'Test phone', hashToken(token), revoked ? new Date() : null],
+      'INSERT INTO devices (device_id, name, token_hash, revoked_at, role) VALUES ($1, $2, $3, $4, $5)',
+      [deviceId, 'Test phone', hashToken(token), revoked ? new Date() : null, role],
     );
     return { deviceId, token };
   }

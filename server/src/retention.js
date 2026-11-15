@@ -28,11 +28,14 @@ export async function purgeOldMessages(db) {
 }
 
 /** Runs the purge on a timer. Logs only a count, never message text. */
-export function startRetentionJob(db, { everyMs = 60 * 60 * 1000, logger = console } = {}) {
+export function startRetentionJob(db, { everyMs = 60 * 60 * 1000, logger = console, onPurged = () => {} } = {}) {
   const run = async () => {
     try {
       const purged = await purgeOldMessages(db);
-      if (purged > 0) logger.log(`retention: deleted ${purged} old messages`);
+      if (purged > 0) {
+        logger.log(`retention: deleted ${purged} old messages`);
+        onPurged(purged);
+      }
     } catch (err) {
       logger.error(`retention failed: ${err.code || err.name}`);
     }

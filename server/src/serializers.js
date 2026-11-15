@@ -37,12 +37,14 @@ export function deviceToApi(row) {
     pairedAt: row.paired_at.toISOString(),
     lastSeen: row.last_seen ? row.last_seen.toISOString() : null,
     revokedAt: row.revoked_at ? row.revoked_at.toISOString() : null,
+    // "sender" (forwards notifications) or "receiver" (the main phone that shows alerts).
+    role: row.role,
     // null until the phone reports its SIMs and whether it takes replies.
     ...simsOf(row.sims),
   };
 }
 
-export const DEVICE_COLUMNS = 'device_id, name, model, app_version, paired_at, last_seen, revoked_at, sims';
+export const DEVICE_COLUMNS = 'device_id, name, model, app_version, paired_at, last_seen, revoked_at, role, sims';
 
 export function outboxToApi(row) {
   return {

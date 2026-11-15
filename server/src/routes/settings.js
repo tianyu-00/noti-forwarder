@@ -9,7 +9,7 @@ const settingsSchema = z.object({
   retentionDays: z.number().int().min(1).max(3650).nullable(),
 });
 
-export function settingsRouter({ db, requireViewer }) {
+export function settingsRouter({ db, requireViewer, events }) {
   const router = Router();
 
   router.get('/settings', requireViewer, async (req, res, next) => {
@@ -26,6 +26,7 @@ export function settingsRouter({ db, requireViewer }) {
       if (!parsed.success) return res.status(400).json({ error: 'invalid_payload' });
       await setRetentionDays(db, parsed.data.retentionDays);
       const purged = await purgeOldMessages(db);
+      if (purged > 0) events?.publish('messages_purged', {});
       await audit(db, { event: 'settings', actor: req.session.username, ip: req.ip });
       res.json({ retentionDays: parsed.data.retentionDays, purged });
     } catch (err) {

@@ -37,6 +37,7 @@ describe('GET /api/v1/devices', () => {
       appVersion: null,
       pairedAt: expect.any(String),
       lastSeen: expect.any(String),
+      role: 'sender',
       sims: null,
       replies: null,
       revokedAt: null,

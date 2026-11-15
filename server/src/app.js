@@ -4,6 +4,7 @@ import cookieParser from 'cookie-parser';
 import { messagesRouter } from './routes/messages.js';
 import { heartbeatRouter } from './routes/heartbeat.js';
 import { simsRouter } from './routes/sims.js';
+import { receiverRouter } from './routes/receiver.js';
 import { deviceStreamRouter } from './routes/device-stream.js';
 import { createPresence } from './presence.js';
 import { authRouter } from './routes/auth.js';
@@ -51,6 +52,7 @@ export function createApp({
   if (db) {
     const viewer = requireViewer ?? requireSession({ db });
     const events = createEventHub();
+    app.locals.events = events; // the hourly retention job announces what it deleted
     // Who holds a connection right now. Going on or offline refreshes "last seen" and tells open
     // dashboards, so the green dot is exact.
     const presence = createPresence({
@@ -67,12 +69,13 @@ export function createApp({
     app.use('/api/v1', authRouter({ db, requireViewer: viewer, cookieSecure, loginRateLimit, now, secretBox }));
     app.use('/api/v1', pairingRouter({ db, requireViewer: viewer, events, publicUrl, pairRateLimit }));
     app.use('/api/v1', devicesRouter({ db, requireViewer: viewer, events, presence, silentAfterMinutes }));
-    app.use('/api/v1', settingsRouter({ db, requireViewer: viewer }));
+    app.use('/api/v1', settingsRouter({ db, requireViewer: viewer, events }));
     app.use('/api/v1', messagesRouter({ db, requireViewer: viewer, events, notifier, messageRateLimit, preAuthRateLimit }));
     app.use('/api/v1', outboxRouter({ db, requireViewer: viewer, events, presence, outboxRateLimit, outboxMaxAgeMs, preAuthRateLimit }));
     app.use('/api/v1', heartbeatRouter({ db, events, presence, preAuthRateLimit }));
     app.use('/api/v1', simsRouter({ db, events, preAuthRateLimit }));
     app.use('/api/v1', deviceStreamRouter({ db, events, presence, preAuthRateLimit }));
+    app.use('/api/v1', receiverRouter({ db, events, presence, preAuthRateLimit }));
     app.use('/api/v1', streamRouter({ requireViewer: viewer, events }));
   }
 

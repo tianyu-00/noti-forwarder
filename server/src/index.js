@@ -94,7 +94,7 @@ const cookieSecure = cookieSecureFor(publicUrl);
 if (!cookieSecure) console.log('PUBLIC_URL is http://: sessions work without HTTPS, but traffic is not encrypted');
 const app = createApp({ ...loadBuildInfo(process.env), db, publicUrl, trustProxy, notifier, cookieSecure, secretBox, silentAfterMinutes });
 
-startRetentionJob(db);
+startRetentionJob(db, { onPurged: () => app.locals.events?.publish('messages_purged', {}) });
 if (silentAfterMinutes > 0) {
   createSilentMonitor({ db, notifier, afterMinutes: silentAfterMinutes, isConnected: (id) => app.locals.presence?.isConnected(id) ?? false }).start();
   console.log(`silent phone alerts after ${silentAfterMinutes} minutes without contact`);

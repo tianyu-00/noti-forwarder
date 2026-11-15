@@ -60,7 +60,7 @@ describe('POST /api/v1/pair', () => {
     const res = await pair({ code: code.code, ...phone });
 
     expect(res.status).toBe(201);
-    expect(res.body).toEqual({ deviceId: expect.any(String), token: expect.any(String) });
+    expect(res.body).toEqual({ deviceId: expect.any(String), token: expect.any(String), role: 'sender' });
     const { rows } = await ctx.pool.query('SELECT * FROM devices WHERE device_id = $1', [res.body.deviceId]);
     expect(rows[0]).toMatchObject({ name: phone.name, model: phone.model, app_version: phone.appVersion });
     expect(rows[0].token_hash).not.toBe(res.body.token);
