@@ -74,6 +74,17 @@ class NotiApp : Application() {
         replyThread.execute { runCatching { simReporter.report(force) } }
     }
 
+    /**
+     * The server is reachable right now (the app started, or the live connection just opened): send what
+     * is waiting at once, even if it was told to wait 15 minutes after earlier failures. Returns at once.
+     */
+    fun sendWaiting() {
+        replyThread.execute {
+            runCatching { queue.retryNow() }
+            scheduler.flushSoon()
+        }
+    }
+
     /** Looks for replies waiting on the server and sends them. Returns at once. */
     fun sendReplies() {
         replyThread.execute { runCatching { replyProcessor.process() } }
@@ -90,7 +101,7 @@ class NotiApp : Application() {
     val deviceStream: DeviceStreamRunner by lazy {
         DeviceStreamRunner(
             // Each time it connects, collect replies that were queued while the phone was away.
-            connect = { onConnected -> streamClient.run { onConnected(); sendReplies(); reportSims() } },
+            connect = { onConnected -> streamClient.run { onConnected(); sendWaiting(); sendReplies(); reportSims() } },
             store = store,
             onRevoked = { controller.refresh() },
             cancel = streamClient::cancel,
@@ -148,7 +159,7 @@ class NotiApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        scheduler.flushSoon() // an app start sends anything left in the queue
+        sendWaiting() // an app start sends anything left in the queue, without waiting out an old retry timer
         if (store.load() != null) deviceStream.start() // reconnect after a restart of the app
         // The moment Android has a network again, reconnect instead of waiting out a retry timer.
         NetworkWatcher(this) { deviceStream.wake() }.start()

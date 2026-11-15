@@ -110,6 +110,45 @@ class MessageQueueTest {
     }
 
     @Test
+    fun `retry now makes every waiting message due at once, for when the server is known to be reachable`() {
+        queue.enqueue(msg("a"))
+        queue.enqueue(msg("b"))
+        queue.retryLater(listOf("a", "b"), atMillis = now + 900_000)
+        assertEquals(emptyList<String>(), ids())
+
+        queue.retryNow()
+
+        assertEquals(listOf("a", "b"), ids())
+        assertNull(queue.nextDueAt())
+    }
+
+    @Test
+    fun `retry now leaves sent and refused messages alone, and keeps the attempt count`() {
+        queue.enqueue(msg("sent"))
+        queue.enqueue(msg("bad"))
+        queue.enqueue(msg("a"))
+        queue.confirmed(listOf("sent"))
+        queue.quarantine("bad")
+        queue.retryLater(listOf("a"), atMillis = now + 900_000)
+
+        queue.retryNow()
+
+        val due = queue.nextBatch(10)
+        assertEquals(listOf("a"), due.map { it.message.id })
+        assertEquals(1, due.single().attempts)
+        assertEquals(1, queue.quarantinedCount())
+    }
+
+    @Test
+    fun `retry now does not release a notification held back so its text message can arrive first`() {
+        queue.enqueue(msg("held"), notBefore = now + 3_000)
+
+        queue.retryNow()
+
+        assertEquals(emptyList<String>(), ids())
+    }
+
+    @Test
     fun `reports when the next waiting message becomes due`() {
         assertNull(queue.nextDueAt())
         queue.enqueue(msg("a"))

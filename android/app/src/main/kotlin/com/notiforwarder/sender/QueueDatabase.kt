@@ -67,6 +67,10 @@ interface QueueDao {
     @Query("UPDATE queued_messages SET quarantined = 1 WHERE id = :id")
     fun quarantine(id: String)
 
+    // Only messages that already failed (attempts > 0): one held back on purpose has none.
+    @Query("UPDATE queued_messages SET nextAttemptAt = 0 WHERE sentAt IS NULL AND quarantined = 0 AND attempts > 0")
+    fun retryNow()
+
     @Query("UPDATE queued_messages SET sentAt = :at, body = '' WHERE id IN (:ids)")
     fun markSent(ids: List<String>, at: Long)
 

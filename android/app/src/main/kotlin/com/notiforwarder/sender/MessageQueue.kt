@@ -88,6 +88,12 @@ class MessageQueue(
 
     fun retryLater(ids: List<String>, atMillis: Long) = dao.retryLater(ids, atMillis)
 
+    /**
+     * Messages that failed are due again right now. For when the server is known to be reachable (the
+     * app just started, or its live connection just opened), so a long retry wait does not hold them.
+     */
+    fun retryNow() = dao.retryNow()
+
     fun quarantine(id: String) = dao.quarantine(id)
 
     fun count(): Int = dao.count()
