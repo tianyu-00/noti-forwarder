@@ -180,7 +180,19 @@ private fun AlertsScreen(app: NotiApp, messages: List<ReceivedMessage>) {
                         style = MaterialTheme.typography.bodySmall,
                         color = colors.onSurfaceVariant,
                     )
-                    d.code?.let { code -> TextButton(onClick = { clipboard.setText(AnnotatedString(code)) }) { Text("Copy code") } }
+                    d.code?.let { code ->
+                        // The button says so for two seconds, so a tap is never silent.
+                        var copied by remember(message.id) { mutableStateOf(false) }
+                        LaunchedEffect(copied) {
+                            if (copied) {
+                                delay(2_000)
+                                copied = false
+                            }
+                        }
+                        TextButton(onClick = { clipboard.setText(AnnotatedString(code)); copied = true }) {
+                            Text(if (copied) "Copied ✓" else "Copy code")
+                        }
+                    }
                 }
                 if (cutOff || expanded) {
                     TextButton(onClick = { expanded = !expanded }) { Text(if (expanded) "Show less" else "Show more") }
