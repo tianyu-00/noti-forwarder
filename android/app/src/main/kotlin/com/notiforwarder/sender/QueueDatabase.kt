@@ -39,6 +39,54 @@ data class QueuedMessage(
     val sim: Int? = null,
 )
 
+/** A message received from the server, kept as received (still encrypted when it was) so the receiver can show it again. */
+@Entity(tableName = "received_messages", indices = [Index(value = ["receivedAt", "id"]), Index(value = ["deviceId"])])
+data class ReceivedRow(
+    @PrimaryKey val id: String,
+    val deviceId: String,
+    val deviceName: String?,
+    val type: String,
+    val app: String,
+    val appLabel: String?,
+    val sender: String,
+    val body: String,
+    val receivedAt: String,
+    val code: String?,
+)
+
+@Dao
+interface ReceivedDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    fun insert(rows: List<ReceivedRow>)
+
+    @Query("SELECT * FROM received_messages ORDER BY receivedAt DESC, id DESC LIMIT :limit")
+    fun recent(limit: Int): List<ReceivedRow>
+
+    @Query("SELECT id, receivedAt FROM received_messages")
+    fun refs(): List<RefRow>
+
+    @Query("SELECT id FROM received_messages")
+    fun allIds(): List<String>
+
+    @Query("SELECT id FROM received_messages WHERE deviceId = :deviceId")
+    fun idsForDevice(deviceId: String): List<String>
+
+    @Query("SELECT COUNT(*) FROM received_messages WHERE id = :id")
+    fun count(id: String): Int
+
+    @Query("DELETE FROM received_messages WHERE id IN (:ids)")
+    fun delete(ids: List<String>)
+
+    /** Keeps the newest [keep] and forgets older ones. */
+    @Query(
+        "DELETE FROM received_messages WHERE id NOT IN " +
+            "(SELECT id FROM received_messages ORDER BY receivedAt DESC, id DESC LIMIT :keep)",
+    )
+    fun trim(keep: Int)
+}
+
+data class RefRow(val id: String, val receivedAt: String)
+
 @Dao
 interface QueueDao {
     /** Returns -1 when a message with this id is already queued. */
@@ -95,15 +143,17 @@ interface QueueDao {
     fun nextDueAt(now: Long): Long?
 }
 
+// Version 4 adds the table of messages a receiver has received.
 // Version 2 adds the nullable sentAt column and version 3 the nullable sim column; Room writes the migration from the two schema files.
 @Database(
-    entities = [QueuedMessage::class],
-    version = 3,
+    entities = [QueuedMessage::class, ReceivedRow::class],
+    version = 4,
     exportSchema = true,
-    autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3)],
+    autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3), AutoMigration(from = 3, to = 4)],
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun queueDao(): QueueDao
+    abstract fun receivedDao(): ReceivedDao
 
     companion object {
         fun open(context: Context): AppDatabase =

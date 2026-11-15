@@ -41,6 +41,13 @@ class DeviceStreamClient(
      * must return quickly (hand the work to another thread).
      */
     private val onOutbox: () -> Unit = {},
+    /** Which stream to hold: the sender's, or the receiver's (`/api/v1/receiver/stream`). */
+    private val path: String = "/api/v1/device-stream",
+    /**
+     * Every event with its data, for a stream that carries news (the receiver's). Called on the stream's thread, so it
+     * must return quickly. `revoked` still ends the connection.
+     */
+    private val onEvent: (type: String, data: String) -> Unit = { _, _ -> },
 ) {
     @Volatile private var call: Call? = null
 
@@ -48,7 +55,7 @@ class DeviceStreamClient(
     fun run(onConnected: () -> Unit = {}): StreamEnd {
         val credentials = store.load() ?: return StreamEnd.NotPaired
         val request = Request.Builder()
-            .url("${credentials.serverUrl}/api/v1/device-stream")
+            .url("${credentials.serverUrl}$path")
             .header("Authorization", "Bearer ${credentials.token}")
             .header("X-App-Version", appVersion)
             .header("Accept", "text/event-stream")
@@ -99,15 +106,19 @@ class DeviceStreamClient(
     // is waiting (what it holds is fetched separately); the rest is ignored.
     private fun readEvents(source: okio.BufferedSource): StreamEnd {
         var event: String? = null
+        var data = ""
         try {
             while (true) {
                 val line = source.readUtf8Line() ?: return StreamEnd.Dropped(wasConnected = true)
                 when {
                     line.startsWith("event:") -> event = line.removePrefix("event:").trim()
+                    line.startsWith("data:") -> data = line.removePrefix("data:").trim()
                     line.isEmpty() -> {
                         if (event == "revoked") return StreamEnd.Revoked
                         if (event == "outbox") onOutbox()
+                        event?.let { onEvent(it, data) }
                         event = null
+                        data = ""
                     }
                 }
             }

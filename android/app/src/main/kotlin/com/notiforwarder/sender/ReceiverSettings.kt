@@ -11,3 +11,48 @@ data class ReceiverSettings(
     /** Packages whose notifications never alert. */
     val blockedApps: Set<String> = emptySet(),
 )
+
+interface ReceiverSettingsStore {
+    fun load(): ReceiverSettings
+    fun save(settings: ReceiverSettings)
+}
+
+class PrefsReceiverSettingsStore(context: android.content.Context, name: String = "receiver_settings") : ReceiverSettingsStore {
+    private val prefs = context.getSharedPreferences(name, android.content.Context.MODE_PRIVATE)
+
+    override fun load() = ReceiverSettings(
+        enabled = prefs.getBoolean(ENABLED, true),
+        mode = AlertMode.entries.firstOrNull { it.name == prefs.getString(MODE, null) } ?: AlertMode.All,
+        types = prefs.getStringSet(TYPES, null)?.toSet() ?: setOf("sms", "notification"),
+        blockedApps = prefs.getStringSet(BLOCKED, emptySet())?.toSet().orEmpty(),
+    )
+
+    override fun save(settings: ReceiverSettings) = prefs.edit()
+        .putBoolean(ENABLED, settings.enabled)
+        .putString(MODE, settings.mode.name)
+        .putStringSet(TYPES, settings.types)
+        .putStringSet(BLOCKED, settings.blockedApps)
+        .apply()
+
+    private companion object {
+        const val ENABLED = "enabled"
+        const val MODE = "mode"
+        const val TYPES = "types"
+        const val BLOCKED = "blockedApps"
+    }
+}
+
+/** Remembers that the first sync after pairing has happened, so the history it brings in is not announced. */
+class PrefsSyncState(context: android.content.Context, name: String = "receiver_sync") : SyncState {
+    private val prefs = context.getSharedPreferences(name, android.content.Context.MODE_PRIVATE)
+
+    override var seeded: Boolean
+        get() = prefs.getBoolean(SEEDED, false)
+        set(value) = prefs.edit().putBoolean(SEEDED, value).apply()
+
+    fun reset() = prefs.edit().clear().apply()
+
+    private companion object {
+        const val SEEDED = "seeded"
+    }
+}

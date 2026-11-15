@@ -139,4 +139,21 @@ class DeviceStreamClientTest {
         client().run(onConnected = { connected++ })
         assertEquals(1, connected)
     }
+
+    @Test
+    fun `can be pointed at another stream and hands each event with its data to the app`() {
+        stream(
+            ": connected\n\nevent: message\ndata: {\"id\":\"m1\"}\n\n: ping\n\n" +
+                "event: messages_cleared\ndata: {\"deviceId\":\"d1\"}\n\nevent: revoked\ndata: {}\n\n",
+        )
+        val seen = mutableListOf<Pair<String, String>>()
+
+        val end = DeviceStreamClient(
+            store, appVersion = "0.1.9", path = "/api/v1/receiver/stream", onEvent = { type, data -> seen += type to data },
+        ).run()
+
+        assertEquals(StreamEnd.Revoked, end)
+        assertEquals("/api/v1/receiver/stream", server.takeRequest().url.encodedPath)
+        assertEquals(listOf("message" to "{\"id\":\"m1\"}", "messages_cleared" to "{\"deviceId\":\"d1\"}"), seen)
+    }
 }
