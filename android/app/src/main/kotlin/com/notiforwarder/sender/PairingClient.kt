@@ -16,7 +16,10 @@ data class DeviceInfo(
 )
 
 sealed interface PairOutcome {
-    data class Paired(val deviceId: String, val token: String) : PairOutcome
+    /** [role] is "sender" or "receiver", what the server made this phone. An older server does not say, so sender. */
+    data class Paired(val deviceId: String, val token: String, val role: String = "sender") : PairOutcome
+    /** The code was made for the other kind of phone. */
+    data class WrongRole(val expected: AppRole, val actual: String) : PairOutcome
     data object InvalidCode : PairOutcome
     data object RateLimited : PairOutcome
     data class ServerError(val status: Int) : PairOutcome
@@ -33,7 +36,7 @@ private data class PairRequest(
 )
 
 @Serializable
-private data class PairResponse(val deviceId: String, val token: String)
+private data class PairResponse(val deviceId: String, val token: String, val role: String = "sender")
 
 /** Blocking: call it off the main thread. */
 class PairingClient(
@@ -59,7 +62,7 @@ class PairingClient(
                 when {
                     response.code == 201 -> {
                         val parsed = json.decodeFromString<PairResponse>(response.body.string())
-                        PairOutcome.Paired(parsed.deviceId, parsed.token)
+                        PairOutcome.Paired(parsed.deviceId, parsed.token, parsed.role)
                     }
                     response.code == 400 -> PairOutcome.InvalidCode
                     response.code == 429 -> PairOutcome.RateLimited

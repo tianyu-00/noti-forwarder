@@ -122,7 +122,7 @@ class MainActivity : ComponentActivity() {
             PackageManager.PERMISSION_GRANTED
         app.controller.refresh() // picks up a revocation seen in the background
         app.deviceStream.wake() // opening the app is a good moment to retry a connection that is waiting
-        if (app.store.load() != null) {
+        if (app.store.load() != null && app.role != AppRole.Receiver) {
             // Android 12+ only allows starting a foreground service from a visible app like this.
             ContextCompat.startForegroundService(this, Intent(this, KeepAliveService::class.java))
         }
@@ -239,16 +239,32 @@ private fun MainScreen(
     }
 
     val paired = state as? UiState.Paired
+    var chosenRole by remember { mutableStateOf(app.roleStore.load()) }
+    val role = effectiveRole(chosenRole, paired != null)
+    // Switching role unpairs this phone (a sender and a receiver use different credentials) and asks again.
+    val changeRole = {
+        controller.unpair()
+        app.roleStore.clear()
+        chosenRole = null
+    }
     Column(modifier = Modifier.fillMaxSize()) {
         Box(modifier = Modifier.weight(1f)) {
-            if (paired == null) {
+            if (role == null) {
+                RoleScreen(onChoose = { picked ->
+                    app.roleStore.save(picked)
+                    chosenRole = picked
+                })
+            } else if (paired == null) {
                 PairingScreen(
+                    role = role,
                     state = state,
                     onScan = { onScan { text -> scope.launch { controller.pairFromQr(text) } } },
                     onPairManual = { address, key, encryptionKey ->
                         scope.launch { controller.pairManual(address, key, encryptionKey) }
                     },
                 )
+            } else if (role == AppRole.Receiver) {
+                ReceiverScreen(paired = paired, onUnpair = controller::unpair, onChangeRole = changeRole)
             } else {
                 when (currentTab(tab, paired = true)) {
                     Tab.Status -> {
@@ -286,6 +302,7 @@ private fun MainScreen(
                         onOpenAutoStart = onOpenAutoStart,
                         developerMode = settings.developerMode,
                         onDeveloperUnlocked = { changeSettings(settings.copy(developerMode = true)) },
+                        onChangeRole = changeRole,
                         onDeveloperChange = { changeSettings(withDeveloperMode(settings, it)) },
                         updateState = updateState,
                         onCheckUpdate = { scope.launch(Dispatchers.IO) { app.updater.check() } },
@@ -302,7 +319,7 @@ private fun MainScreen(
                 }
             }
         }
-        if (paired != null) BottomBar(tabs = visibleTabs(paired = true), current = tab, onSelect = { tab = it })
+        if (paired != null && role == AppRole.Sender) BottomBar(tabs = visibleTabs(paired = true), current = tab, onSelect = { tab = it })
     }
 }
 

@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 /** Shown until the phone is paired: scan the dashboard's QR code, or type the details. */
 @Composable
 internal fun PairingScreen(
+    role: AppRole,
     state: UiState,
     onScan: () -> Unit,
     onPairManual: (address: String, key: String, encryptionKey: String) -> Unit,
@@ -41,7 +42,11 @@ internal fun PairingScreen(
             }
             Text("Not paired", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             Text(
-                "Open the dashboard, choose Add phone, and scan the code it shows.",
+                if (role == AppRole.Receiver) {
+                    "Open the dashboard, choose Add phone, pick Receiver, and scan the code it shows."
+                } else {
+                    "Open the dashboard, choose Add phone, pick Sender, and scan the code it shows."
+                },
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 8.dp, bottom = 14.dp),
             )

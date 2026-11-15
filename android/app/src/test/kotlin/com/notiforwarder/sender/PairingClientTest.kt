@@ -54,6 +54,15 @@ class PairingClientTest {
     }
 
     @Test
+    fun `reads which kind of phone the server made, and assumes a sender when an older server does not say`() {
+        reply(201, """{"deviceId":"dev-1","token":"t","role":"receiver"}""")
+        assertEquals(PairOutcome.Paired("dev-1", "t", role = "receiver"), client.pair(target(), device))
+
+        reply(201, """{"deviceId":"dev-1","token":"t"}""")
+        assertEquals(PairOutcome.Paired("dev-1", "t", role = "sender"), client.pair(target(), device))
+    }
+
+    @Test
     fun `sends the hardware id so the server can recognise this phone next time`() {
         reply(201, """{"deviceId":"dev-1","token":"t"}""")
 

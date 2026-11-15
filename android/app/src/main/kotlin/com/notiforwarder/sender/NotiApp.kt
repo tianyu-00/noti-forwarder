@@ -34,6 +34,16 @@ class NotiApp : Application() {
     }
     val simLookup by lazy { SimLookup(this) }
 
+    /** Whether this phone sends or receives. Null on a new install, until the user chooses. */
+    val roleStore: RoleStore by lazy { PrefsRoleStore(this) }
+    val role: AppRole? get() = effectiveRole(roleStore.load(), paired = store.load() != null)
+
+    /** Starts what a receiver does once paired: the live connection and the alerts. Filled in as the receiver is built. */
+    fun startReceiver() {}
+
+    /** Stops it, when the phone is unpaired or changes role. */
+    fun stopReceiver() {}
+
     // In-app updates: look at this project's GitHub releases, download the APK and hand it to Android.
     val updater by lazy {
         Updater(
@@ -144,7 +154,7 @@ class NotiApp : Application() {
     val controller: PairingController by lazy {
         PairingController(
             store = store,
-            flow = PairingFlow(store, PairingClient()),
+            flow = PairingFlow(store, PairingClient(), expectedRole = { roleStore.load() ?: AppRole.Sender }),
             device = DeviceInfo(
                 name = "${Build.MANUFACTURER} ${Build.MODEL}".trim(),
                 model = Build.MODEL,
@@ -154,14 +164,19 @@ class NotiApp : Application() {
             ),
             // Messages queued while unpaired (or revoked) go out as soon as pairing works.
             onPaired = {
-                scheduler.flushSoon()
-                deviceStream.start()
-                reportSims(force = true) // a new pairing: the server has not seen this phone's SIMs
+                if (roleStore.load() == AppRole.Receiver) {
+                    startReceiver()
+                } else {
+                    scheduler.flushSoon()
+                    deviceStream.start()
+                    reportSims(force = true) // a new pairing: the server has not seen this phone's SIMs
+                }
             },
             // No point keeping a "running" notice on screen for a phone that is not paired.
             onUnpaired = {
                 stopService(Intent(this, KeepAliveService::class.java))
                 deviceStream.stop()
+                stopReceiver()
             },
             // Best effort: the dashboard shows this phone as unpaired at once instead of slowly "quiet".
             unpairOnServer = { UnpairClient().unpair(it) },
@@ -170,8 +185,9 @@ class NotiApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        sendWaiting() // an app start sends anything left in the queue, without waiting out an old retry timer
-        if (store.load() != null) deviceStream.start() // reconnect after a restart of the app
+        if (role != AppRole.Receiver) sendWaiting() // an app start sends anything left in the queue, without waiting out an old retry timer
+        // A sender reconnects after a restart of the app; a receiver does the same through its own connection.
+        if (store.load() != null) if (role == AppRole.Receiver) startReceiver() else deviceStream.start()
         // The moment Android has a network again, reconnect instead of waiting out a retry timer.
         NetworkWatcher(this) { deviceStream.wake() }.start()
         HeartbeatWorker.schedule(this) // checks in every ~15 minutes while the phone has a network

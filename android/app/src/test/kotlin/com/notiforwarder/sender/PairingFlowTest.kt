@@ -8,8 +8,8 @@ class PairingFlowTest {
     private val target = PairingTarget("https://nf.example.com", "KEY")
     private val device = DeviceInfo("Phone", "HD1913", "0.1.0")
 
-    private fun flow(store: TokenStore, outcome: PairOutcome) =
-        PairingFlow(store) { _, _ -> outcome }
+    private fun flow(store: TokenStore, outcome: PairOutcome, expected: AppRole = AppRole.Sender) =
+        PairingFlow(store, expectedRole = { expected }) { _, _ -> outcome }
 
     @Test
     fun `stores the credentials once the server accepts the code`() {
@@ -48,5 +48,36 @@ class PairingFlowTest {
         flow(store, PairOutcome.Paired("dev-1", "tok")).pair(keyed, device)
 
         assertEquals(keyed.e2eKey, store.load()?.e2eKey)
+    }
+
+    @Test
+    fun `a receiver is paired with a receiver code`() {
+        val store = InMemoryTokenStore()
+
+        val outcome = flow(store, PairOutcome.Paired("dev-1", "tok", role = "receiver"), expected = AppRole.Receiver).pair(target, device)
+
+        assertEquals(PairOutcome.Paired("dev-1", "tok", role = "receiver"), outcome)
+        assertEquals("dev-1", store.load()?.deviceId)
+    }
+
+    @Test
+    fun `a code made for the other role is refused and nothing is stored`() {
+        val store = InMemoryTokenStore()
+
+        val asSender = flow(store, PairOutcome.Paired("dev-1", "tok", role = "receiver"), expected = AppRole.Sender).pair(target, device)
+        val asReceiver = flow(store, PairOutcome.Paired("dev-2", "tok", role = "sender"), expected = AppRole.Receiver).pair(target, device)
+
+        assertEquals(PairOutcome.WrongRole(expected = AppRole.Sender, actual = "receiver"), asSender)
+        assertEquals(PairOutcome.WrongRole(expected = AppRole.Receiver, actual = "sender"), asReceiver)
+        assertNull(store.load())
+    }
+
+    @Test
+    fun `an older server that does not say its role is a sender server`() {
+        val store = InMemoryTokenStore()
+
+        flow(store, PairOutcome.Paired("dev-1", "tok")).pair(target, device)
+
+        assertEquals("dev-1", store.load()?.deviceId)
     }
 }

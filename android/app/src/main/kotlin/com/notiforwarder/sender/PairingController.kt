@@ -74,6 +74,10 @@ class PairingController(
             }
             PairOutcome.InvalidCode -> UiState.Unpaired("That key is invalid or expired. Create a new one on the dashboard.")
             PairOutcome.RateLimited -> UiState.Unpaired("Too many attempts. Wait a few minutes and try again.")
+            is PairOutcome.WrongRole -> when (outcome.expected) {
+                AppRole.Sender -> UiState.Unpaired("That key is for a receiver. On the dashboard, choose Sender when you add this phone.")
+                AppRole.Receiver -> UiState.Unpaired("That key is for a sender. On the dashboard, choose Receiver when you add this phone.")
+            }
             is PairOutcome.Unreachable -> UiState.Unpaired("Could not reach the server. Check the address and your connection.")
             is PairOutcome.ServerError -> UiState.Unpaired("The server returned an error (${outcome.status}).")
         }

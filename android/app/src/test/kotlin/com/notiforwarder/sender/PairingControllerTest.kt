@@ -227,4 +227,18 @@ class PairingControllerTest {
         assertEquals(UiState.Unpaired(), controller.state.value)
         assertEquals(null, store.load())
     }
+
+    @Test
+    fun `a code made for the other role says so in plain words`() {
+        val asSender = Harness(InMemoryTokenStore()) { PairOutcome.WrongRole(expected = AppRole.Sender, actual = "receiver") }
+        runBlocking { asSender.controller.pairManual("https://nf.example.com", code) }
+        val senderError = (asSender.controller.state.value as UiState.Unpaired).error!!
+
+        val asReceiver = Harness(InMemoryTokenStore()) { PairOutcome.WrongRole(expected = AppRole.Receiver, actual = "sender") }
+        runBlocking { asReceiver.controller.pairManual("https://nf.example.com", code) }
+        val receiverError = (asReceiver.controller.state.value as UiState.Unpaired).error!!
+
+        assertTrue(senderError, senderError.contains("receiver", ignoreCase = true) && senderError.contains("Sender"))
+        assertTrue(receiverError, receiverError.contains("sender", ignoreCase = true) && receiverError.contains("Receiver"))
+    }
 }
