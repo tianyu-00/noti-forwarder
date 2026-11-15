@@ -144,17 +144,26 @@ private fun UpdateCard(state: UpdateState, onCheck: () -> Unit, onInstall: () ->
             else androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 12.dp),
         )
+        // The main action for this state, and always a way to look again.
         when (state) {
             is UpdateState.Available ->
-                PrimaryButton(onClick = onInstall, modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)) { Text("Download and install") }
+                PrimaryButton(onClick = onInstall, modifier = Modifier.fillMaxWidth().padding(top = 12.dp)) { Text("Download and install") }
             is UpdateState.NeedsPermission ->
-                PrimaryButton(onClick = onAllowInstall, modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)) { Text("Allow installing") }
-            else ->
-                SecondaryButton(
-                    onClick = onCheck,
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
-                    enabled = !busy,
-                ) { Text(if (state is UpdateState.Failed) "Try again" else "Check for updates") }
+                PrimaryButton(onClick = onAllowInstall, modifier = Modifier.fillMaxWidth().padding(top = 12.dp)) { Text("Allow installing") }
+            else -> Unit
+        }
+        SecondaryButton(
+            onClick = onCheck,
+            modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+            enabled = !busy,
+        ) {
+            Text(
+                when (state) {
+                    is UpdateState.Available, is UpdateState.NeedsPermission -> "Check again"
+                    is UpdateState.Failed -> "Try again"
+                    else -> "Check for updates"
+                },
+            )
         }
     }
 }

@@ -208,4 +208,27 @@ class UpdaterTest {
 
         assertEquals(UpdateState.Available(info), u.state.value)
     }
+
+    @Test
+    fun `checking again while an update is offered looks again, so a newer release replaces it`() {
+        val u = updater()
+        u.check()
+        val newer = ReleaseInfo("0.1.70", "https://github.com/o/r/b.apk", 200, null)
+        source.outcome = ReleaseOutcome.Found(newer)
+
+        u.check()
+
+        assertEquals(UpdateState.Available(newer), u.state.value)
+    }
+
+    @Test
+    fun `checking again when the offered update is no longer newer says up to date`() {
+        val u = updater("0.1.65")
+        u.check()
+        source.outcome = ReleaseOutcome.Found(ReleaseInfo("0.1.65", "https://github.com/o/r/c.apk", 1, null))
+
+        u.check()
+
+        assertEquals(UpdateState.UpToDate("0.1.65"), u.state.value)
+    }
 }
