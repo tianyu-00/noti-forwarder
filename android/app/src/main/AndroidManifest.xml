@@ -79,6 +79,19 @@
                 android:value="Keeps the notification forwarder running so no notification is missed" />
         </service>
 
+        <service
+            android:name=".ReceiverService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Keeps the connection to the user's own server open so message alerts arrive on time" />
+        </service>
+
+        <receiver
+            android:name=".CopyCodeReceiver"
+            android:exported="false" />
+
         <!-- BROADCAST_SMS means only the system can deliver texts to this receiver. -->
         <receiver
             android:name=".SmsReceiver"

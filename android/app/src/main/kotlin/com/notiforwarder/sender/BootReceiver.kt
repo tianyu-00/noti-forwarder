@@ -10,10 +10,12 @@ class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != Intent.ACTION_BOOT_COMPLETED && intent.action != Intent.ACTION_MY_PACKAGE_REPLACED) return
         val app = context.applicationContext as NotiApp
-        app.scheduler.flushSoon()
+        val receiver = app.role == AppRole.Receiver
+        if (!receiver) app.scheduler.flushSoon()
         // Only keep a notice on screen for a phone that is actually paired.
         if (app.store.load() != null) {
-            ContextCompat.startForegroundService(context, Intent(context, KeepAliveService::class.java))
+            val service = if (receiver) ReceiverService::class.java else KeepAliveService::class.java
+            ContextCompat.startForegroundService(context, Intent(context, service))
         }
     }
 }

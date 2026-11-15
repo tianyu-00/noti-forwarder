@@ -38,11 +38,55 @@ class NotiApp : Application() {
     val roleStore: RoleStore by lazy { PrefsRoleStore(this) }
     val role: AppRole? get() = effectiveRole(roleStore.load(), paired = store.load() != null)
 
-    /** Starts what a receiver does once paired: the live connection and the alerts. Filled in as the receiver is built. */
-    fun startReceiver() {}
+    // --- Receiver: the main phone that shows alerts ---
+    val receivedStore by lazy { RoomReceivedStore(database.receivedDao()) }
+    val receiverSettingsStore: ReceiverSettingsStore by lazy { PrefsReceiverSettingsStore(this) }
+    private val syncState by lazy { PrefsSyncState(this) }
+    private val alertSink: AlertSink by lazy { AndroidAlertSink(this) }
 
-    /** Stops it, when the phone is unpaired or changes role. */
-    fun stopReceiver() {}
+    // One thread for everything the receiver does with its messages, so events and syncs never overlap.
+    private val receiverThread = Executors.newSingleThreadExecutor { r -> Thread(r, "receiver").apply { isDaemon = true } }
+    private val receiverEngine by lazy {
+        ReceiverEngine(
+            api = ReceiverClient(store, appVersion = BuildConfig.VERSION_NAME, onRevoked = { controller.refresh() }),
+            store = receivedStore,
+            alerts = alertSink,
+            settings = receiverSettingsStore::load,
+            reader = MessageReader { store.load()?.e2eKey },
+            state = syncState,
+        )
+    }
+    private val receiverStreamClient by lazy {
+        DeviceStreamClient(
+            store, appVersion = BuildConfig.VERSION_NAME, beat = { heartbeat.send() },
+            path = "/api/v1/receiver/stream",
+            onEvent = { type, data -> receiverThread.execute { runCatching { receiverEngine.onEvent(type, data) } } },
+        )
+    }
+    val receiverStream: DeviceStreamRunner by lazy {
+        DeviceStreamRunner(
+            // Each time it connects, bring the list in line with the dashboard, so nothing missed while away is lost.
+            connect = { onConnected -> receiverStreamClient.run { onConnected(); receiverThread.execute { runCatching { receiverEngine.sync() } } } },
+            store = store,
+            onRevoked = { controller.refresh() },
+            cancel = receiverStreamClient::cancel,
+        )
+    }
+
+    /** Opens the receiver's connection to the server. Safe to call again: a running connection is left alone. */
+    fun startReceiver() = receiverStream.start()
+
+    /** Closes it and forgets everything received, when the phone is unpaired or changes role. */
+    fun stopReceiver() {
+        receiverStream.stop()
+        syncState.reset()
+        receiverThread.execute {
+            runCatching {
+                receivedStore.delete(receivedStore.allIds())
+                alertSink.cancelAll()
+            }
+        }
+    }
 
     // In-app updates: look at this project's GitHub releases, download the APK and hand it to Android.
     val updater by lazy {
@@ -176,6 +220,7 @@ class NotiApp : Application() {
             onUnpaired = {
                 stopService(Intent(this, KeepAliveService::class.java))
                 deviceStream.stop()
+                stopService(Intent(this, ReceiverService::class.java))
                 stopReceiver()
             },
             // Best effort: the dashboard shows this phone as unpaired at once instead of slowly "quiet".
@@ -189,7 +234,10 @@ class NotiApp : Application() {
         // A sender reconnects after a restart of the app; a receiver does the same through its own connection.
         if (store.load() != null) if (role == AppRole.Receiver) startReceiver() else deviceStream.start()
         // The moment Android has a network again, reconnect instead of waiting out a retry timer.
-        NetworkWatcher(this) { deviceStream.wake() }.start()
+        NetworkWatcher(this) {
+            deviceStream.wake()
+            receiverStream.wake()
+        }.start()
         HeartbeatWorker.schedule(this) // checks in every ~15 minutes while the phone has a network
     }
 }

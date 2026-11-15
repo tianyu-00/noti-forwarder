@@ -122,6 +122,9 @@ class MainActivity : ComponentActivity() {
             PackageManager.PERMISSION_GRANTED
         app.controller.refresh() // picks up a revocation seen in the background
         app.deviceStream.wake() // opening the app is a good moment to retry a connection that is waiting
+        if (app.store.load() != null && app.role == AppRole.Receiver) {
+            ContextCompat.startForegroundService(this, Intent(this, ReceiverService::class.java))
+        }
         if (app.store.load() != null && app.role != AppRole.Receiver) {
             // Android 12+ only allows starting a foreground service from a visible app like this.
             ContextCompat.startForegroundService(this, Intent(this, KeepAliveService::class.java))
