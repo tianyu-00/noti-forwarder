@@ -86,18 +86,6 @@ internal fun SettingsScreen(
             }
         }
 
-        UpdateCard(
-            updateState, onCheckUpdate, onInstallUpdate, onAllowInstall,
-            // Tapping the installed version several times turns developer mode on. Only the unlocking tap
-            // says anything: a message per tap queues up and lags behind the taps.
-            onVersionTap = {
-                if (!developerMode && taps.tap(System.currentTimeMillis())) {
-                    onDeveloperUnlocked()
-                    Toast.makeText(context, "Developer mode is on", Toast.LENGTH_SHORT).show()
-                }
-            },
-        )
-
         if (developerMode) {
             NotiCard(padding = androidx.compose.foundation.layout.PaddingValues(horizontal = 18.dp, vertical = 10.dp)) {
                 SwitchRow(
@@ -116,6 +104,18 @@ internal fun SettingsScreen(
                 )
             }
         }
+
+        UpdateCard(
+            updateState, onCheckUpdate, onInstallUpdate, onAllowInstall,
+            // Tapping the installed version several times turns developer mode on. Only the unlocking tap
+            // says anything: a message per tap queues up and lags behind the taps.
+            onVersionTap = {
+                if (!developerMode && taps.tap(System.currentTimeMillis())) {
+                    onDeveloperUnlocked()
+                    Toast.makeText(context, "Developer mode is on", Toast.LENGTH_SHORT).show()
+                }
+            },
+        )
     }
 }
 

@@ -1,5 +1,6 @@
 package com.notiforwarder.sender
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -71,9 +72,19 @@ internal fun ReceiverScreen(
     }
     val connection by app.receiverStream.state.collectAsState()
 
+    // The alert rules are a page behind Settings; the back button and leaving the tab both close it.
+    var showAlertSettings by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(tab) { if (tab != Tab.Settings) showAlertSettings = false }
+    BackHandler(enabled = showAlertSettings && tab == Tab.Settings) { showAlertSettings = false }
+
     when (tab) {
         Tab.Alerts -> AlertsScreen(app, messages)
-        Tab.Settings -> ReceiverSettingsScreen(app, paired, themeMode, updateState, actions, messages)
+        Tab.Settings ->
+            if (showAlertSettings) {
+                ReceiverAlertSettingsScreen(app, messages, onBack = { showAlertSettings = false })
+            } else {
+                ReceiverSettingsScreen(app, paired, themeMode, updateState, actions, onOpenAlertSettings = { showAlertSettings = true })
+            }
         else -> {
             // Worked out again each time the list is re-read (every couple of seconds).
             val stats = remember(messages) {
@@ -239,21 +250,72 @@ private fun ReceiverSettingsScreen(
     themeMode: ThemeMode,
     updateState: UpdateState,
     actions: ReceiverActions,
-    messages: List<ReceivedMessage>,
+    onOpenAlertSettings: () -> Unit,
 ) {
-    var settings by remember { mutableStateOf(app.receiverSettingsStore.load()) }
-    val change = { updated: ReceiverSettings ->
-        settings = updated
-        app.receiverSettingsStore.save(updated)
-    }
     var confirmRole by remember { mutableStateOf(false) }
-    val apps = remember(messages) { appsSeen(messages) }
+    val alertsOn = remember { app.receiverSettingsStore.load().enabled }
 
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp, vertical = 20.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         ScreenTitle("Settings")
+
+        NotiCard(padding = androidx.compose.foundation.layout.PaddingValues(horizontal = 18.dp, vertical = 8.dp)) {
+            CardLabel("Connection")
+            KeyValueRow("Server", serverName(paired.serverUrl))
+            RowDivider()
+            KeyValueRow("Encryption", if (paired.encrypted) "On" else "Off")
+            RowDivider()
+            SecondaryButton(onClick = actions.onUnpair, danger = true, modifier = Modifier.fillMaxWidth().padding(top = 12.dp)) { Text("Unpair this phone") }
+            SecondaryButton(onClick = { confirmRole = true }, modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)) { Text("Use as a sender instead") }
+        }
+
+        NotiCard(padding = androidx.compose.foundation.layout.PaddingValues(horizontal = 18.dp, vertical = 8.dp)) {
+            CardLabel("Appearance")
+            Column(modifier = Modifier.padding(bottom = 10.dp)) {
+                Choice(
+                    options = listOf(ThemeMode.SYSTEM to "System", ThemeMode.LIGHT to "Light", ThemeMode.DARK to "Dark"),
+                    selected = themeMode,
+                    onSelect = actions.onThemeChange,
+                )
+            }
+        }
+
+        NotiCard(padding = androidx.compose.foundation.layout.PaddingValues(horizontal = 18.dp, vertical = 8.dp)) {
+            KeyValueRow("Alert settings", if (alertsOn) "On  ›" else "Off  ›", onClick = onOpenAlertSettings)
+        }
+
+        UpdateCard(updateState, actions.onCheckUpdate, actions.onInstallUpdate, actions.onAllowInstall)
+    }
+
+    if (confirmRole) {
+        AlertDialog(
+            onDismissRequest = { confirmRole = false },
+            title = { Text("Change role?") },
+            text = { Text("This unpairs the phone and clears the messages it holds. You then pick Sender or Receiver again and pair it with a new key from the dashboard.") },
+            confirmButton = { TextButton(onClick = { confirmRole = false; actions.onChangeRole() }) { Text("Change role") } },
+            dismissButton = { TextButton(onClick = { confirmRole = false }) { Text("Cancel") } },
+        )
+    }
+}
+
+/** The receiver's alert rules, on a page of their own behind Settings. */
+@Composable
+private fun ReceiverAlertSettingsScreen(app: NotiApp, messages: List<ReceivedMessage>, onBack: () -> Unit) {
+    var settings by remember { mutableStateOf(app.receiverSettingsStore.load()) }
+    val change = { updated: ReceiverSettings ->
+        settings = updated
+        app.receiverSettingsStore.save(updated)
+    }
+    val apps = remember(messages) { appsSeen(messages) }
+
+    Column(
+        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp, vertical = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        TextButton(onClick = onBack) { Text("‹ Settings") }
+        ScreenTitle("Alert settings")
 
         NotiCard(padding = androidx.compose.foundation.layout.PaddingValues(horizontal = 18.dp, vertical = 10.dp)) {
             CardLabel("Alerts")
@@ -294,38 +356,5 @@ private fun ReceiverSettingsScreen(
                 }
             }
         }
-
-        NotiCard(padding = androidx.compose.foundation.layout.PaddingValues(horizontal = 18.dp, vertical = 8.dp)) {
-            CardLabel("Connection")
-            KeyValueRow("Server", serverName(paired.serverUrl))
-            RowDivider()
-            KeyValueRow("Encryption", if (paired.encrypted) "On" else "Off")
-            RowDivider()
-            SecondaryButton(onClick = actions.onUnpair, danger = true, modifier = Modifier.fillMaxWidth().padding(top = 12.dp)) { Text("Unpair this phone") }
-            SecondaryButton(onClick = { confirmRole = true }, modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)) { Text("Use as a sender instead") }
-        }
-
-        NotiCard(padding = androidx.compose.foundation.layout.PaddingValues(horizontal = 18.dp, vertical = 8.dp)) {
-            CardLabel("Appearance")
-            Column(modifier = Modifier.padding(bottom = 10.dp)) {
-                Choice(
-                    options = listOf(ThemeMode.SYSTEM to "System", ThemeMode.LIGHT to "Light", ThemeMode.DARK to "Dark"),
-                    selected = themeMode,
-                    onSelect = actions.onThemeChange,
-                )
-            }
-        }
-
-        UpdateCard(updateState, actions.onCheckUpdate, actions.onInstallUpdate, actions.onAllowInstall)
-    }
-
-    if (confirmRole) {
-        AlertDialog(
-            onDismissRequest = { confirmRole = false },
-            title = { Text("Change role?") },
-            text = { Text("This unpairs the phone and clears the messages it holds. You then pick Sender or Receiver again and pair it with a new key from the dashboard.") },
-            confirmButton = { TextButton(onClick = { confirmRole = false; actions.onChangeRole() }) { Text("Change role") } },
-            dismissButton = { TextButton(onClick = { confirmRole = false }) { Text("Cancel") } },
-        )
     }
 }
