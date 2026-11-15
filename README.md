@@ -106,16 +106,41 @@ docker compose start server
 
 Every time you publish (`git push origin main:publish`), CI also builds the Android app and attaches it to a **GitHub Release** named after the version (for example `v0.1.57`). Download `notiforwarder-0.1.57.apk` from the repository's Releases page on your phone and install it. The version is `MAJOR.MINOR` from the `VERSION` file plus the CI run number, and the server and web images carry the same number (see the footer of the dashboard). To start `0.2.x`, change `VERSION` to `0.2`.
 
-**One-time setup so the app can update in place.** An update only installs over the old app if both are signed with the same key. Make one key and keep it forever:
+### One-time setup: the signing key
 
-```bash
-keytool -genkeypair -keystore notiforwarder-release.jks -alias notiforwarder -keyalg RSA -keysize 4096 -validity 36500
-base64 -w0 notiforwarder-release.jks    # copy the output
-```
+An update only installs over the old app if both are signed with the **same key**. Make one key, keep it forever, and give it to CI as four GitHub secrets. Without them CI still builds, but signs with a throwaway debug key and prints a warning, and phones then cannot update in place.
 
-In the GitHub repository open **Settings**, **Secrets and variables**, **Actions**, and add four secrets: `ANDROID_KEYSTORE_BASE64` (the base64 text), `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` (`notiforwarder`) and `ANDROID_KEY_PASSWORD`. Back the `.jks` file up somewhere safe and do not commit it: if you lose it, phones must uninstall the app before they can install a build signed with a new key. Without these secrets CI still builds, but signs with a throwaway debug key and prints a warning.
+1. **Create the key.** In a terminal on your PC (the WSL/Ubuntu one if you use Windows; the path below is where the Android tools live in this project, so adjust it if yours differs):
+   ```bash
+   $HOME/android-dev/jdk/bin/keytool -genkeypair -v -keystore ~/notiforwarder-release.jks \
+     -alias notiforwarder -keyalg RSA -keysize 4096 -validity 10000
+   ```
+   It asks for a **keystore password** (choose a long one, you will type it twice, nothing shows as you type) and then name questions. You have no company, and that is fine: the name fields are only a label inside the certificate, so press **Enter** to skip each one and answer `yes` at the end. If it asks for a separate key password, press Enter to use the same one. The file is saved as `~/notiforwarder-release.jks`, outside the repository (`*.jks` is also git-ignored). To start over, delete the file first (`rm ~/notiforwarder-release.jks`), because keytool will not overwrite it.
+2. **Turn the key file into text** so it can live in a GitHub secret, and copy it:
+   ```bash
+   base64 -w0 ~/notiforwarder-release.jks | clip.exe
+   ```
+   Nothing prints, and the long text is now on your Windows clipboard (`| clip.exe` is what copies it). On plain Linux, leave that part off, run `base64 -w0 ~/notiforwarder-release.jks`, and select and copy the printed line.
+3. **Add four secrets** in the GitHub repository: **Settings**, then **Secrets and variables**, then **Actions**, then **New repository secret**. Paste the clipboard text first, before copying anything else.
+
+   | Name | Value |
+   |---|---|
+   | `ANDROID_KEYSTORE_BASE64` | the long text from step 2 |
+   | `ANDROID_KEYSTORE_PASSWORD` | the keystore password you chose |
+   | `ANDROID_KEY_ALIAS` | `notiforwarder` |
+   | `ANDROID_KEY_PASSWORD` | the same password again (with this key format both are the same value) |
+
+   Never paste these values into a chat, an issue or a commit.
+4. **Back up** `~/notiforwarder-release.jks` and its password in a safe place (a password manager, plus a second copy of the file). If you lose either, every phone must uninstall the app before it can install a build signed with a new key.
+5. **Publish** (`git push origin main:publish`). The CI log for the Android release no longer shows the "signing with the debug key" warning. To check a downloaded APK yourself: `$ANDROID_HOME/build-tools/<version>/apksigner verify --print-certs notiforwarder-<version>.apk` prints the certificate, and it should be the same for every release.
 
 Moving to the first release-signed build means uninstalling the debug-signed app once, which removes its pairing, so pair the phone again afterwards.
+
+### Updating from inside the app
+
+On the phone, open **Settings**, then **App updates**, and tap **Check for updates**. If a newer release exists, it shows the version and a **Download and install** button. The app downloads the APK from GitHub (only from GitHub, over https, checked for size and checksum) and hands it to Android, which asks you to confirm. The first time, Android sends you to a page to allow this app to install apps; allow it and come back.
+
+It only works between builds signed with the same key (see the setup above). Between different keys Android refuses the update, and the app says so and tells you to uninstall once.
 
 ## Two-step login
 
