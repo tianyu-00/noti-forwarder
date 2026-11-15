@@ -2,13 +2,11 @@ import { fileURLToPath } from 'node:url';
 import { openDatabase } from './db/sqlite.js';
 import { createApp } from './app.js';
 import { cookieSecureFor } from './cookie-secure.js';
-import { createSilentMonitor } from './silent.js';
 import { createSecretBox, plainSecretBox } from './auth/secret-box.js';
 import { assertSecretsReadable, sealExistingSecrets } from './auth/secrets-at-rest.js';
 import { loadBuildInfo } from './config.js';
 import { runMigrations } from './db/migrate.js';
 import { ensureAdminUser } from './auth/users.js';
-import { ntfyFromEnv } from './ntfy.js';
 import { startRetentionJob } from './retention.js';
 
 const port = Number(process.env.PORT) || 3000;
@@ -72,18 +70,7 @@ if (process.env.ADMIN_USERNAME && process.env.ADMIN_PASSWORD) {
 // Cloudflare tunnel + proxy). Leave unset if clients connect directly.
 const trustProxy = process.env.TRUST_PROXY ? Number(process.env.TRUST_PROXY) : undefined;
 
-// Push alerts via ntfy are optional. A wrong setting stops the server at start, so a typo
-// cannot silently turn alerts off (or send private text somewhere unintended).
-let notifier = null;
-try {
-  notifier = ntfyFromEnv(process.env);
-} catch (err) {
-  console.error(`ntfy settings: ${err.message}`);
-  process.exit(1);
-}
-console.log(notifier ? 'ntfy push enabled' : 'ntfy push off (set NTFY_TOPIC to turn it on)');
-
-// A phone unseen for this many minutes counts as quiet (0 turns the check off). Phones check in
+// A phone unseen for this many minutes shows as quiet on the dashboard (0 turns the label off). Phones check in
 // every ~15 minutes, so the default leaves room for a couple of missed ones.
 const silentAfterMinutes = process.env.SILENT_AFTER_MINUTES === undefined || process.env.SILENT_AFTER_MINUTES === '' ? 120 : Number(process.env.SILENT_AFTER_MINUTES);
 if (!Number.isInteger(silentAfterMinutes) || silentAfterMinutes < 0 || (silentAfterMinutes > 0 && silentAfterMinutes < 30)) {
@@ -92,15 +79,9 @@ if (!Number.isInteger(silentAfterMinutes) || silentAfterMinutes < 0 || (silentAf
 }
 const cookieSecure = cookieSecureFor(publicUrl);
 if (!cookieSecure) console.log('PUBLIC_URL is http://: sessions work without HTTPS, but traffic is not encrypted');
-const app = createApp({ ...loadBuildInfo(process.env), db, publicUrl, trustProxy, notifier, cookieSecure, secretBox, silentAfterMinutes });
+const app = createApp({ ...loadBuildInfo(process.env), db, publicUrl, trustProxy, cookieSecure, secretBox, silentAfterMinutes });
 
 startRetentionJob(db, { onPurged: () => app.locals.events?.publish('messages_purged', {}) });
-if (silentAfterMinutes > 0) {
-  createSilentMonitor({ db, notifier, afterMinutes: silentAfterMinutes, isConnected: (id) => app.locals.presence?.isConnected(id) ?? false }).start();
-  console.log(`silent phone alerts after ${silentAfterMinutes} minutes without contact`);
-} else {
-  console.log('silent phone alerts off (SILENT_AFTER_MINUTES=0)');
-}
 
 app.listen(port, () => {
   console.log(`server listening on :${port}`);

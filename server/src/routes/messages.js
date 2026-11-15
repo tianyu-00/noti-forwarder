@@ -21,7 +21,6 @@ export function messagesRouter({
   db,
   requireViewer = denyViewers,
   events,
-  notifier,
   messageRateLimit = { limit: 120, windowMs: 60000 },
   // Before the token check, per IP: bad-token guessing must not cost a database write each time.
   // Generous, because several phones can share one home IP.
@@ -39,7 +38,6 @@ export function messagesRouter({
       }
       const incoming = parsed.data.messages;
       let stored = 0;
-      const storedMessages = [];
       // ON CONFLICT DO NOTHING covers both a retried id and a repeated dedupe_hash.
       for (const m of incoming) {
         const hash = dedupeHash({
@@ -59,23 +57,13 @@ export function messagesRouter({
           [m.id.toLowerCase(), req.deviceId, m.type, m.app, m.appLabel ?? null, m.sender, m.body, new Date(m.receivedAt), hash, m.sim ?? null],
         );
         stored += result.rowCount;
-        // Only newly stored messages are pushed; duplicates stay silent.
+        // Only newly stored messages go out live; duplicates stay silent.
         if (result.rowCount === 1) {
           const apiMessage = toApi(result.rows[0]);
-          storedMessages.push(apiMessage);
           events.publish('message', apiMessage);
         }
       }
       res.status(201).json({ stored, duplicates: incoming.length - stored });
-      // After the phone has its answer, and never awaited: a slow or broken push must not
-      // delay the phone, make it retry, or lose anything that is already stored.
-      if (notifier && storedMessages.length > 0) {
-        try {
-          Promise.resolve(notifier.notify(storedMessages, req.deviceName)).catch(() => {});
-        } catch {
-          // swallowed on purpose; the notifier logs its own failures without message text
-        }
-      }
     } catch (err) {
       next(err);
     }

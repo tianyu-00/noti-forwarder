@@ -24,7 +24,6 @@ export function createApp({
   requireViewer,
   messageRateLimit,
   preAuthRateLimit,
-  notifier,
   loginRateLimit,
   now,
   cookieSecure,
@@ -70,7 +69,7 @@ export function createApp({
     app.use('/api/v1', pairingRouter({ db, requireViewer: viewer, events, publicUrl, pairRateLimit }));
     app.use('/api/v1', devicesRouter({ db, requireViewer: viewer, events, presence, silentAfterMinutes }));
     app.use('/api/v1', settingsRouter({ db, requireViewer: viewer, events }));
-    app.use('/api/v1', messagesRouter({ db, requireViewer: viewer, events, notifier, messageRateLimit, preAuthRateLimit }));
+    app.use('/api/v1', messagesRouter({ db, requireViewer: viewer, events, messageRateLimit, preAuthRateLimit }));
     app.use('/api/v1', outboxRouter({ db, requireViewer: viewer, events, presence, outboxRateLimit, outboxMaxAgeMs, preAuthRateLimit }));
     app.use('/api/v1', heartbeatRouter({ db, events, presence, preAuthRateLimit }));
     app.use('/api/v1', simsRouter({ db, events, preAuthRateLimit }));

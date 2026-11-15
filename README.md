@@ -163,7 +163,7 @@ Optional. With it on, the server only ever stores scrambled text, so even someon
 - **Phones paired before:** they keep sending readable text until you unpair them and pair again.
 - **Another browser:** open Settings there, paste the key into *Already have a key from another browser?* (use *Show key* to read it on the first one).
 - **What the server can still see:** which app, whether it is an SMS, and when. Not the sender or the text.
-- **What changes:** search happens in the browser (over the messages loaded so far), the 2FA code is found after decrypting, and ntfy push alerts say "New message" without text.
+- **What changes:** search happens in the browser (over the messages loaded so far), the 2FA code is found after decrypting, and a receiver phone decrypts messages itself.
 - **Keep the key safe.** If you lose it, the encrypted messages cannot be read by anyone, including you. Clearing the browser's site data forgets the key too.
 
 ## Connection dot and instant revoke
@@ -172,9 +172,9 @@ Each phone keeps one open connection to your server (the same kind of connection
 
 If Android puts the phone into deep sleep and drops the connection, the 15-minute check-in described below is the fallback: a revoke then reaches the phone within about 15 minutes. Excluding the app from battery optimisation (the app asks for it) keeps the connection up.
 
-## Silent-phone alerts
+## Quiet phones
 
-Android sometimes kills the app, or a user turns off Notification access, and then messages silently stop. To catch that, each phone checks in about every 15 minutes even when it has nothing to send. A phone not heard from for `SILENT_AFTER_MINUTES` (default 120, `0` turns it off) shows **Quiet for 3 h** in red in the sidebar, and if ntfy push is on you get one alert when it goes quiet and one when it is back. Check the app is running, Notification access is still on, and the battery and auto-start settings for the app. A phone still running an older version of the app never checks in, so it shows as quiet once it has been idle for that long. Update the app on every phone.
+Android sometimes kills the app, or a user turns off Notification access, and then messages silently stop. To catch that, each phone checks in about every 15 minutes even when it has nothing to send. A phone not heard from for `SILENT_AFTER_MINUTES` (default 120, `0` turns it off) shows **Quiet for 3 h** in red in the sidebar. Check the app is running, Notification access is still on, and the battery and auto-start settings for the app. A phone still running an older version of the app never checks in, so it shows as quiet once it has been idle for that long. Update the app on every phone.
 
 ## Changing the password
 
@@ -187,38 +187,20 @@ Android sometimes kills the app, or a user turns off Notification access, and th
 - **Clear a phone's messages**: select the phone, choose *Manage phone*, then *Clear messages*. Its messages are deleted; the phone stays paired and keeps sending. No revoke needed.
 - **Erase a phone**: revoke it first, then open it and choose *Erase this phone and its messages*. The phone entry and all its messages are removed.
 
-## Push alerts with ntfy
+## Alerts on your main phone (receiver)
 
-The server can send an alert to your main phone for each new message, through
-[ntfy](https://ntfy.sh). A message with a 2FA code gets a title like `🔑 482913 · Kitchen phone ·
-SMS from BANK` and a higher priority, so the code shows on the lock screen.
+The same Android app can be a **receiver**: the phone where you want to see alerts. On first open the app asks *Sender* or *Receiver*; pick Receiver on your main phone.
 
 **Set it up**
-1. Install the **ntfy** app on the phone that should get the alerts.
-2. Make up a long random topic name (20+ characters), for example `openssl rand -hex 16`.
-3. In the ntfy app, tap **+**, enter that topic, and keep the default server (`ntfy.sh`).
-4. Put the same topic in `deploy/.env` as `NTFY_TOPIC=...`, then apply it from `deploy/`:
-   `docker compose up -d`
-5. Check `docker compose logs server | grep ntfy`. It should say `ntfy push enabled`.
+1. In the dashboard choose **Add phone**, then **Receiver**.
+2. In the app, pick Receiver and scan the QR code (or type the address and key).
+3. Allow notifications and set battery use to unrestricted, so alerts arrive with the screen off.
 
-**Choose what gets pushed** (all optional, in `deploy/.env`; leave a line blank to use the default)
-
-| Setting | Meaning |
-|---|---|
-| `NTFY_MODE` | `all` = every message (default), `codes` = only messages containing a 2FA code |
-| `NTFY_TYPES` | `sms,notification` (default), or just `sms` / `notification` |
-| `NTFY_APPS_BLOCK` | Apps that never push, as a comma list of package names, e.g. `com.game,com.news` |
-| `NTFY_INCLUDE_BODY` | `false` = alerts only say "New message", with no text, sender, app or code |
-| `NTFY_URL` | `https://ntfy.sh` (default) or your own ntfy server (https) |
-| `NTFY_TOKEN` | An access token, only if your ntfy server requires one |
-
-A burst of messages sends at most 5 alerts plus one "+N more" summary. A failed push never stops a
-message from being stored, and the logs never contain message text.
-
-**Privacy, please read.** A push carries the message text, including 2FA codes. On the public
-`ntfy.sh`, that text passes through ntfy's servers, and **anyone who learns your topic can read
-your alerts**. Keep the topic secret, treat it like a password, and never share it. If you do not
-want the text to leave your server, set `NTFY_INCLUDE_BODY=false`, or run your own ntfy server.
-The server refuses to start with a short topic on `ntfy.sh`, or with plain `http` to a remote server.
+**What it does**
+- Each new message from your sender phones shows as a notification with the real text and sender. A 2FA code gets its own alert with a **Copy code** button.
+- Its Alerts tab keeps the latest messages, in step with the dashboard: delete messages there (or let the retention setting purge them) and they disappear from the phone and its notifications.
+- With end-to-end encryption on, the receiver decrypts on the phone, using the key from the QR code. Nothing readable passes through any third party.
+- **Alert settings** (Settings tab) choose all messages or 2FA codes only, texts and/or app notifications, and which apps are silenced.
+- A receiver has its own limited token: it can read messages but never send, and revoking it in the dashboard stops it at once. One role per phone at a time; **Unpair this phone** returns to the Sender or Receiver choice.
 
 More about the server install and HTTPS: [deploy/README.md](deploy/README.md).
