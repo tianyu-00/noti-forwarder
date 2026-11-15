@@ -119,6 +119,17 @@ describe('GET /api/v1/receiver/messages (the recent messages, still encrypted)',
     expect(mine[0].code).toBeNull();
   });
 
+  it("names the phone each message came from, so an alert can say 'Kitchen phone'", async () => {
+    const s = await ctx.addDevice();
+    const r = await ctx.addDevice({ role: 'receiver' });
+    await send(s.token, [msg({ body: 'e2e:v1:NAME' })]);
+
+    const res = await list(r.token, '?limit=100');
+
+    const mine = res.body.messages.find((m) => m.body === 'e2e:v1:NAME');
+    expect(mine.deviceName).toBe('Test phone');
+  });
+
   it('can be limited, and refuses a nonsense limit', async () => {
     const r = await ctx.addDevice({ role: 'receiver' });
 
@@ -157,6 +168,7 @@ describe('GET /api/v1/receiver/stream (live updates for the receiver)', () => {
     const event = await nextOfType(stream, 'message');
     expect(event.data.body).toBe('e2e:v1:ZZZZ');
     expect(event.data.deviceId).toBe(s.deviceId);
+    expect(event.data.deviceName).toBe('Test phone');
     stream.close();
   });
 

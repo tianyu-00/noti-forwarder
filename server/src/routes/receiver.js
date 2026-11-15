@@ -23,8 +23,12 @@ export function receiverRouter({ db, events, presence, preAuthRateLimit = { limi
     try {
       const parsed = querySchema.safeParse(req.query);
       if (!parsed.success) return res.status(400).json({ error: 'invalid_query' });
-      const { rows } = await db.query('SELECT * FROM messages ORDER BY received_at DESC, id DESC LIMIT $1', [parsed.data.limit]);
-      res.json({ messages: rows.map(messageToApi) });
+      const { rows } = await db.query(
+        `SELECT m.*, d.name AS device_name FROM messages m LEFT JOIN devices d ON d.device_id = m.device_id
+          ORDER BY m.received_at DESC, m.id DESC LIMIT $1`,
+        [parsed.data.limit],
+      );
+      res.json({ messages: rows.map((row) => ({ ...messageToApi(row), deviceName: row.device_name ?? null })) });
     } catch (err) {
       next(err);
     }
@@ -43,8 +47,16 @@ export function receiverRouter({ db, events, presence, preAuthRateLimit = { limi
     const write = (event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
     // While it is open the receiver counts as connected, and a revoke reaches it at once.
     const release = presence.connect(req.deviceId, { send: write, close: () => res.end() });
+    // A new message is sent with the name of the phone it came to ("Kitchen phone"), for the alert. Looked up one at
+    // a time, in order, so messages never overtake each other.
+    let pending = Promise.resolve();
     const unsubscribe = events.subscribe(({ type, data }) => {
-      if (RECEIVER_EVENTS.has(type)) write(type, data);
+      if (!RECEIVER_EVENTS.has(type)) return;
+      if (type !== 'message') return write(type, data);
+      pending = pending
+        .then(() => db.query('SELECT name FROM devices WHERE device_id = $1', [data.deviceId]))
+        .then(({ rows }) => write(type, { ...data, deviceName: rows[0]?.name ?? null }))
+        .catch(() => write(type, data)); // the name is a nicety; never lose the message over it
     });
     const ping = setInterval(() => res.write(': ping\n\n'), PING_MS);
     res.on('close', () => {
