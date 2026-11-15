@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import android.widget.Toast
+import android.net.Uri
+import android.content.Intent
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -126,6 +128,13 @@ private fun UpdateCard(state: UpdateState, onCheck: () -> Unit, onInstall: () ->
     NotiCard(padding = androidx.compose.foundation.layout.PaddingValues(horizontal = 18.dp, vertical = 8.dp)) {
         CardLabel("App updates")
         KeyValueRow("Installed", BuildConfig.VERSION_NAME)
+        RowDivider()
+        val context = LocalContext.current
+        KeyValueRow(
+            "Source code",
+            "GitHub",
+            onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(PROJECT_URL))) },
+        )
         RowDivider()
         val busy = state is UpdateState.Checking || state is UpdateState.Downloading || state is UpdateState.Installing
         Text(

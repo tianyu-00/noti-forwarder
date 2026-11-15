@@ -10,9 +10,6 @@ import androidx.core.content.ContextCompat
 import java.util.concurrent.Executors
 
 /** Wires the pure classes together once per process. */
-/** The GitHub repository whose releases the app updates itself from. */
-private const val UPDATE_REPO = "tianyu-00/noti-forwarder"
-
 class NotiApp : Application() {
     val store: TokenStore by lazy { EncryptedTokenStore(this) }
     val settingsStore: SettingsStore by lazy { PrefsSettingsStore(this) }
@@ -40,7 +37,7 @@ class NotiApp : Application() {
     // In-app updates: look at this project's GitHub releases, download the APK and hand it to Android.
     val updater by lazy {
         Updater(
-            source = GitHubReleaseSource(UPDATE_REPO),
+            source = GitHubReleaseSource(PROJECT_REPO),
             downloader = ApkDownloader(File(cacheDir, "updates")),
             installer = AndroidApkInstaller(this),
             installedVersion = BuildConfig.VERSION_NAME,
