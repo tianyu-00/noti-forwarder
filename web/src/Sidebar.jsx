@@ -10,6 +10,8 @@ export const deviceShape = PropTypes.shape({
   // True while the phone holds its connection to the server.
   connected: PropTypes.bool,
   revokedAt: PropTypes.string,
+  // "sender" forwards notifications; "receiver" is the main phone that shows alerts.
+  role: PropTypes.string,
 });
 
 // A phone that has not checked in for silentAfterMinutes is "quiet": its messages may have
@@ -140,7 +142,14 @@ export default function Sidebar({
           onClick={() => onSelect(d.deviceId)}
         >
           <span className="flex items-center justify-between gap-2 font-medium">
-            {d.name}
+            <span className="flex min-w-0 items-center gap-2">
+              <span className="truncate">{d.name}</span>
+              {d.role === "receiver" && (
+                <span className="rounded bg-rail-active px-1.5 text-[10px] font-semibold uppercase tracking-wide text-rail-muted">
+                  Receiver
+                </span>
+              )}
+            </span>
             {unread[d.deviceId] > 0 && (
               <span
                 aria-label={`${unread[d.deviceId]} unread`}

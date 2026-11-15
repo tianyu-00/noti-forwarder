@@ -14,6 +14,7 @@ export function device(overrides = {}) {
     pairedAt: "2026-11-01T10:00:00.000Z",
     lastSeen: new Date().toISOString(),
     revokedAt: null,
+    role: "sender",
     sims: null,
     replies: null,
     ...overrides,

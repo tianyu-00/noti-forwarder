@@ -12,7 +12,62 @@ function formatRemaining(ms) {
   return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
 }
 
-function PairingPanel({ devices, onDevicesLoaded, onClose, timing }) {
+const ROLES = [
+  {
+    value: "sender",
+    label: "Sender",
+    hint: "Forwards this phone's notifications and texts",
+  },
+  {
+    value: "receiver",
+    label: "Receiver",
+    hint: "Shows your alerts, on your main phone",
+  },
+];
+
+function RoleChoice({ role, onChange }) {
+  return (
+    <fieldset className="space-y-2">
+      <legend className="text-sm text-muted">What will this phone do?</legend>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {ROLES.map((r) => (
+          <label
+            key={r.value}
+            className={`flex cursor-pointer flex-col rounded-lg border p-3 text-sm ${
+              role === r.value ? "border-accent bg-surface" : "border-line"
+            }`}
+          >
+            <span className="flex items-center gap-2 font-medium text-fg">
+              <input
+                type="radio"
+                name="phone-role"
+                value={r.value}
+                checked={role === r.value}
+                onChange={() => onChange(r.value)}
+              />
+              {r.label}
+            </span>
+            <span className="pl-6 text-xs text-muted">{r.hint}</span>
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
+RoleChoice.propTypes = {
+  role: PropTypes.oneOf(["sender", "receiver"]).isRequired,
+  onChange: PropTypes.func.isRequired,
+};
+
+function PairingPanel({
+  devices,
+  onDevicesLoaded,
+  onClose,
+  timing,
+  role,
+  onRoleChange,
+}) {
   // Phones known when the dialog opened: any other phone appearing means pairing worked.
   const [knownIds] = useState(() => new Set(devices.map((d) => d.deviceId)));
   const e2eKey = useE2eKey();
@@ -23,7 +78,7 @@ function PairingPanel({ devices, onDevicesLoaded, onClose, timing }) {
 
   useEffect(() => {
     let stale = false;
-    api("/pairing-codes", { method: "POST" })
+    api("/pairing-codes", { method: "POST", body: { role } })
       .then((p) => {
         if (stale) return;
         setNow(Date.now()); // the clock state may predate the response by up to a second
@@ -35,12 +90,19 @@ function PairingPanel({ devices, onDevicesLoaded, onClose, timing }) {
     return () => {
       stale = true;
     };
-  }, [attempt]);
+  }, [attempt, role]);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  function chooseRole(next) {
+    if (next === role) return;
+    setPairing(null);
+    setError(null);
+    onRoleChange(next);
+  }
 
   function newCode() {
     setPairing(null);
@@ -93,9 +155,11 @@ function PairingPanel({ devices, onDevicesLoaded, onClose, timing }) {
       </p>
     );
   }
+  const choice = <RoleChoice role={role} onChange={chooseRole} />;
   if (error) {
     return (
       <div className="space-y-3">
+        {choice}
         <p role="alert" className="text-danger">
           {error}
         </p>
@@ -105,12 +169,19 @@ function PairingPanel({ devices, onDevicesLoaded, onClose, timing }) {
       </div>
     );
   }
-  if (!pairing) return <p className="text-sm text-muted">Creating code…</p>;
+  if (!pairing)
+    return (
+      <div className="space-y-3">
+        {choice}
+        <p className="text-sm text-muted">Creating code…</p>
+      </div>
+    );
 
   const remaining = new Date(pairing.expiresAt).getTime() - now;
   if (expired) {
     return (
       <div className="space-y-3">
+        {choice}
         <p className="text-sm text-fg">This code has expired.</p>
         <Button onClick={newCode}>New code</Button>
       </div>
@@ -120,6 +191,7 @@ function PairingPanel({ devices, onDevicesLoaded, onClose, timing }) {
   const { u: serverUrl } = JSON.parse(pairing.qrPayload);
   return (
     <div className="space-y-3">
+      {choice}
       <div className="inline-block rounded-lg border border-line bg-white p-3">
         <QRCodeSVG
           value={withKey(pairing.qrPayload, e2eKey)}
@@ -170,6 +242,8 @@ PairingPanel.propTypes = {
   onDevicesLoaded: PropTypes.func.isRequired,
   onClose: PropTypes.func.isRequired,
   timing: timingShape.isRequired,
+  role: PropTypes.oneOf(["sender", "receiver"]).isRequired,
+  onRoleChange: PropTypes.func.isRequired,
 };
 
 export const DEFAULT_PAIRING_TIMING = { pollMs: 2000, closeMs: 2500 };
@@ -181,18 +255,25 @@ export default function AddPhoneDialog({
   onDevicesLoaded,
   timing,
 }) {
+  const [role, setRole] = useState("sender");
   return (
     <Modal
       open={open}
       onOpenChange={onOpenChange}
       title="Add phone"
-      description="In the Notiforwarder app, scan this code or type the server address and security key."
+      description={
+        role === "receiver"
+          ? "On your main phone, open the Notiforwarder app, choose Receiver, then scan this code or type the server address and security key."
+          : "In the Notiforwarder app, choose Sender, then scan this code or type the server address and security key."
+      }
     >
       <PairingPanel
         devices={devices}
         onDevicesLoaded={onDevicesLoaded}
         onClose={() => onOpenChange(false)}
         timing={{ ...DEFAULT_PAIRING_TIMING, ...timing }}
+        role={role}
+        onRoleChange={setRole}
       />
     </Modal>
   );
