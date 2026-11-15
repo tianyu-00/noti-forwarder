@@ -166,7 +166,7 @@ private fun AlertsScreen(app: NotiApp, messages: List<ReceivedMessage>) {
                     text,
                     style = MaterialTheme.typography.bodyMedium,
                     maxLines = if (expanded) Int.MAX_VALUE else 6,
-                    overflow = TextOverflow.Ellipsis,
+                    overflow = TextOverflow.Clip,
                     onTextLayout = { if (!expanded) cutOff = it.hasVisualOverflow },
                     modifier = Modifier.padding(top = 6.dp),
                 )
