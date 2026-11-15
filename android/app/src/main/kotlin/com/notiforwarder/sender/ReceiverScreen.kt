@@ -33,6 +33,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.saveable.rememberSaveable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -155,13 +156,18 @@ private fun AlertsScreen(app: NotiApp, messages: List<ReceivedMessage>) {
         items(messages, key = { it.id }) { message ->
             val d = MessageDescriber.describe(message, reader.read(message))
             val at = runCatching { java.time.Instant.parse(message.receivedAt).toEpochMilli() }.getOrNull()
+            var expanded by rememberSaveable(message.id) { mutableStateOf(false) }
+            val text = d.text.trim().replace(Regex("\\s*\\n\\s*\\n(\\s*\\n)*"), "\n\n")
+            // Set by the text itself when six lines are not enough; stays true once expanded so the button can fold it again.
+            var cutOff by remember(message.id) { mutableStateOf(false) }
             NotiCard(padding = androidx.compose.foundation.layout.PaddingValues(18.dp)) {
-                Text(d.title, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(d.title, fontWeight = FontWeight.SemiBold)
                 Text(
-                    d.text,
+                    text,
                     style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 6,
+                    maxLines = if (expanded) Int.MAX_VALUE else 6,
                     overflow = TextOverflow.Ellipsis,
+                    onTextLayout = { if (!expanded) cutOff = it.hasVisualOverflow },
                     modifier = Modifier.padding(top = 6.dp),
                 )
                 Row(
@@ -175,6 +181,9 @@ private fun AlertsScreen(app: NotiApp, messages: List<ReceivedMessage>) {
                         color = colors.onSurfaceVariant,
                     )
                     d.code?.let { code -> TextButton(onClick = { clipboard.setText(AnnotatedString(code)) }) { Text("Copy code") } }
+                }
+                if (cutOff || expanded) {
+                    TextButton(onClick = { expanded = !expanded }) { Text(if (expanded) "Show less" else "Show more") }
                 }
             }
         }
