@@ -244,8 +244,8 @@ private fun MainScreen(
     val paired = state as? UiState.Paired
     var chosenRole by remember { mutableStateOf(app.roleStore.load()) }
     val role = effectiveRole(chosenRole, paired != null)
-    // Switching role unpairs this phone (a sender and a receiver use different credentials) and asks again.
-    val changeRole = {
+    // Unpairing forgets the role as well, so the phone goes back to "Sender or Receiver" (they use different credentials).
+    val unpairAndAsk = {
         controller.unpair()
         app.roleStore.clear()
         chosenRole = null
@@ -275,8 +275,7 @@ private fun MainScreen(
                     updateState = updateState,
                     tab = currentTab(tab, paired = true),
                     actions = ReceiverActions(
-                        onUnpair = controller::unpair,
-                        onChangeRole = changeRole,
+                        onUnpair = unpairAndAsk,
                         onAllowNotifications = { ask(Manifest.permission.POST_NOTIFICATIONS, askNotifications) },
                         onRequestBatteryExemption = onRequestBatteryExemption,
                         onThemeChange = onThemeChange,
@@ -320,10 +319,9 @@ private fun MainScreen(
                         paired = paired,
                         themeMode = themeMode,
                         onThemeChange = onThemeChange,
-                        onUnpair = controller::unpair,
+                        onUnpair = unpairAndAsk,
                         developerMode = settings.developerMode,
                         onDeveloperUnlocked = { changeSettings(settings.copy(developerMode = true)) },
-                        onChangeRole = changeRole,
                         onDeveloperChange = { changeSettings(withDeveloperMode(settings, it)) },
                         updateState = updateState,
                         onCheckUpdate = { scope.launch(Dispatchers.IO) { app.updater.check() } },

@@ -29,7 +29,6 @@ internal fun SettingsScreen(
     onUnpair: () -> Unit,
     developerMode: Boolean,
     onDeveloperUnlocked: () -> Unit,
-    onChangeRole: () -> Unit,
     onDeveloperChange: (Boolean) -> Unit,
     updateState: UpdateState,
     onCheckUpdate: () -> Unit,
@@ -55,24 +54,8 @@ internal fun SettingsScreen(
             SecondaryButton(
                 onClick = onUnpair,
                 danger = true,
-                modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
-            ) { Text("Unpair this phone") }
-            var confirmRole by remember { mutableStateOf(false) }
-            SecondaryButton(
-                onClick = { confirmRole = true },
                 modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
-            ) { Text("Use as a receiver instead") }
-            if (confirmRole) {
-                androidx.compose.material3.AlertDialog(
-                    onDismissRequest = { confirmRole = false },
-                    title = { Text("Change role?") },
-                    text = { Text("This unpairs the phone. You then pick Sender or Receiver again and pair it with a new key from the dashboard.") },
-                    confirmButton = {
-                        androidx.compose.material3.TextButton(onClick = { confirmRole = false; onChangeRole() }) { Text("Change role") }
-                    },
-                    dismissButton = { androidx.compose.material3.TextButton(onClick = { confirmRole = false }) { Text("Cancel") } },
-                )
-            }
+            ) { Text("Unpair this phone") }
         }
 
         NotiCard(padding = androidx.compose.foundation.layout.PaddingValues(horizontal = 18.dp, vertical = 8.dp)) {

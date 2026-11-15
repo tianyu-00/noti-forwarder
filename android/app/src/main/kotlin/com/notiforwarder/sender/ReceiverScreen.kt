@@ -42,7 +42,6 @@ import kotlinx.coroutines.withContext
 /** What the receiver's screens need from the app. */
 internal class ReceiverActions(
     val onUnpair: () -> Unit,
-    val onChangeRole: () -> Unit,
     val onAllowNotifications: () -> Unit,
     val onRequestBatteryExemption: () -> Unit,
     val onThemeChange: (ThemeMode) -> Unit,
@@ -252,7 +251,6 @@ private fun ReceiverSettingsScreen(
     actions: ReceiverActions,
     onOpenAlertSettings: () -> Unit,
 ) {
-    var confirmRole by remember { mutableStateOf(false) }
     val alertsOn = remember { app.receiverSettingsStore.load().enabled }
 
     Column(
@@ -267,8 +265,7 @@ private fun ReceiverSettingsScreen(
             RowDivider()
             KeyValueRow("Encryption", if (paired.encrypted) "On" else "Off")
             RowDivider()
-            SecondaryButton(onClick = actions.onUnpair, danger = true, modifier = Modifier.fillMaxWidth().padding(top = 12.dp)) { Text("Unpair this phone") }
-            SecondaryButton(onClick = { confirmRole = true }, modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)) { Text("Use as a sender instead") }
+            SecondaryButton(onClick = actions.onUnpair, danger = true, modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)) { Text("Unpair this phone") }
         }
 
         NotiCard(padding = androidx.compose.foundation.layout.PaddingValues(horizontal = 18.dp, vertical = 8.dp)) {
@@ -287,16 +284,6 @@ private fun ReceiverSettingsScreen(
         }
 
         UpdateCard(updateState, actions.onCheckUpdate, actions.onInstallUpdate, actions.onAllowInstall)
-    }
-
-    if (confirmRole) {
-        AlertDialog(
-            onDismissRequest = { confirmRole = false },
-            title = { Text("Change role?") },
-            text = { Text("This unpairs the phone and clears the messages it holds. You then pick Sender or Receiver again and pair it with a new key from the dashboard.") },
-            confirmButton = { TextButton(onClick = { confirmRole = false; actions.onChangeRole() }) { Text("Change role") } },
-            dismissButton = { TextButton(onClick = { confirmRole = false }) { Text("Cancel") } },
-        )
     }
 }
 
