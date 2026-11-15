@@ -41,6 +41,17 @@ class WorkManagerFlushScheduler(context: Context) : FlushScheduler {
         }
     }
 
+    override fun flushNow() {
+        executor.execute {
+            val phases = workManager.getWorkInfosForUniqueWork(NAME).get().map { it.state.toPhase() }
+            when (planFlushNow(phases)) {
+                FlushPlan.Start -> enqueue(0, ExistingWorkPolicy.REPLACE)
+                FlushPlan.FollowUp -> enqueue(0, ExistingWorkPolicy.APPEND_OR_REPLACE)
+                FlushPlan.Nothing -> Unit
+            }
+        }
+    }
+
     override fun flushAfter(delayMillis: Long) {
         // Called from inside a running flush: chain the retry after it.
         enqueue(delayMillis, ExistingWorkPolicy.APPEND_OR_REPLACE)

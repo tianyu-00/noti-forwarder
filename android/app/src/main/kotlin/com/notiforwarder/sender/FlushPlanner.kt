@@ -14,6 +14,13 @@ enum class FlushPlan {
     Nothing,
 }
 
+/**
+ * Like [planFlushSoon], but a flush that is waiting out a retry delay is replaced, not respected. For when the
+ * server is known to be reachable. A running flush is still never interrupted.
+ */
+fun planFlushNow(existing: List<WorkPhase>): FlushPlan =
+    if (WorkPhase.Running in existing) FlushPlan.FollowUp else FlushPlan.Start
+
 fun planFlushSoon(existing: List<WorkPhase>): FlushPlan = when {
     WorkPhase.Waiting in existing -> FlushPlan.Nothing
     WorkPhase.Running in existing -> FlushPlan.FollowUp

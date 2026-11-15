@@ -27,4 +27,19 @@ class FlushPlannerTest {
         assertEquals(FollowUp, planFlushSoon(listOf(Running)))
         assertEquals(FollowUp, planFlushSoon(listOf(Finished, Running)))
     }
+
+    // "Now" is for when the server is known to be reachable: a long retry wait must not hold the queue.
+
+    @Test
+    fun `flushing now replaces a flush that is waiting out a retry delay`() {
+        assertEquals(Start, planFlushNow(listOf(Waiting)))
+        assertEquals(Start, planFlushNow(emptyList()))
+        assertEquals(Start, planFlushNow(listOf(Finished)))
+    }
+
+    @Test
+    fun `flushing now never interrupts a flush that is running, it follows it`() {
+        assertEquals(FollowUp, planFlushNow(listOf(Running)))
+        assertEquals(FollowUp, planFlushNow(listOf(Running, Waiting)))
+    }
 }

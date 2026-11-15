@@ -7,6 +7,9 @@ interface FlushScheduler {
 
     /** Flush after a delay, and only with a network connection. */
     fun flushAfter(delayMillis: Long)
+
+    /** Flush at once, even if a flush is waiting out a retry delay. For when the server is known to be reachable. */
+    fun flushNow() = flushSoon()
 }
 
 /** One scheduled flush: run it, then schedule whatever should happen next. */

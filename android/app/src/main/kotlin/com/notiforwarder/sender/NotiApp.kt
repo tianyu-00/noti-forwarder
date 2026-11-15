@@ -81,7 +81,7 @@ class NotiApp : Application() {
     fun sendWaiting() {
         replyThread.execute {
             runCatching { queue.retryNow() }
-            scheduler.flushSoon()
+            scheduler.flushNow()
         }
     }
 
