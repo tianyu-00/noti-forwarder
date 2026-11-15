@@ -170,32 +170,34 @@ private fun AlertsScreen(app: NotiApp, messages: List<ReceivedMessage>) {
                     onTextLayout = { if (!expanded) cutOff = it.hasVisualOverflow },
                     modifier = Modifier.padding(top = 6.dp),
                 )
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        listOfNotNull(d.device, describeAgo(at, now)).joinToString(" · "),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = colors.onSurfaceVariant,
-                    )
-                    d.code?.let { code ->
-                        // The button says so for two seconds, so a tap is never silent.
-                        var copied by remember(message.id) { mutableStateOf(false) }
-                        LaunchedEffect(copied) {
-                            if (copied) {
-                                delay(2_000)
-                                copied = false
+                Text(
+                    listOfNotNull(d.device, describeAgo(at, now)).joinToString(" · "),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = colors.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+                val showMore = cutOff || expanded
+                if (showMore || d.code != null) {
+                    // One row of actions: Show more on the left, Copy code on the right.
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        if (showMore) {
+                            TextButton(onClick = { expanded = !expanded }) { Text(if (expanded) "Show less" else "Show more") }
+                        }
+                        Box(Modifier.weight(1f))
+                        d.code?.let { code ->
+                            // The button says so for two seconds, so a tap is never silent.
+                            var copied by remember(message.id) { mutableStateOf(false) }
+                            LaunchedEffect(copied) {
+                                if (copied) {
+                                    delay(2_000)
+                                    copied = false
+                                }
+                            }
+                            TextButton(onClick = { clipboard.setText(AnnotatedString(code)); copied = true }) {
+                                Text(if (copied) "Copied ✓" else "Copy code")
                             }
                         }
-                        TextButton(onClick = { clipboard.setText(AnnotatedString(code)); copied = true }) {
-                            Text(if (copied) "Copied ✓" else "Copy code")
-                        }
                     }
-                }
-                if (cutOff || expanded) {
-                    TextButton(onClick = { expanded = !expanded }) { Text(if (expanded) "Show less" else "Show more") }
                 }
             }
         }
