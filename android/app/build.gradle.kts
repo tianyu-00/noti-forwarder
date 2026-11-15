@@ -34,7 +34,14 @@ android {
     }
 
     buildTypes {
+        // A build from this PC is its own app ("...sender.debug", named "Notiforwarder dev"), so it installs next to
+        // the signed release app: different id means different signing key, pairing and settings, and no uninstall.
+        debug {
+            applicationIdSuffix = ".debug"
+            manifestPlaceholders["appLabel"] = "Notiforwarder dev"
+        }
         release {
+            manifestPlaceholders["appLabel"] = "Notiforwarder"
             signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
     }

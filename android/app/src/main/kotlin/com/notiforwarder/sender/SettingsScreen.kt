@@ -136,6 +136,16 @@ private fun UpdateCard(state: UpdateState, onCheck: () -> Unit, onInstall: () ->
             onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(PROJECT_URL))) },
         )
         RowDivider()
+        // A debug build is a separate app (its own id), so the release APK cannot update it.
+        if (BuildConfig.DEBUG) {
+            Text(
+                "This is a development build. Install new versions from your computer.",
+                style = androidx.compose.material3.MaterialTheme.typography.bodyMedium,
+                color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(vertical = 12.dp),
+            )
+            return@NotiCard
+        }
         val busy = state is UpdateState.Checking || state is UpdateState.Downloading || state is UpdateState.Installing
         Text(
             when (state) {

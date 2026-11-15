@@ -46,7 +46,7 @@
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
-        android:label="Notiforwarder"
+        android:label="${appLabel}"
         android:theme="@style/Theme.Notiforwarder"
         android:usesCleartextTraffic="true">
 
@@ -63,7 +63,7 @@
         <service
             android:name=".NotificationForwarderService"
             android:exported="true"
-            android:label="Notiforwarder"
+            android:label="${appLabel}"
             android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
             <intent-filter>
                 <action android:name="android.service.notification.NotificationListenerService" />
