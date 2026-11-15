@@ -75,14 +75,12 @@ internal fun ReceiverScreen(
         Tab.Alerts -> AlertsScreen(app, messages)
         Tab.Settings -> ReceiverSettingsScreen(app, paired, ready, themeMode, updateState, actions, messages)
         else -> {
-            val reader = remember { MessageReader { app.store.load()?.e2eKey } }
             // Worked out again each time the list is re-read (every couple of seconds).
             val stats = remember(messages) {
                 val startOfToday = java.time.LocalDate.now().atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
-                receiverStats(messages, startOfToday) { MessageDescriber.describe(it, reader.read(it)).code != null }
+                receiverStats(messages, startOfToday)
             }
-            val alerts = remember(messages) { app.receiverSettingsStore.load() }
-            ReceiverStatusScreen(paired, connection, ready, stats, alerts, actions)
+            ReceiverStatusScreen(paired, connection, ready, stats, actions)
         }
     }
 }
@@ -93,7 +91,6 @@ private fun ReceiverStatusScreen(
     connection: ConnectionState,
     ready: Readiness,
     stats: ReceiverStats,
-    alerts: ReceiverSettings,
     actions: ReceiverActions,
 ) {
     val colors = MaterialTheme.colorScheme
@@ -132,44 +129,12 @@ private fun ReceiverStatusScreen(
             ) {
                 Chip(if (paired.encrypted) "End-to-end encrypted" else "Not end-to-end encrypted", good = paired.encrypted)
                 Chip("Receiver")
-                Chip(if (alerts.enabled) "Alerts on" else "Alerts off", good = alerts.enabled)
             }
         }
 
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             StatTile("Today", stats.today.toString(), Modifier.weight(1f))
-            StatTile("2FA codes today", stats.codesToday.toString(), Modifier.weight(1f))
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             StatTile("Last message", describeAgoShort(stats.lastAt, now), Modifier.weight(1f))
-            StatTile("Held on this phone", stats.held.toString(), Modifier.weight(1f))
-        }
-
-        NotiCard(padding = androidx.compose.foundation.layout.PaddingValues(horizontal = 18.dp, vertical = 8.dp)) {
-            CardLabel("Alerts")
-            KeyValueRow("Show alerts", if (alerts.enabled) "On" else "Off")
-            RowDivider()
-            KeyValueRow("Which messages", if (alerts.mode == AlertMode.CodesOnly) "2FA codes only" else "All messages")
-            RowDivider()
-            KeyValueRow(
-                "Types",
-                listOfNotNull("Texts".takeIf { "sms" in alerts.types }, "App notifications".takeIf { "notification" in alerts.types })
-                    .ifEmpty { listOf("None") }.joinToString(", "),
-            )
-            if (alerts.blockedApps.isNotEmpty()) {
-                RowDivider()
-                KeyValueRow("Apps turned off", alerts.blockedApps.size.toString())
-            }
-        }
-
-        if (stats.phones.isNotEmpty()) {
-            NotiCard(padding = androidx.compose.foundation.layout.PaddingValues(horizontal = 18.dp, vertical = 8.dp)) {
-                CardLabel("Sender phones")
-                stats.phones.forEachIndexed { index, phone ->
-                    if (index > 0) RowDivider()
-                    KeyValueRow(phone.name, if (phone.count == 1) "1 message" else "${phone.count} messages")
-                }
-            }
         }
 
         NotiCard(padding = androidx.compose.foundation.layout.PaddingValues(horizontal = 18.dp, vertical = 8.dp)) {
