@@ -14,6 +14,15 @@ export default function Footer() {
     <footer className="border-t border-line p-4 text-xs text-faint">
       Web {__APP_VERSION__}
       {server && ` · Server ${server.version} (${server.commit})`}
+      {" · "}
+      <a
+        href="https://github.com/tianyu-00/noti-forwarder"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="underline hover:text-muted"
+      >
+        GitHub
+      </a>
     </footer>
   );
 }

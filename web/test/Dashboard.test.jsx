@@ -755,6 +755,25 @@ describe("footer and sign out", () => {
     );
   });
 
+  it("links to the project on GitHub from the footer, opening in a new tab without handing over the page", async () => {
+    mockApi({});
+    render(<Dashboard username="admin" onLogout={() => {}} />);
+
+    const link = within(await screen.findByRole("contentinfo")).getByRole(
+      "link",
+      {
+        name: /github/i,
+      },
+    );
+
+    expect(link).toHaveAttribute(
+      "href",
+      "https://github.com/tianyu-00/noti-forwarder",
+    );
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(link).toHaveAttribute("rel", expect.stringContaining("noopener"));
+  });
+
   it("signs out through the API and tells the app", async () => {
     mockApi({});
     let called = false;
