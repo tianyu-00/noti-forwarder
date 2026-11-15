@@ -86,22 +86,17 @@ internal fun SettingsScreen(
             }
         }
 
-        NotiCard(padding = androidx.compose.foundation.layout.PaddingValues(horizontal = 18.dp, vertical = 8.dp)) {
-            CardLabel("About")
-            KeyValueRow(
-                "Version",
-                BuildConfig.VERSION_NAME,
-                // Only the unlocking tap says anything: a message per tap queues up and lags behind the taps.
-                onClick = {
-                    if (!developerMode && taps.tap(System.currentTimeMillis())) {
-                        onDeveloperUnlocked()
-                        Toast.makeText(context, "Developer mode is on", Toast.LENGTH_SHORT).show()
-                    }
-                },
-            )
-        }
-
-        UpdateCard(updateState, onCheckUpdate, onInstallUpdate, onAllowInstall)
+        UpdateCard(
+            updateState, onCheckUpdate, onInstallUpdate, onAllowInstall,
+            // Tapping the installed version several times turns developer mode on. Only the unlocking tap
+            // says anything: a message per tap queues up and lags behind the taps.
+            onVersionTap = {
+                if (!developerMode && taps.tap(System.currentTimeMillis())) {
+                    onDeveloperUnlocked()
+                    Toast.makeText(context, "Developer mode is on", Toast.LENGTH_SHORT).show()
+                }
+            },
+        )
 
         if (developerMode) {
             NotiCard(padding = androidx.compose.foundation.layout.PaddingValues(horizontal = 18.dp, vertical = 10.dp)) {
@@ -126,10 +121,16 @@ internal fun SettingsScreen(
 
 /** Check for a newer release and install it from inside the app. */
 @Composable
-internal fun UpdateCard(state: UpdateState, onCheck: () -> Unit, onInstall: () -> Unit, onAllowInstall: () -> Unit) {
+internal fun UpdateCard(
+    state: UpdateState,
+    onCheck: () -> Unit,
+    onInstall: () -> Unit,
+    onAllowInstall: () -> Unit,
+    onVersionTap: (() -> Unit)? = null,
+) {
     NotiCard(padding = androidx.compose.foundation.layout.PaddingValues(horizontal = 18.dp, vertical = 8.dp)) {
         CardLabel("App updates")
-        KeyValueRow("Installed", BuildConfig.VERSION_NAME)
+        KeyValueRow("Installed", BuildConfig.VERSION_NAME, onClick = onVersionTap)
         RowDivider()
         val context = LocalContext.current
         KeyValueRow(
