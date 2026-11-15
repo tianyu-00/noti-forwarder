@@ -1,6 +1,5 @@
 package com.notiforwarder.sender
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -25,7 +24,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -51,7 +49,7 @@ internal class ReceiverActions(
     val onAllowInstall: () -> Unit,
 )
 
-/** The receiver's home: its latest alerts, and a Settings page behind a button. */
+/** The receiver's pages, picked from the bottom bar: Status, Alerts and Settings. */
 @Composable
 internal fun ReceiverScreen(
     app: NotiApp,
@@ -59,11 +57,9 @@ internal fun ReceiverScreen(
     ready: Readiness,
     themeMode: ThemeMode,
     updateState: UpdateState,
+    tab: Tab,
     actions: ReceiverActions,
 ) {
-    var showSettings by rememberSaveable { mutableStateOf(false) }
-    BackHandler(enabled = showSettings) { showSettings = false }
-
     // The list is read from the phone's own copy; the connection keeps that copy in step with the dashboard.
     var messages by remember { mutableStateOf<List<ReceivedMessage>>(emptyList()) }
     LaunchedEffect(Unit) {
@@ -74,78 +70,78 @@ internal fun ReceiverScreen(
     }
     val connection by app.receiverStream.state.collectAsState()
 
-    if (showSettings) {
-        ReceiverSettingsScreen(app, paired, ready, themeMode, updateState, actions, messages, onBack = { showSettings = false })
-    } else {
-        AlertsScreen(app, connection, ready, messages, actions, onSettings = { showSettings = true })
+    when (tab) {
+        Tab.Alerts -> AlertsScreen(app, messages)
+        Tab.Settings -> ReceiverSettingsScreen(app, paired, ready, themeMode, updateState, actions, messages)
+        else -> ReceiverStatusScreen(connection, ready, messages.size, actions)
     }
 }
 
 @Composable
-private fun AlertsScreen(
-    app: NotiApp,
+private fun ReceiverStatusScreen(
     connection: ConnectionState,
     ready: Readiness,
-    messages: List<ReceivedMessage>,
+    held: Int,
     actions: ReceiverActions,
-    onSettings: () -> Unit,
 ) {
+    val colors = MaterialTheme.colorScheme
+    val label = describeConnection(connection)
+    Column(
+        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp, vertical = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        ScreenTitle("Status")
+        NotiCard(padding = androidx.compose.foundation.layout.PaddingValues(horizontal = 18.dp, vertical = 14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Box(Modifier.size(10.dp).clip(CircleShape).background(if (label.good) colors.tertiary else colors.outline))
+                Text(label.text, style = MaterialTheme.typography.bodyLarge)
+            }
+            Text(
+                if (held == 0) "No messages held yet" else "$held messages on this phone",
+                style = MaterialTheme.typography.bodySmall,
+                color = colors.onSurfaceVariant,
+                modifier = Modifier.padding(top = 6.dp),
+            )
+        }
+        if (!ready.notificationsAllowed) {
+            NotiCard(padding = androidx.compose.foundation.layout.PaddingValues(18.dp)) {
+                Text("Allow notifications", fontWeight = FontWeight.SemiBold)
+                Text(
+                    "Without it, alerts cannot show on this phone.",
+                    color = colors.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(vertical = 6.dp),
+                )
+                PrimaryButton(onClick = actions.onAllowNotifications, modifier = Modifier.fillMaxWidth()) { Text("Allow") }
+            }
+        }
+        if (!ready.batteryExempt) {
+            NotiCard(padding = androidx.compose.foundation.layout.PaddingValues(18.dp)) {
+                Text("Keep it running", fontWeight = FontWeight.SemiBold)
+                Text(
+                    "Set battery use to unrestricted so alerts arrive when the screen is off.",
+                    color = colors.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(vertical = 6.dp),
+                )
+                SecondaryButton(onClick = actions.onRequestBatteryExemption, modifier = Modifier.fillMaxWidth()) { Text("Fix") }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AlertsScreen(app: NotiApp, messages: List<ReceivedMessage>) {
     val colors = MaterialTheme.colorScheme
     val reader = remember { MessageReader { app.store.load()?.e2eKey } }
     val clipboard = LocalClipboardManager.current
-    val label = describeConnection(connection)
     val now = System.currentTimeMillis()
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(horizontal = 18.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(top = 20.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                ScreenTitle("Alerts")
-                TextButton(onClick = onSettings) { Text("Settings") }
-            }
-        }
-        item {
-            NotiCard(padding = androidx.compose.foundation.layout.PaddingValues(horizontal = 18.dp, vertical = 14.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Box(Modifier.size(10.dp).clip(CircleShape).background(if (label.good) colors.tertiary else colors.outline))
-                    Text(label.text, style = MaterialTheme.typography.bodyLarge)
-                }
-            }
-        }
-        if (!ready.notificationsAllowed) {
-            item {
-                NotiCard(padding = androidx.compose.foundation.layout.PaddingValues(18.dp)) {
-                    Text("Allow notifications", fontWeight = FontWeight.SemiBold)
-                    Text(
-                        "Without it, alerts cannot show on this phone.",
-                        color = colors.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(vertical = 6.dp),
-                    )
-                    PrimaryButton(onClick = actions.onAllowNotifications, modifier = Modifier.fillMaxWidth()) { Text("Allow") }
-                }
-            }
-        }
-        if (!ready.batteryExempt) {
-            item {
-                NotiCard(padding = androidx.compose.foundation.layout.PaddingValues(18.dp)) {
-                    Text("Keep it running", fontWeight = FontWeight.SemiBold)
-                    Text(
-                        "Set battery use to unrestricted so alerts arrive when the screen is off.",
-                        color = colors.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(vertical = 6.dp),
-                    )
-                    SecondaryButton(onClick = actions.onRequestBatteryExemption, modifier = Modifier.fillMaxWidth()) { Text("Fix") }
-                }
-            }
-        }
+        item { Box(Modifier.padding(top = 20.dp)) { ScreenTitle("Alerts") } }
         if (messages.isEmpty()) {
             item {
                 Text(
@@ -195,7 +191,6 @@ private fun ReceiverSettingsScreen(
     updateState: UpdateState,
     actions: ReceiverActions,
     messages: List<ReceivedMessage>,
-    onBack: () -> Unit,
 ) {
     var settings by remember { mutableStateOf(app.receiverSettingsStore.load()) }
     val change = { updated: ReceiverSettings ->
@@ -209,9 +204,6 @@ private fun ReceiverSettingsScreen(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp, vertical = 20.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            TextButton(onClick = onBack) { Text("‹ Alerts") }
-        }
         ScreenTitle("Settings")
 
         NotiCard(padding = androidx.compose.foundation.layout.PaddingValues(horizontal = 18.dp, vertical = 10.dp)) {

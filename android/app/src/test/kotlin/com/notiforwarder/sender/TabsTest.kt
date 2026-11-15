@@ -35,4 +35,22 @@ class TabsTest {
     fun `goes back to Status after unpairing and pairing again`() {
         assertEquals(Tab.Status, currentTab(Tab.Settings, paired = false))
     }
+
+    @Test
+    fun `a paired receiver has Status, Alerts and Settings`() {
+        assertEquals(
+            listOf(Tab.Status, Tab.Alerts, Tab.Settings),
+            visibleTabs(paired = true, role = AppRole.Receiver),
+        )
+    }
+
+    @Test
+    fun `an unpaired receiver has no tabs`() {
+        assertTrue(visibleTabs(paired = false, role = AppRole.Receiver).isEmpty())
+    }
+
+    @Test
+    fun `a sender never sees the Alerts tab`() {
+        assertTrue(Tab.Alerts !in visibleTabs(paired = true, role = AppRole.Sender))
+    }
 }

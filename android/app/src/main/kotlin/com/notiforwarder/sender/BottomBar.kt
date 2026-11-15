@@ -121,6 +121,24 @@ private fun TabIcon(tab: Tab, color: Color) {
                     style = stroke,
                 )
             }
+            Tab.Alerts -> {
+                // A bell: a dome with a flat rim, and a clapper under it.
+                drawPath(
+                    Path().apply {
+                        moveTo(6 * unit, 17 * unit)
+                        lineTo(6 * unit, 11 * unit)
+                        cubicTo(6 * unit, 7 * unit, 9 * unit, 5 * unit, 12 * unit, 5 * unit)
+                        cubicTo(15 * unit, 5 * unit, 18 * unit, 7 * unit, 18 * unit, 11 * unit)
+                        lineTo(18 * unit, 17 * unit)
+                        lineTo(5 * unit, 17 * unit)
+                        moveTo(18 * unit, 17 * unit)
+                        lineTo(19 * unit, 17 * unit)
+                    },
+                    color,
+                    style = stroke,
+                )
+                drawLine(color, p(10f, 20.5f), p(14f, 20.5f), stroke.width, StrokeCap.Round)
+            }
             Tab.Settings -> {
                 drawCircle(color, radius = 3f * unit, center = p(12f, 12f), style = stroke)
                 drawCircle(color, radius = 7f * unit, center = p(12f, 12f), style = stroke)

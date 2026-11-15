@@ -273,6 +273,7 @@ private fun MainScreen(
                     ready = ready,
                     themeMode = themeMode,
                     updateState = updateState,
+                    tab = currentTab(tab, paired = true),
                     actions = ReceiverActions(
                         onUnpair = controller::unpair,
                         onChangeRole = changeRole,
@@ -314,7 +315,7 @@ private fun MainScreen(
                     sims = sims,
                     onAllowSimAccess = { ask(Manifest.permission.READ_PHONE_STATE, askPhoneState) },
                 )
-                    Tab.Activity -> ActivityScreen(activity)
+                    Tab.Activity, Tab.Alerts -> ActivityScreen(activity)
                     Tab.Settings -> SettingsScreen(
                         paired = paired,
                         themeMode = themeMode,
@@ -343,7 +344,11 @@ private fun MainScreen(
                 }
             }
         }
-        if (paired != null && role == AppRole.Sender) BottomBar(tabs = visibleTabs(paired = true), current = tab, onSelect = { tab = it })
+        if (paired != null && role != null) {
+            // A tab the other role has (a stale choice after a role change) falls back to Status.
+            val tabs = visibleTabs(paired = true, role = role)
+            BottomBar(tabs = tabs, current = if (tab in tabs) tab else Tab.Status, onSelect = { tab = it })
+        }
     }
 }
 
