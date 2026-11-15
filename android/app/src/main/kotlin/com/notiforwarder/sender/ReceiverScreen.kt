@@ -178,12 +178,8 @@ private fun AlertsScreen(app: NotiApp, messages: List<ReceivedMessage>) {
                 )
                 val showMore = cutOff || expanded
                 if (showMore || d.code != null) {
-                    // One row of actions: Show more on the left, Copy code on the right.
+                    // One row of actions: Copy code on the left, Show more on the right.
                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        if (showMore) {
-                            TextButton(onClick = { expanded = !expanded }) { Text(if (expanded) "Show less" else "Show more") }
-                        }
-                        Box(Modifier.weight(1f))
                         d.code?.let { code ->
                             // The button says so for two seconds, so a tap is never silent.
                             var copied by remember(message.id) { mutableStateOf(false) }
@@ -196,6 +192,10 @@ private fun AlertsScreen(app: NotiApp, messages: List<ReceivedMessage>) {
                             TextButton(onClick = { clipboard.setText(AnnotatedString(code)); copied = true }) {
                                 Text(if (copied) "Copied ✓" else "Copy code")
                             }
+                        }
+                        Box(Modifier.weight(1f))
+                        if (showMore) {
+                            TextButton(onClick = { expanded = !expanded }) { Text(if (expanded) "Show less" else "Show more") }
                         }
                     }
                 }
