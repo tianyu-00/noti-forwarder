@@ -74,59 +74,121 @@ internal fun ReceiverScreen(
     when (tab) {
         Tab.Alerts -> AlertsScreen(app, messages)
         Tab.Settings -> ReceiverSettingsScreen(app, paired, ready, themeMode, updateState, actions, messages)
-        else -> ReceiverStatusScreen(connection, ready, messages.size, actions)
+        else -> {
+            val reader = remember { MessageReader { app.store.load()?.e2eKey } }
+            // Worked out again each time the list is re-read (every couple of seconds).
+            val stats = remember(messages) {
+                val startOfToday = java.time.LocalDate.now().atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+                receiverStats(messages, startOfToday) { MessageDescriber.describe(it, reader.read(it)).code != null }
+            }
+            val alerts = remember(messages) { app.receiverSettingsStore.load() }
+            ReceiverStatusScreen(paired, connection, ready, stats, alerts, actions)
+        }
     }
 }
 
 @Composable
 private fun ReceiverStatusScreen(
+    paired: UiState.Paired,
     connection: ConnectionState,
     ready: Readiness,
-    held: Int,
+    stats: ReceiverStats,
+    alerts: ReceiverSettings,
     actions: ReceiverActions,
 ) {
     val colors = MaterialTheme.colorScheme
-    val label = describeConnection(connection)
+    val now = System.currentTimeMillis()
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp, vertical = 20.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        ScreenTitle("Status")
-        NotiCard(padding = androidx.compose.foundation.layout.PaddingValues(horizontal = 18.dp, vertical = 14.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Box(Modifier.size(10.dp).clip(CircleShape).background(if (label.good) colors.tertiary else colors.outline))
-                Text(label.text, style = MaterialTheme.typography.bodyLarge)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Box(
+                modifier = Modifier.padding(start = 4.dp).size(28.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(9.dp)).background(colors.primary),
+                contentAlignment = Alignment.Center,
+            ) { Text("N", color = colors.onPrimary, fontWeight = FontWeight.Bold) }
+            Text("Notiforwarder", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        }
+
+        val good = connection == ConnectionState.Connected
+        NotiCard(padding = androidx.compose.foundation.layout.PaddingValues(20.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                val dot = if (good) colors.tertiary else colors.outline
+                Box(Modifier.size(26.dp).clip(CircleShape).background(dot.copy(alpha = 0.18f)), contentAlignment = Alignment.Center) {
+                    Box(Modifier.size(14.dp).clip(CircleShape).background(dot))
+                }
+                Text(connectionHeadline(connection), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             }
             Text(
-                if (held == 0) "No messages held yet" else "$held messages on this phone",
-                style = MaterialTheme.typography.bodySmall,
+                "Receiving from ${serverName(paired.serverUrl)}",
+                style = MaterialTheme.typography.bodyMedium,
                 color = colors.onSurfaceVariant,
-                modifier = Modifier.padding(top = 6.dp),
+                modifier = Modifier.padding(top = 12.dp),
             )
-        }
-        if (!ready.notificationsAllowed) {
-            NotiCard(padding = androidx.compose.foundation.layout.PaddingValues(18.dp)) {
-                Text("Allow notifications", fontWeight = FontWeight.SemiBold)
-                Text(
-                    "Without it, alerts cannot show on this phone.",
-                    color = colors.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(vertical = 6.dp),
-                )
-                PrimaryButton(onClick = actions.onAllowNotifications, modifier = Modifier.fillMaxWidth()) { Text("Allow") }
+            androidx.compose.foundation.layout.FlowRow(
+                modifier = Modifier.padding(top = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Chip(if (paired.encrypted) "End-to-end encrypted" else "Not end-to-end encrypted", good = paired.encrypted)
+                Chip("Receiver")
+                Chip(if (alerts.enabled) "Alerts on" else "Alerts off", good = alerts.enabled)
             }
         }
-        if (!ready.batteryExempt) {
-            NotiCard(padding = androidx.compose.foundation.layout.PaddingValues(18.dp)) {
-                Text("Keep it running", fontWeight = FontWeight.SemiBold)
-                Text(
-                    "Set battery use to unrestricted so alerts arrive when the screen is off.",
-                    color = colors.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(vertical = 6.dp),
-                )
-                SecondaryButton(onClick = actions.onRequestBatteryExemption, modifier = Modifier.fillMaxWidth()) { Text("Fix") }
+
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            StatTile("Today", stats.today.toString(), Modifier.weight(1f))
+            StatTile("2FA codes today", stats.codesToday.toString(), Modifier.weight(1f))
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            StatTile("Last message", describeAgoShort(stats.lastAt, now), Modifier.weight(1f))
+            StatTile("Held on this phone", stats.held.toString(), Modifier.weight(1f))
+        }
+
+        NotiCard(padding = androidx.compose.foundation.layout.PaddingValues(horizontal = 18.dp, vertical = 8.dp)) {
+            CardLabel("Alerts")
+            KeyValueRow("Show alerts", if (alerts.enabled) "On" else "Off")
+            RowDivider()
+            KeyValueRow("Which messages", if (alerts.mode == AlertMode.CodesOnly) "2FA codes only" else "All messages")
+            RowDivider()
+            KeyValueRow(
+                "Types",
+                listOfNotNull("Texts".takeIf { "sms" in alerts.types }, "App notifications".takeIf { "notification" in alerts.types })
+                    .ifEmpty { listOf("None") }.joinToString(", "),
+            )
+            if (alerts.blockedApps.isNotEmpty()) {
+                RowDivider()
+                KeyValueRow("Apps turned off", alerts.blockedApps.size.toString())
             }
+        }
+
+        if (stats.phones.isNotEmpty()) {
+            NotiCard(padding = androidx.compose.foundation.layout.PaddingValues(horizontal = 18.dp, vertical = 8.dp)) {
+                CardLabel("Sender phones")
+                stats.phones.forEachIndexed { index, phone ->
+                    if (index > 0) RowDivider()
+                    KeyValueRow(phone.name, if (phone.count == 1) "1 message" else "${phone.count} messages")
+                }
+            }
+        }
+
+        NotiCard(padding = androidx.compose.foundation.layout.PaddingValues(horizontal = 18.dp, vertical = 8.dp)) {
+            CardLabel("Keep it running")
+            CheckRow(
+                text = if (ready.notificationsAllowed) "Notifications are allowed" else "Allow notifications",
+                ok = ready.notificationsAllowed,
+                detail = if (ready.notificationsAllowed) null else "Without it, alerts cannot show on this phone",
+                action = if (ready.notificationsAllowed) null else "Allow",
+                onAction = actions.onAllowNotifications,
+            )
+            RowDivider()
+            CheckRow(
+                text = if (ready.batteryExempt) "Battery optimisation is off" else "Battery optimisation is on",
+                ok = ready.batteryExempt,
+                detail = if (ready.batteryExempt) null else "Alerts may arrive late, or not at all, when the screen is off",
+                action = if (ready.batteryExempt) null else "Turn off",
+                onAction = actions.onRequestBatteryExemption,
+            )
         }
     }
 }
