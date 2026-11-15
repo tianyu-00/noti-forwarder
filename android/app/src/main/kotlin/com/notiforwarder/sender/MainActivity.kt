@@ -164,6 +164,7 @@ private fun MainScreen(
     var activity by remember { mutableStateOf<ActivityView?>(null) }
     var now by remember { mutableStateOf(System.currentTimeMillis()) }
     val hostActivity = LocalActivity.current!!
+    val updateState by app.updater.state.collectAsStateWithLifecycle()
     // Asks for a permission with the system dialog, or, when Android no longer shows it (refused too often),
     // opens this app's permission page so the button is never dead.
     val ask = { permission: String, launcher: ManagedActivityResultLauncher<String, Boolean> ->
@@ -211,6 +212,8 @@ private fun MainScreen(
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
         sims = app.simLookup.activeSims()
         app.reportSims()
+        // Back from Android's "install unknown apps" page: carry on installing a downloaded update.
+        scope.launch(Dispatchers.IO) { app.updater.continueInstall() }
     }
     val changeReplies = { on: Boolean ->
         val allowed = ContextCompat.checkSelfPermission(app, Manifest.permission.SEND_SMS) == PackageManager.PERMISSION_GRANTED
@@ -284,6 +287,15 @@ private fun MainScreen(
                         developerMode = settings.developerMode,
                         onDeveloperUnlocked = { changeSettings(settings.copy(developerMode = true)) },
                         onDeveloperChange = { changeSettings(withDeveloperMode(settings, it)) },
+                        updateState = updateState,
+                        onCheckUpdate = { scope.launch(Dispatchers.IO) { app.updater.check() } },
+                        onInstallUpdate = { scope.launch(Dispatchers.IO) { app.updater.downloadAndInstall() } },
+                        onAllowInstall = {
+                            app.startActivity(
+                                Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${app.packageName}"))
+                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                            )
+                        },
                         practiceMode = settings.practiceReplies,
                         onPracticeChange = { changeSettings(settings.copy(practiceReplies = it)) },
                     )

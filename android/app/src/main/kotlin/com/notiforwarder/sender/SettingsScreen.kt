@@ -29,6 +29,10 @@ internal fun SettingsScreen(
     developerMode: Boolean,
     onDeveloperUnlocked: () -> Unit,
     onDeveloperChange: (Boolean) -> Unit,
+    updateState: UpdateState,
+    onCheckUpdate: () -> Unit,
+    onInstallUpdate: () -> Unit,
+    onAllowInstall: () -> Unit,
     practiceMode: Boolean,
     onPracticeChange: (Boolean) -> Unit,
 ) {
@@ -93,6 +97,8 @@ internal fun SettingsScreen(
             )
         }
 
+        UpdateCard(updateState, onCheckUpdate, onInstallUpdate, onAllowInstall)
+
         if (developerMode) {
             NotiCard(padding = androidx.compose.foundation.layout.PaddingValues(horizontal = 18.dp, vertical = 10.dp)) {
                 SwitchRow(
@@ -110,6 +116,45 @@ internal fun SettingsScreen(
                     onPracticeChange,
                 )
             }
+        }
+    }
+}
+
+/** Check for a newer release and install it from inside the app. */
+@Composable
+private fun UpdateCard(state: UpdateState, onCheck: () -> Unit, onInstall: () -> Unit, onAllowInstall: () -> Unit) {
+    NotiCard(padding = androidx.compose.foundation.layout.PaddingValues(horizontal = 18.dp, vertical = 8.dp)) {
+        CardLabel("App updates")
+        KeyValueRow("Installed", BuildConfig.VERSION_NAME)
+        RowDivider()
+        val busy = state is UpdateState.Checking || state is UpdateState.Downloading || state is UpdateState.Installing
+        Text(
+            when (state) {
+                UpdateState.Idle -> "Look for a newer version."
+                UpdateState.Checking -> "Checking…"
+                is UpdateState.UpToDate -> "You have the latest version."
+                is UpdateState.Available -> "Version ${state.info.version} is available (${state.info.sizeBytes / 1_000_000} MB)."
+                is UpdateState.Downloading -> "Downloading version ${state.info.version}… ${state.percent}%"
+                is UpdateState.NeedsPermission -> "Android needs your permission first: allow this app to install apps, then come back."
+                UpdateState.Installing -> "Android is asking you to confirm the installation."
+                is UpdateState.Failed -> state.message
+            },
+            style = androidx.compose.material3.MaterialTheme.typography.bodyMedium,
+            color = if (state is UpdateState.Failed) androidx.compose.material3.MaterialTheme.colorScheme.error
+            else androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 12.dp),
+        )
+        when (state) {
+            is UpdateState.Available ->
+                PrimaryButton(onClick = onInstall, modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)) { Text("Download and install") }
+            is UpdateState.NeedsPermission ->
+                PrimaryButton(onClick = onAllowInstall, modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)) { Text("Allow installing") }
+            else ->
+                SecondaryButton(
+                    onClick = onCheck,
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                    enabled = !busy,
+                ) { Text(if (state is UpdateState.Failed) "Try again" else "Check for updates") }
         }
     }
 }

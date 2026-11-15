@@ -102,10 +102,12 @@ fun SecondaryButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     danger: Boolean = false,
+    enabled: Boolean = true,
     content: @Composable RowScope.() -> Unit,
 ) {
     OutlinedButton(
         onClick = onClick,
+        enabled = enabled,
         modifier = modifier.heightIn(min = ButtonHeight),
         shape = MaterialTheme.shapes.medium,
         contentPadding = ButtonPadding,
