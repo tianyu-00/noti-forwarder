@@ -72,6 +72,7 @@ class InstallResultReceiver : BroadcastReceiver() {
             PackageInstaller.STATUS_SUCCESS -> Unit // the app is replaced and restarted by Android
             else -> {
                 val message = installFailureMessage(status, intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE))
+                (context.applicationContext as NotiApp).updater.installFailed(message) // shown on the update card
                 Toast.makeText(context, message, Toast.LENGTH_LONG).show()
             }
         }

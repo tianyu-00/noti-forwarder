@@ -115,6 +115,11 @@ class Updater(
         if (installer.canInstall()) start(waiting.file)
     }
 
+    /** Android refused or cancelled the install: say why, so the card does not wait for a confirmation that never comes. */
+    fun installFailed(message: String) {
+        if (_state.value == UpdateState.Installing) _state.value = UpdateState.Failed(message)
+    }
+
     private fun start(file: File) {
         if (!installer.canInstall()) {
             _state.value = UpdateState.NeedsPermission(file)

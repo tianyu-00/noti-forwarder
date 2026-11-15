@@ -174,4 +174,38 @@ class UpdaterTest {
         assertTrue(installer.installed.isEmpty())
         assertEquals(UpdateState.NeedsPermission(file), u.state.value)
     }
+
+    @Test
+    fun `when Android refuses the install the card says why, instead of staying on waiting for confirmation`() {
+        val u = updater()
+        u.check()
+        u.downloadAndInstall()
+        assertEquals(UpdateState.Installing, u.state.value)
+
+        u.installFailed("The installation was cancelled.")
+
+        assertEquals(UpdateState.Failed("The installation was cancelled."), u.state.value)
+    }
+
+    @Test
+    fun `an install result that arrives when nothing is installing changes nothing`() {
+        val u = updater()
+        u.check()
+
+        u.installFailed("late news")
+
+        assertEquals(UpdateState.Available(info), u.state.value)
+    }
+
+    @Test
+    fun `after a refused install the user can check again and be offered the update again`() {
+        val u = updater()
+        u.check()
+        u.downloadAndInstall()
+        u.installFailed("signed differently")
+
+        u.check()
+
+        assertEquals(UpdateState.Available(info), u.state.value)
+    }
 }
