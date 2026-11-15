@@ -130,7 +130,7 @@ internal fun UpdateCard(
 ) {
     NotiCard(padding = androidx.compose.foundation.layout.PaddingValues(horizontal = 18.dp, vertical = 8.dp)) {
         CardLabel("App updates")
-        KeyValueRow("Installed", BuildConfig.VERSION_NAME, onClick = onVersionTap)
+        KeyValueRow("Version", BuildConfig.VERSION_NAME, onClick = onVersionTap)
         RowDivider()
         val context = LocalContext.current
         KeyValueRow(
