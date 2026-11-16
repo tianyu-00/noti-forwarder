@@ -41,10 +41,18 @@ export function deviceToApi(row) {
     role: row.role,
     // null until the phone reports its SIMs and whether it takes replies.
     ...simsOf(row.sims),
+    battery: batteryOf(row),
   };
 }
 
-export const DEVICE_COLUMNS = 'device_id, name, model, app_version, paired_at, last_seen, revoked_at, role, sims';
+// The last level the phone reported, or null if it never has (older versions of the app do not).
+export function batteryOf(row) {
+  if (row.battery_percent === null || row.battery_percent === undefined) return null;
+  return { percent: row.battery_percent, charging: row.battery_charging === 1 };
+}
+
+export const DEVICE_COLUMNS =
+  'device_id, name, model, app_version, paired_at, last_seen, revoked_at, role, sims, battery_percent, battery_charging';
 
 export function outboxToApi(row) {
   return {

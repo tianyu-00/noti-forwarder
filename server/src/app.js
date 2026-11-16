@@ -14,6 +14,7 @@ import { outboxRouter } from './routes/outbox.js';
 import { settingsRouter } from './routes/settings.js';
 import { streamRouter } from './routes/stream.js';
 import { createEventHub } from './events.js';
+import { createBatteryWatcher } from './battery.js';
 import { requireSession } from './auth/sessions.js';
 
 export function createApp({
@@ -71,7 +72,12 @@ export function createApp({
     app.use('/api/v1', settingsRouter({ db, requireViewer: viewer, events }));
     app.use('/api/v1', messagesRouter({ db, requireViewer: viewer, events, messageRateLimit, preAuthRateLimit }));
     app.use('/api/v1', outboxRouter({ db, requireViewer: viewer, events, presence, outboxRateLimit, outboxMaxAgeMs, preAuthRateLimit }));
-    app.use('/api/v1', heartbeatRouter({ db, events, presence, preAuthRateLimit }));
+    // A sender phone that is running out of battery is announced to the receiver phones.
+    const battery = createBatteryWatcher({
+      onLow: (e) => events.publish('device_battery_low', e),
+      onOk: (e) => events.publish('device_battery_ok', e),
+    });
+    app.use('/api/v1', heartbeatRouter({ db, events, presence, battery, preAuthRateLimit }));
     app.use('/api/v1', simsRouter({ db, events, preAuthRateLimit }));
     app.use('/api/v1', deviceStreamRouter({ db, events, presence, preAuthRateLimit }));
     app.use('/api/v1', receiverRouter({ db, events, presence, preAuthRateLimit }));

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { authenticateDevice, requireRole } from '../auth/device-auth.js';
 import { rateLimit } from '../rate-limit.js';
-import { messageToApi } from '../serializers.js';
+import { batteryOf, messageToApi } from '../serializers.js';
 
 const PING_MS = 25000;
 // What a receiver is told about. Never which phones are online, their SIMs or their replies: that is
@@ -16,6 +16,8 @@ const RECEIVER_EVENTS = new Set([
   'messages_purged',
   'device_quiet',
   'device_back',
+  'device_battery_low',
+  'device_battery_ok',
 ]);
 const querySchema = z.object({ limit: z.coerce.number().int().min(1).max(500).default(100) });
 
@@ -38,6 +40,26 @@ export function receiverRouter({ db, events, presence, preAuthRateLimit = { limi
         [parsed.data.limit],
       );
       res.json({ messages: rows.map((row) => ({ ...messageToApi(row), deviceName: row.device_name ?? null })) });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  // The sender phones still paired, with the last battery level each reported. A receiver is not one of them.
+  router.get('/receiver/phones', ...guard, async (req, res, next) => {
+    try {
+      const { rows } = await db.query(
+        `SELECT device_id, name, last_seen, battery_percent, battery_charging FROM devices
+          WHERE role = 'sender' AND revoked_at IS NULL ORDER BY name, device_id`,
+      );
+      res.json({
+        phones: rows.map((row) => ({
+          deviceId: row.device_id,
+          name: row.name,
+          battery: batteryOf(row),
+          lastSeen: row.last_seen ? row.last_seen.toISOString() : null,
+        })),
+      });
     } catch (err) {
       next(err);
     }

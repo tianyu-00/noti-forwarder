@@ -223,6 +223,18 @@ describe('GET /api/v1/receiver/stream (live updates for the receiver)', () => {
     stream.close();
   });
 
+  it('tells it when a sender phones battery gets low and when it recovers, by name and level only', async () => {
+    const r = await ctx.addDevice({ role: 'receiver' });
+    const stream = await receiverStream(r.token);
+
+    ctx.app.locals.events.publish('device_battery_low', { deviceId: 'k1', deviceName: 'Kitchen phone', percent: 14 });
+    ctx.app.locals.events.publish('device_battery_ok', { deviceId: 'k1', deviceName: 'Kitchen phone', percent: 22 });
+
+    expect((await nextOfType(stream, 'device_battery_low')).data).toEqual({ deviceId: 'k1', deviceName: 'Kitchen phone', percent: 14 });
+    expect((await nextOfType(stream, 'device_battery_ok')).data).toEqual({ deviceId: 'k1', deviceName: 'Kitchen phone', percent: 22 });
+    stream.close();
+  });
+
   it('does not leak dashboard-only news, such as which phones are online or their replies and SIMs', async () => {
     const s = await ctx.addDevice();
     const r = await ctx.addDevice({ role: 'receiver' });
@@ -246,5 +258,34 @@ describe('GET /api/v1/receiver/stream (live updates for the receiver)', () => {
 
     await nextOfType(stream, 'revoked');
     stream.close();
+  });
+});
+
+describe('GET /api/v1/receiver/phones (the sender phones, with their battery)', () => {
+  const phones = (token) => request(ctx.app).get('/api/v1/receiver/phones').set(bearer(token));
+
+  it('needs a receiver token', async () => {
+    const s = await ctx.addDevice();
+
+    expect((await request(ctx.app).get('/api/v1/receiver/phones')).status).toBe(401);
+    expect((await phones(s.token)).status).toBe(403);
+  });
+
+  it('lists the sender phones that are still paired, with their last known battery', async () => {
+    const r = await ctx.addDevice({ role: 'receiver' });
+    const a = await ctx.addDevice();
+    const b = await ctx.addDevice();
+    const gone = await ctx.addDevice({ revoked: true });
+    await ctx.pool.query("UPDATE devices SET name = 'Alpha', battery_percent = 80, battery_charging = 1 WHERE device_id = $1", [a.deviceId]);
+    await ctx.pool.query("UPDATE devices SET name = 'Bravo' WHERE device_id = $1", [b.deviceId]);
+
+    const res = await phones(r.token);
+
+    expect(res.status).toBe(200);
+    const byId = Object.fromEntries(res.body.phones.map((p) => [p.deviceId, p]));
+    expect(byId[a.deviceId]).toEqual({ deviceId: a.deviceId, name: 'Alpha', battery: { percent: 80, charging: true }, lastSeen: null });
+    expect(byId[b.deviceId].battery).toBeNull();
+    expect(byId[gone.deviceId]).toBeUndefined();
+    expect(byId[r.deviceId]).toBeUndefined(); // a receiver is not a sender phone
   });
 });

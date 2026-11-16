@@ -40,10 +40,25 @@ describe('GET /api/v1/devices', () => {
       role: 'sender',
       sims: null,
       replies: null,
+      battery: null,
       revokedAt: null,
       connected: false,
     });
     expect(JSON.stringify(res.body)).not.toMatch(/token/i);
+  });
+});
+
+describe('a phones battery in GET /api/v1/devices', () => {
+  it('shows the level and whether it is charging once the phone has reported it', async () => {
+    const d = await ctx.addDevice();
+    await request(ctx.app)
+      .post('/api/v1/heartbeat')
+      .set('Authorization', `Bearer ${d.token}`)
+      .send({ battery: { percent: 42, charging: true } });
+
+    const found = (await agent.get('/api/v1/devices')).body.devices.find((x) => x.deviceId === d.deviceId);
+
+    expect(found.battery).toEqual({ percent: 42, charging: true });
   });
 });
 
