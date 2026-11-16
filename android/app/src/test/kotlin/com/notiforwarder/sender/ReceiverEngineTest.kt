@@ -21,10 +21,14 @@ private class FakeStore : ReceivedStore {
 
 private class FakeAlerts : AlertSink {
     val shown = mutableListOf<AlertPlan>()
+    val statuses = mutableListOf<StatusPlan>()
     val cancelled = mutableListOf<String>()
     var cancelledAll = 0
     override fun show(plan: AlertPlan) {
         shown += plan
+    }
+    override fun showStatus(plan: StatusPlan) {
+        statuses += plan
     }
     override fun cancel(keys: List<String>) {
         cancelled += keys
@@ -204,5 +208,60 @@ class ReceiverEngineTest {
 
         assertTrue(store.rows.isEmpty())
         assertFalse(alerts.shown.isNotEmpty())
+    }
+
+    // --- a sender phone going quiet, and coming back ---
+
+    @Test
+    fun `a phone going quiet shows a notice naming it`() {
+        engine().onEvent("device_quiet", """{"deviceId":"d1","deviceName":"Kitchen phone","minutes":180}""")
+
+        assertEquals(listOf("Kitchen phone has gone quiet"), alerts.statuses.map { it.title })
+        assertTrue(alerts.shown.isEmpty())
+    }
+
+    @Test
+    fun `a phone coming back replaces that notice`() {
+        engine().onEvent("device_quiet", """{"deviceId":"d1","deviceName":"Kitchen phone","minutes":180}""")
+        engine().onEvent("device_back", """{"deviceId":"d1","deviceName":"Kitchen phone"}""")
+
+        assertEquals(listOf("Kitchen phone has gone quiet", "Kitchen phone is back"), alerts.statuses.map { it.title })
+        assertEquals(alerts.statuses[0].key, alerts.statuses[1].key)
+    }
+
+    @Test
+    fun `quiet-phone notices follow the switches`() {
+        settings = ReceiverSettings(quietAlerts = false)
+        engine().onEvent("device_quiet", """{"deviceId":"d1","deviceName":"Kitchen phone","minutes":180}""")
+        settings = ReceiverSettings(enabled = false)
+        engine().onEvent("device_quiet", """{"deviceId":"d1","deviceName":"Kitchen phone","minutes":180}""")
+
+        assertTrue(alerts.statuses.isEmpty())
+    }
+
+    @Test
+    fun `switching quiet-phone alerts off still clears a notice that is already showing when the phone returns`() {
+        engine().onEvent("device_quiet", """{"deviceId":"d1","deviceName":"Kitchen phone","minutes":180}""")
+        settings = ReceiverSettings(quietAlerts = false)
+        engine().onEvent("device_back", """{"deviceId":"d1","deviceName":"Kitchen phone"}""")
+
+        assertEquals(listOf(QuietPlanner.keyFor("d1")), alerts.cancelled)
+        assertEquals(1, alerts.statuses.size) // only the first; no "is back" while switched off
+    }
+
+    @Test
+    fun `an erased phone takes its quiet notice with it`() {
+        engine().onEvent("device_deleted", """{"deviceId":"d1"}""")
+
+        assertTrue(QuietPlanner.keyFor("d1") in alerts.cancelled)
+    }
+
+    @Test
+    fun `damaged quiet news is ignored`() {
+        engine().onEvent("device_quiet", "not json")
+        engine().onEvent("device_quiet", """{"minutes":5}""")
+        engine().onEvent("device_back", "{")
+
+        assertTrue(alerts.statuses.isEmpty())
     }
 }

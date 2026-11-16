@@ -332,6 +332,10 @@ private fun ReceiverAlertSettingsScreen(app: NotiApp, messages: List<ReceivedMes
             SwitchRow("App notifications", "Alerts for what apps on your sender phones show", "notification" in settings.types) { on ->
                 change(settings.copy(types = if (on) settings.types + "notification" else settings.types - "notification"))
             }
+            RowDivider()
+            SwitchRow("Quiet phones", "Tell me when a sender phone stops checking in, and when it is back", settings.quietAlerts) {
+                change(settings.copy(quietAlerts = it))
+            }
         }
 
         if (apps.isNotEmpty()) {

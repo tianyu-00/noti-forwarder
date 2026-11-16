@@ -6,6 +6,10 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 
+/** News from the server about a sender phone: it stopped checking in (minutes quiet), or it is back. */
+@kotlinx.serialization.Serializable
+private data class QuietEvent(val deviceId: String, val deviceName: String? = null, val minutes: Int = 0)
+
 sealed interface RecentOutcome {
     data class Messages(val messages: List<ReceivedMessage>) : RecentOutcome
     data object Unauthorized : RecentOutcome
@@ -32,6 +36,7 @@ interface ReceivedStore {
 /** Shows and removes notifications. Android code behind this. */
 interface AlertSink {
     fun show(plan: AlertPlan)
+    fun showStatus(plan: StatusPlan)
     fun cancel(keys: List<String>)
     fun cancelAll()
 }
@@ -95,7 +100,18 @@ class ReceiverEngine(
                 val deviceId = deviceIdOf(data) ?: return
                 val ids = store.idsForDevice(deviceId)
                 store.delete(ids)
-                alerts.cancel(ids)
+                // An erased phone can no longer be quiet, so its notice goes too.
+                alerts.cancel(if (type == "device_deleted") ids + QuietPlanner.keyFor(deviceId) else ids)
+            }
+            "device_quiet" -> {
+                val e = parse<QuietEvent>(data) ?: return
+                QuietPlanner.quiet(e.deviceId, e.deviceName, e.minutes, settings())?.let(alerts::showStatus)
+            }
+            "device_back" -> {
+                val e = parse<QuietEvent>(data) ?: return
+                val plan = QuietPlanner.back(e.deviceId, e.deviceName, settings())
+                // With the notices switched off the old one still has to go, so it never lingers as a false alarm.
+                if (plan != null) alerts.showStatus(plan) else alerts.cancel(listOf(QuietPlanner.keyFor(e.deviceId)))
             }
             "messages_cleared_all" -> {
                 store.delete(store.allIds())

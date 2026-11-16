@@ -10,6 +10,8 @@ data class ReceiverSettings(
     val types: Set<String> = setOf("sms", "notification"),
     /** Packages whose notifications never alert. */
     val blockedApps: Set<String> = emptySet(),
+    /** Tell me when a sender phone stops checking in, and when it is back. */
+    val quietAlerts: Boolean = true,
 )
 
 interface ReceiverSettingsStore {
@@ -25,6 +27,7 @@ class PrefsReceiverSettingsStore(context: android.content.Context, name: String 
         mode = AlertMode.entries.firstOrNull { it.name == prefs.getString(MODE, null) } ?: AlertMode.All,
         types = prefs.getStringSet(TYPES, null)?.toSet() ?: setOf("sms", "notification"),
         blockedApps = prefs.getStringSet(BLOCKED, emptySet())?.toSet().orEmpty(),
+        quietAlerts = prefs.getBoolean(QUIET, true),
     )
 
     override fun save(settings: ReceiverSettings) = prefs.edit()
@@ -32,6 +35,7 @@ class PrefsReceiverSettingsStore(context: android.content.Context, name: String 
         .putString(MODE, settings.mode.name)
         .putStringSet(TYPES, settings.types)
         .putStringSet(BLOCKED, settings.blockedApps)
+        .putBoolean(QUIET, settings.quietAlerts)
         .apply()
 
     private companion object {
@@ -39,6 +43,7 @@ class PrefsReceiverSettingsStore(context: android.content.Context, name: String 
         const val MODE = "mode"
         const val TYPES = "types"
         const val BLOCKED = "blockedApps"
+        const val QUIET = "quietAlerts"
     }
 }
 

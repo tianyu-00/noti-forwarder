@@ -24,6 +24,7 @@ class ReceiverPrefsTest {
         val n = name()
         val rules = ReceiverSettings(
             enabled = false, mode = AlertMode.CodesOnly, types = setOf("sms"), blockedApps = setOf("com.game", "com.news"),
+            quietAlerts = false,
         )
 
         PrefsReceiverSettingsStore(context, n).save(rules)

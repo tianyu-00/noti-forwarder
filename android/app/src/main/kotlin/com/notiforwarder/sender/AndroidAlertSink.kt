@@ -38,6 +38,12 @@ class AndroidAlertSink(private val context: Context) : AlertSink {
                 .setDescription("Messages that contain a one-time code")
                 .build(),
         )
+        manager.createNotificationChannel(
+            NotificationChannelCompat.Builder(CHANNEL_STATUS, NotificationManagerCompat.IMPORTANCE_DEFAULT)
+                .setName("Phone status")
+                .setDescription("A sender phone has stopped checking in, or is back")
+                .build(),
+        )
     }
 
     private fun allowed() = Build.VERSION.SDK_INT < 33 ||
@@ -73,6 +79,26 @@ class AndroidAlertSink(private val context: Context) : AlertSink {
         }
     }
 
+    override fun showStatus(plan: StatusPlan) {
+        if (!allowed()) return
+        val open = PendingIntent.getActivity(context, 0, Intent(context, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
+        val notification = NotificationCompat.Builder(context, CHANNEL_STATUS)
+            .setSmallIcon(R.drawable.ic_stat_alert)
+            .setContentTitle(plan.title)
+            .setContentText(plan.text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(plan.text))
+            .setContentIntent(open)
+            .setAutoCancel(true)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setCategory(NotificationCompat.CATEGORY_STATUS)
+            .build()
+        try {
+            manager.notify(TAG, plan.key.hashCode(), notification)
+        } catch (e: SecurityException) {
+            // The permission was taken away between the check and now.
+        }
+    }
+
     override fun cancel(keys: List<String>) = keys.forEach { manager.cancel(TAG, it.hashCode()) }
 
     override fun cancelAll() {
@@ -84,6 +110,7 @@ class AndroidAlertSink(private val context: Context) : AlertSink {
         const val TAG = "alert"
         const val CHANNEL_MESSAGES = "receiver_messages"
         const val CHANNEL_CODES = "receiver_codes"
+        const val CHANNEL_STATUS = "receiver_status"
     }
 }
 
