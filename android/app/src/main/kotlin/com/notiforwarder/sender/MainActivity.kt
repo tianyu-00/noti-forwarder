@@ -277,6 +277,13 @@ private fun MainScreen(
                     actions = ReceiverActions(
                         onUnpair = unpairAndAsk,
                         onAllowNotifications = { ask(Manifest.permission.POST_NOTIFICATIONS, askNotifications) },
+                        onOpenNotificationSettings = {
+                            app.startActivity(
+                                Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                                    .putExtra(Settings.EXTRA_APP_PACKAGE, app.packageName)
+                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                            )
+                        },
                         onRequestBatteryExemption = onRequestBatteryExemption,
                         onThemeChange = onThemeChange,
                         onCheckUpdate = { scope.launch(Dispatchers.IO) { app.updater.check() } },

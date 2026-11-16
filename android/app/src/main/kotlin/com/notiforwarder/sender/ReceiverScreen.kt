@@ -43,6 +43,7 @@ import kotlinx.coroutines.withContext
 internal class ReceiverActions(
     val onUnpair: () -> Unit,
     val onAllowNotifications: () -> Unit,
+    val onOpenNotificationSettings: () -> Unit,
     val onRequestBatteryExemption: () -> Unit,
     val onThemeChange: (ThemeMode) -> Unit,
     val onCheckUpdate: () -> Unit,
@@ -164,6 +165,9 @@ private fun ReceiverStatusScreen(
                 action = if (ready.batteryExempt) null else "Turn off",
                 onAction = actions.onRequestBatteryExemption,
             )
+            RowDivider()
+            // Banners and the lock screen are switches in Android's own page, and phones like OnePlus start them off.
+            KeyValueRow("Banners and lock screen", "", onClick = actions.onOpenNotificationSettings, chevron = true)
         }
     }
 }
