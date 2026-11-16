@@ -6,8 +6,17 @@ import { messageToApi } from '../serializers.js';
 
 const PING_MS = 25000;
 // What a receiver is told about. Never which phones are online, their SIMs or their replies: that is
-// dashboard business. Message text stays encrypted when the phone paired with a key.
-const RECEIVER_EVENTS = new Set(['message', 'messages_cleared', 'messages_cleared_all', 'device_deleted', 'messages_purged']);
+// dashboard business. Message text stays encrypted when the phone paired with a key. A sender phone going
+// quiet, and coming back, is news for the person holding the receiver (names only, never text).
+const RECEIVER_EVENTS = new Set([
+  'message',
+  'messages_cleared',
+  'messages_cleared_all',
+  'device_deleted',
+  'messages_purged',
+  'device_quiet',
+  'device_back',
+]);
 const querySchema = z.object({ limit: z.coerce.number().int().min(1).max(500).default(100) });
 
 /**

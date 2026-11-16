@@ -4,6 +4,7 @@ import { createApp } from './app.js';
 import { cookieSecureFor } from './cookie-secure.js';
 import { createSecretBox, plainSecretBox } from './auth/secret-box.js';
 import { assertSecretsReadable, sealExistingSecrets } from './auth/secrets-at-rest.js';
+import { createSilentMonitor } from './silent.js';
 import { loadBuildInfo } from './config.js';
 import { runMigrations } from './db/migrate.js';
 import { ensureAdminUser } from './auth/users.js';
@@ -82,6 +83,20 @@ if (!cookieSecure) console.log('PUBLIC_URL is http://: sessions work without HTT
 const app = createApp({ ...loadBuildInfo(process.env), db, publicUrl, trustProxy, cookieSecure, secretBox, silentAfterMinutes });
 
 startRetentionJob(db, { onPurged: () => app.locals.events?.publish('messages_purged', {}) });
+
+// A phone that stops checking in is announced to the receiver phones (and shows as quiet on the dashboard).
+if (silentAfterMinutes > 0) {
+  createSilentMonitor({
+    db,
+    afterMinutes: silentAfterMinutes,
+    isConnected: (id) => app.locals.presence?.isConnected(id) ?? false,
+    onQuiet: (e) => app.locals.events?.publish('device_quiet', e),
+    onBack: (e) => app.locals.events?.publish('device_back', e),
+  }).start();
+  console.log(`quiet phone alerts after ${silentAfterMinutes} minutes without contact`);
+} else {
+  console.log('quiet phone alerts off (SILENT_AFTER_MINUTES=0)');
+}
 
 app.listen(port, () => {
   console.log(`server listening on :${port}`);

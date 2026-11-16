@@ -211,6 +211,18 @@ describe('GET /api/v1/receiver/stream (live updates for the receiver)', () => {
     stream.close();
   });
 
+  it('tells it when a sender phone goes quiet and when it is back, by name and never with message text', async () => {
+    const r = await ctx.addDevice({ role: 'receiver' });
+    const stream = await receiverStream(r.token);
+
+    ctx.app.locals.events.publish('device_quiet', { deviceId: 'k1', deviceName: 'Kitchen phone', minutes: 180 });
+    ctx.app.locals.events.publish('device_back', { deviceId: 'k1', deviceName: 'Kitchen phone' });
+
+    expect((await nextOfType(stream, 'device_quiet')).data).toEqual({ deviceId: 'k1', deviceName: 'Kitchen phone', minutes: 180 });
+    expect((await nextOfType(stream, 'device_back')).data).toEqual({ deviceId: 'k1', deviceName: 'Kitchen phone' });
+    stream.close();
+  });
+
   it('does not leak dashboard-only news, such as which phones are online or their replies and SIMs', async () => {
     const s = await ctx.addDevice();
     const r = await ctx.addDevice({ role: 'receiver' });
