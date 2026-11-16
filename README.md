@@ -174,7 +174,7 @@ If Android puts the phone into deep sleep and drops the connection, the 15-minut
 
 ## Quiet phones
 
-Android sometimes kills the app, or a user turns off Notification access, and then messages silently stop. To catch that, each phone checks in about every 15 minutes even when it has nothing to send. A phone not heard from for `SILENT_AFTER_MINUTES` (default 120, `0` turns it off) shows **Quiet for 3 h** in red in the sidebar. Check the app is running, Notification access is still on, and the battery and auto-start settings for the app. A phone still running an older version of the app never checks in, so it shows as quiet once it has been idle for that long. Update the app on every phone.
+Android sometimes kills the app, or a user turns off Notification access, and then messages silently stop. To catch that, each phone checks in about every 15 minutes even when it has nothing to send. A phone not heard from for `SILENT_AFTER_MINUTES` (default 120, `0` turns it off) shows **Quiet for 3 h** in red in the sidebar, and a receiver phone gets a notification when it goes quiet and when it is back. Check the app is running, Notification access is still on, and the battery and auto-start settings for the app. A phone still running an older version of the app never checks in, so it shows as quiet once it has been idle for that long. Update the app on every phone.
 
 ## Changing the password
 
@@ -200,7 +200,8 @@ The same Android app can be a **receiver**: the phone where you want to see aler
 - Each new message from your sender phones shows as a notification with the real text and sender. A 2FA code gets its own alert with a **Copy code** button.
 - Its Alerts tab keeps the latest messages, in step with the dashboard: delete messages there (or let the retention setting purge them) and they disappear from the phone and its notifications.
 - With end-to-end encryption on, the receiver decrypts on the phone, using the key from the QR code. Nothing readable passes through any third party.
-- **Alert settings** (Settings tab) choose all messages or 2FA codes only, texts and/or app notifications, and which apps are silenced.
+- **Quiet phones:** if a sender phone stops checking in (see "Quiet phones" above) the receiver shows "<phone> has gone quiet", and "<phone> is back" when it returns. Only receivers that are connected at that moment are told.
+- **Alert settings** (Settings tab) choose all messages or 2FA codes only, texts and/or app notifications, which apps are silenced, and whether quiet-phone notices show.
 - A receiver has its own limited token: it can read messages but never send, and revoking it in the dashboard stops it at once. One role per phone at a time; **Unpair this phone** returns to the Sender or Receiver choice.
 
 More about the server install and HTTPS: [deploy/README.md](deploy/README.md).

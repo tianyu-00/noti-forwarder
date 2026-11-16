@@ -38,8 +38,10 @@ class AndroidAlertSink(private val context: Context) : AlertSink {
                 .setDescription("Messages that contain a one-time code")
                 .build(),
         )
+        // The first version of this channel was a quiet one, and Android keeps a channel's importance once made.
+        manager.deleteNotificationChannel("receiver_status")
         manager.createNotificationChannel(
-            NotificationChannelCompat.Builder(CHANNEL_STATUS, NotificationManagerCompat.IMPORTANCE_DEFAULT)
+            NotificationChannelCompat.Builder(CHANNEL_STATUS, NotificationManagerCompat.IMPORTANCE_HIGH)
                 .setName("Phone status")
                 .setDescription("A sender phone has stopped checking in, or is back")
                 .build(),
@@ -89,7 +91,7 @@ class AndroidAlertSink(private val context: Context) : AlertSink {
             .setStyle(NotificationCompat.BigTextStyle().bigText(plan.text))
             .setContentIntent(open)
             .setAutoCancel(true)
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_STATUS)
             .build()
         try {
@@ -110,7 +112,7 @@ class AndroidAlertSink(private val context: Context) : AlertSink {
         const val TAG = "alert"
         const val CHANNEL_MESSAGES = "receiver_messages"
         const val CHANNEL_CODES = "receiver_codes"
-        const val CHANNEL_STATUS = "receiver_status"
+        const val CHANNEL_STATUS = "receiver_phone_status"
     }
 }
 
