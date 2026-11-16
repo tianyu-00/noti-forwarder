@@ -27,7 +27,9 @@ class HeartbeatSenderTest {
         server.close()
     }
 
-    private fun sender() = HeartbeatSender(store, appVersion = "0.1.9", onRevoked = { revoked++ })
+    private var reading: BatteryReading? = null
+
+    private fun sender() = HeartbeatSender(store, appVersion = "0.1.9", onRevoked = { revoked++ }, battery = { reading })
 
     private fun reply(code: Int) = server.enqueue(MockResponse.Builder().code(code).build())
 
@@ -43,6 +45,28 @@ class HeartbeatSenderTest {
         assertEquals("/api/v1/heartbeat", request.url.encodedPath)
         assertEquals("Bearer device-token", request.headers["Authorization"])
         assertEquals("0.1.9", request.headers["X-App-Version"])
+    }
+
+    @Test
+    fun `says how full the battery is, and whether it is charging`() {
+        reading = BatteryReading(63, true)
+        reply(204)
+
+        sender().send()
+
+        val request = server.takeRequest()
+        assertEquals("application/json; charset=utf-8", request.headers["Content-Type"])
+        assertEquals("""{"battery":{"percent":63,"charging":true}}""", request.body?.utf8())
+    }
+
+    @Test
+    fun `sends no body when the battery cannot be read`() {
+        reading = null
+        reply(204)
+
+        sender().send()
+
+        assertEquals(0L, server.takeRequest().bodySize)
     }
 
     @Test

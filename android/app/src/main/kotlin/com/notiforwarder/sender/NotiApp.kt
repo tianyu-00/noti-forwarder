@@ -30,7 +30,9 @@ class NotiApp : Application() {
         )
     }
     val heartbeat by lazy {
-        HeartbeatSender(store, appVersion = BuildConfig.VERSION_NAME, onRevoked = { controller.refresh() })
+        // Each check-in carries the battery level, so the dashboard and the receiver can show it.
+        val batteryReader = AndroidBatteryReader(this)
+        HeartbeatSender(store, appVersion = BuildConfig.VERSION_NAME, onRevoked = { controller.refresh() }, battery = batteryReader::read)
     }
     val simLookup by lazy { SimLookup(this) }
 

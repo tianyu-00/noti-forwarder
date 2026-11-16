@@ -1,6 +1,7 @@
 package com.notiforwarder.sender
 
 import java.io.IOException
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -26,14 +27,21 @@ class HeartbeatSender(
     private val http: OkHttpClient = defaultHttpClient(),
     /** Called after the credentials are cleared because the server revoked this phone. */
     private val onRevoked: () -> Unit = {},
+    /** The battery level to report with the check-in, or null when it cannot be read. */
+    private val battery: () -> BatteryReading? = { null },
 ) {
+    // Older servers ignore the body; a phone that cannot read its battery sends none, as before.
+    private fun body() = battery()?.let {
+        """{"battery":{"percent":${it.percent},"charging":${it.charging}}}""".toRequestBody("application/json; charset=utf-8".toMediaType())
+    } ?: ByteArray(0).toRequestBody(null)
+
     fun send(): HeartbeatOutcome {
         val credentials = store.load() ?: return HeartbeatOutcome.NotPaired
         val request = Request.Builder()
             .url("${credentials.serverUrl}/api/v1/heartbeat")
             .header("Authorization", "Bearer ${credentials.token}")
             .header("X-App-Version", appVersion)
-            .post(ByteArray(0).toRequestBody(null))
+            .post(body())
             .build()
         return try {
             http.newCall(request).execute().use { response ->
