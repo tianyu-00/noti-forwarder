@@ -77,7 +77,7 @@ The phone sends to a public domain (via Cloudflare tunnel), so it works from any
 /android     Kotlin Android app (sender)
 /server      Node.js API + SQLite migrations
 /web         React dashboard (PWA)
-/deploy      docker-compose.yml, env examples
+/deploy      docker-compose.yml, .env.example
 ```
 
 ## Tech stack
@@ -200,9 +200,9 @@ Current setup (decided during Milestone 0; the earlier plan for release-please, 
 - Image tags: the short commit SHA (`sha-abc1234`) and `latest` (always the newest published build). There is no `edge` or semver tag yet. The old `publish` image tag is gone; the `publish` branch is still the release trigger.
 - Builds target `linux/amd64` and `linux/arm64` until the Ubuntu host's architecture is confirmed (`uname -m` on the server); narrow it then.
 - Deploy is manual: on the Ubuntu server set `VERSION` in `.env` to an explicit tag (a SHA tag, or `latest` for the newest) and run `docker compose pull && docker compose up -d`. Roll back by changing `VERSION`. See `deploy/README.md`. A push publishing an image does not by itself change what is running.
-- `deploy/docker-compose.yml` references images by `${VERSION}`, defaulting to `latest` only in the own-database file. The `web` container (nginx) is the single public entry point on `127.0.0.1:3000`; it serves the dashboard and proxies `/api` to the server, which is not published. Point the Cloudflare tunnel at it. Phones use the same public address.
+- `deploy/docker-compose.yml` is the one compose file: images by `${VERSION:-latest}`, only `PUBLIC_URL` and `ADMIN_PASSWORD` required, the rest defaulted (see `deploy/.env.example`), data in the `notiforwarder-data` volume. The `web` container (nginx) is the single public entry point on port 3000 (`WEB_BIND` to restrict it); it serves the dashboard and proxies `/api` to the server, which is not published. Point the Cloudflare tunnel at it. Phones use the same public address.
 - Set `TRUST_PROXY` to the number of reverse-proxy hops in front of the server (2 = cloudflared + the web container) so per-IP rate limits see the real client address.
-- The compose files do not include a tunnel or proxy (HTTPS is the user's own setup). `deploy/docker-compose.byo.yml` is the short version with defaults: it runs only `web` and `server` (with `.env.byo.example`). There is no database to set up. See `deploy/README.md`.
+- The compose file does not include a tunnel or proxy (HTTPS is the user's own setup); it runs only `web` and `server`. There is no database to set up. See `deploy/README.md`.
 - Every component reports its version: `GET /api/v1/health` returns `{ version, commit, buildTime }`, and the web dashboard shows the web and server versions in its footer. They are passed in as Docker build args (`APP_VERSION`, `GIT_COMMIT`, `BUILD_TIME`).
 - Versions: the `VERSION` file at the repo root holds `MAJOR.MINOR` (edit it by hand to bump). CI appends the workflow run number, giving `0.1.<run>`, and uses it for the server and web images (`APP_VERSION`), the Android `versionName`, and a GitHub Release tag `v0.1.<run>`. The Android `versionCode` is the run number, so it always rises. Local builds use `0.1.0-dev`, code 1.\n- Android release: on a push to `publish`, the `release-android` job builds a signed release APK and attaches it to that GitHub Release (sideload it). It signs with a keystore from the GitHub secrets `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` and `ANDROID_KEY_PASSWORD`; without them it falls back to the debug key with a warning, and a phone then cannot update the app in place. Never commit a keystore (`*.jks` is ignored). Not decided yet: changelog automation.
 - API compatibility: the API is versioned in the URL (`/api/v1`). Old phones must keep working after a server update, so never make a breaking change to `v1`. Add `v2` instead and support both until the phones are updated. The server records the phone app's version from each request (`X-App-Version` header).
