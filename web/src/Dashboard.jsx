@@ -191,15 +191,19 @@ export default function Dashboard({ username, onLogout, pairingTiming }) {
 
   // A heartbeat or a message proves the phone is alive right now.
   const markSeen = useCallback(
-    (deviceId, lastSeen) =>
+    (deviceId, lastSeen, battery) =>
       setDevices((list) =>
-        list.map((x) => (x.deviceId === deviceId ? { ...x, lastSeen } : x)),
+        list.map((x) =>
+          x.deviceId === deviceId
+            ? { ...x, lastSeen, ...(battery ? { battery } : {}) }
+            : x,
+        ),
       ),
     [],
   );
 
   useStream({
-    device_seen: (d) => markSeen(d.deviceId, d.lastSeen),
+    device_seen: (d) => markSeen(d.deviceId, d.lastSeen, d.battery),
     // The phone listed its SIMs again (a SIM was swapped, or it changed which ones it allows).
     device_sims: (d) =>
       setDevices((list) =>

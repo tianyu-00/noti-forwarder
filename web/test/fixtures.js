@@ -17,6 +17,7 @@ export function device(overrides = {}) {
     role: "sender",
     sims: null,
     replies: null,
+    battery: null,
     ...overrides,
   };
 }

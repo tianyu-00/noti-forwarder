@@ -2,6 +2,11 @@ import PropTypes from "prop-types";
 import clsx from "clsx";
 import { formatQuiet, timeAgo } from "./time.js";
 
+const batteryShape = PropTypes.shape({
+  percent: PropTypes.number.isRequired,
+  charging: PropTypes.bool.isRequired,
+});
+
 export const deviceShape = PropTypes.shape({
   deviceId: PropTypes.string.isRequired,
   name: PropTypes.string.isRequired,
@@ -12,6 +17,8 @@ export const deviceShape = PropTypes.shape({
   revokedAt: PropTypes.string,
   // "sender" forwards notifications; "receiver" is the main phone that shows alerts.
   role: PropTypes.string,
+  // The last level the phone reported; null if it never has.
+  battery: batteryShape,
 });
 
 // A phone that has not checked in for silentAfterMinutes is "quiet": its messages may have
@@ -88,6 +95,39 @@ Item.propTypes = {
   children: PropTypes.node.isRequired,
 };
 
+// 15% or less and not charging: the same limit the receiver alerts at.
+const isLow = (battery) => battery.percent <= 15 && !battery.charging;
+
+// A small battery drawn in SVG, filled to the level, with a bolt while it charges. The words say the
+// same thing for screen readers (and for anyone who cannot tell the colours apart).
+function BatteryBadge({ battery }) {
+  const low = isLow(battery);
+  const label = `Battery ${battery.percent}%${battery.charging ? ", charging" : low ? ", low" : ""}`;
+  const fill = Math.max(0, Math.min(100, battery.percent)) / 100;
+  return (
+    <span
+      role="img"
+      aria-label={label}
+      className={clsx(
+        "flex shrink-0 items-center gap-1 text-xs",
+        low ? "font-medium text-rail-danger" : "text-rail-muted",
+      )}
+    >
+      <svg viewBox="0 0 24 12" width="18" height="9" aria-hidden="true">
+        <rect x="0.75" y="0.75" width="19" height="10.5" rx="2.5" fill="none" stroke="currentColor" strokeWidth="1.5" />
+        <rect x="21" y="3.75" width="2.25" height="4.5" rx="1" fill="currentColor" />
+        <rect x="2.5" y="2.5" width={15.5 * fill} height="7" rx="1.2" fill="currentColor" />
+        {battery.charging && (
+          <path d="M11.5 1.5 7 6.6h3.3L9 10.6l5-5.3h-3.4z" fill="var(--rail)" stroke="currentColor" strokeWidth="0.6" strokeLinejoin="round" />
+        )}
+      </svg>
+      <span aria-hidden="true">{battery.percent}%</span>
+    </span>
+  );
+}
+
+BatteryBadge.propTypes = { battery: batteryShape.isRequired };
+
 function StatusRow({ device, silentAfterMinutes, now }) {
   const state = stateOf(device, silentAfterMinutes, now);
   const tone =
@@ -95,9 +135,14 @@ function StatusRow({ device, silentAfterMinutes, now }) {
       state
     ] ?? "text-rail-muted";
   return (
-    <span className={clsx("flex items-center gap-1.5 text-xs", tone)}>
-      <StatusDot state={state} />
-      {status(device, state, silentAfterMinutes, now)}
+    <span className="flex items-center justify-between gap-2">
+      <span className={clsx("flex items-center gap-1.5 text-xs", tone)}>
+        <StatusDot state={state} />
+        {status(device, state, silentAfterMinutes, now)}
+      </span>
+      {device.battery && state !== "revoked" && (
+        <BatteryBadge battery={device.battery} />
+      )}
     </span>
   );
 }
