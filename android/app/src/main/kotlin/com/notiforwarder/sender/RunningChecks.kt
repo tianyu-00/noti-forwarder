@@ -60,3 +60,23 @@ fun runningChecks(settings: CaptureSettings, ready: Readiness): List<RunningChec
     // Android cannot say whether auto-start is allowed, so this always asks the user to check.
     add(RunningCheck(RunningCheck.Kind.AutoStart, text = "Auto-start", ok = false, detail = autoStartHelp(), action = "Open"))
 }
+
+/** The receiver's version: it needs to show notifications and stay alive, but never reads notifications or texts itself. */
+fun receiverChecks(ready: Readiness): List<RunningCheck> = listOf(
+    RunningCheck(
+        RunningCheck.Kind.PostNotifications,
+        text = if (ready.notificationsAllowed) "Notifications are allowed" else "Allow notifications",
+        ok = ready.notificationsAllowed,
+        detail = if (ready.notificationsAllowed) null else "Without it, alerts cannot show on this phone",
+        action = if (ready.notificationsAllowed) null else "Allow",
+    ),
+    RunningCheck(
+        RunningCheck.Kind.Battery,
+        text = if (ready.batteryExempt) "Battery optimisation is off" else "Battery optimisation is on",
+        ok = ready.batteryExempt,
+        detail = if (ready.batteryExempt) null else "Alerts may arrive late, or not at all, when the screen is off",
+        action = if (ready.batteryExempt) null else "Turn off",
+    ),
+    // Android cannot say whether auto-start is allowed, so this always asks the user to check.
+    RunningCheck(RunningCheck.Kind.AutoStart, text = "Auto-start", ok = false, detail = autoStartHelp(), action = "Open"),
+)

@@ -285,6 +285,7 @@ private fun MainScreen(
                             )
                         },
                         onRequestBatteryExemption = onRequestBatteryExemption,
+                        onOpenAutoStart = onOpenAutoStart,
                         onThemeChange = onThemeChange,
                         onCheckUpdate = { scope.launch(Dispatchers.IO) { app.updater.check() } },
                         onInstallUpdate = { scope.launch(Dispatchers.IO) { app.updater.downloadAndInstall() } },

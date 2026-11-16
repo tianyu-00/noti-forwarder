@@ -45,6 +45,7 @@ internal class ReceiverActions(
     val onAllowNotifications: () -> Unit,
     val onOpenNotificationSettings: () -> Unit,
     val onRequestBatteryExemption: () -> Unit,
+    val onOpenAutoStart: () -> Unit,
     val onThemeChange: (ThemeMode) -> Unit,
     val onCheckUpdate: () -> Unit,
     val onInstallUpdate: () -> Unit,
@@ -150,21 +151,20 @@ private fun ReceiverStatusScreen(
 
         NotiCard(padding = androidx.compose.foundation.layout.PaddingValues(horizontal = 18.dp, vertical = 8.dp)) {
             CardLabel("Keep it running")
-            CheckRow(
-                text = if (ready.notificationsAllowed) "Notifications are allowed" else "Allow notifications",
-                ok = ready.notificationsAllowed,
-                detail = if (ready.notificationsAllowed) null else "Without it, alerts cannot show on this phone",
-                action = if (ready.notificationsAllowed) null else "Allow",
-                onAction = actions.onAllowNotifications,
-            )
-            RowDivider()
-            CheckRow(
-                text = if (ready.batteryExempt) "Battery optimisation is off" else "Battery optimisation is on",
-                ok = ready.batteryExempt,
-                detail = if (ready.batteryExempt) null else "Alerts may arrive late, or not at all, when the screen is off",
-                action = if (ready.batteryExempt) null else "Turn off",
-                onAction = actions.onRequestBatteryExemption,
-            )
+            receiverChecks(ready).forEachIndexed { index, check ->
+                if (index > 0) RowDivider()
+                CheckRow(
+                    text = check.text,
+                    ok = check.ok,
+                    detail = check.detail,
+                    action = check.action,
+                    onAction = when (check.kind) {
+                        RunningCheck.Kind.PostNotifications -> actions.onAllowNotifications
+                        RunningCheck.Kind.Battery -> actions.onRequestBatteryExemption
+                        else -> actions.onOpenAutoStart
+                    },
+                )
+            }
             RowDivider()
             // Banners and the lock screen are switches in Android's own page, and phones like OnePlus start them off.
             KeyValueRow("Banners and lock screen", "", onClick = actions.onOpenNotificationSettings, chevron = true)
