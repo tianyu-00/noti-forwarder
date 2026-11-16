@@ -21,6 +21,23 @@ class NotificationParserTest {
     ) = RawNotification(packageName, title, text, bigText, postTime, ongoing, groupSummary, foregroundService)
 
     @Test
+    fun `ignores this app's own notifications, and those of its release or dev twin installed beside it`() {
+        // The signed app and the dev build are separate apps on one phone. Neither may forward the other's alerts,
+        // which carry message text and 2FA codes (and clearing them after forwarding would also remove them at once).
+        assertNull(parser.parse(raw(packageName = "com.notiforwarder.sender")))
+        assertNull(parser.parse(raw(packageName = "com.notiforwarder.sender.debug")))
+        val dev = NotificationParser(ownPackage = "com.notiforwarder.sender.debug")
+        assertNull(dev.parse(raw(packageName = "com.notiforwarder.sender.debug")))
+        assertNull(dev.parse(raw(packageName = "com.notiforwarder.sender")))
+    }
+
+    @Test
+    fun `still forwards an app whose name only starts like this one`() {
+        assertNotNull(parser.parse(raw(packageName = "com.notiforwarder.sender.other")))
+        assertNotNull(parser.parse(raw(packageName = "com.notiforwarder.senderx")))
+    }
+
+    @Test
     fun `maps a notification to a message`() {
         val message = parser.parse(raw())!!
 

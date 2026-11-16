@@ -6,6 +6,7 @@ import android.content.IntentFilter
 import android.os.BatteryManager
 
 /** How full the battery is (0 to 100) and whether the phone is plugged in. */
+@kotlinx.serialization.Serializable
 data class BatteryReading(val percent: Int, val charging: Boolean) {
     companion object {
         /** From what Android reports: [level] out of [scale], and the [status] code. Null if it gave nothing usable. */

@@ -264,4 +264,48 @@ class ReceiverEngineTest {
 
         assertTrue(alerts.statuses.isEmpty())
     }
+
+    // --- a sender phone's battery running low ---
+
+    @Test
+    fun `a phone's battery running low shows a notice naming it`() {
+        engine().onEvent("device_battery_low", """{"deviceId":"d1","deviceName":"Kitchen phone","percent":14}""")
+
+        assertEquals(listOf("Kitchen phone battery is low"), alerts.statuses.map { it.title })
+        assertEquals(BatteryPlanner.keyFor("d1"), alerts.statuses[0].key)
+    }
+
+    @Test
+    fun `low-battery notices follow the switches`() {
+        settings = ReceiverSettings(batteryAlerts = false)
+        engine().onEvent("device_battery_low", """{"deviceId":"d1","deviceName":"Kitchen phone","percent":14}""")
+        settings = ReceiverSettings(enabled = false)
+        engine().onEvent("device_battery_low", """{"deviceId":"d1","deviceName":"Kitchen phone","percent":14}""")
+
+        assertTrue(alerts.statuses.isEmpty())
+    }
+
+    @Test
+    fun `when the battery recovers the notice goes, even with the alerts switched off by then`() {
+        settings = ReceiverSettings(batteryAlerts = false)
+        engine().onEvent("device_battery_ok", """{"deviceId":"d1","deviceName":"Kitchen phone","percent":40}""")
+
+        assertEquals(listOf(BatteryPlanner.keyFor("d1")), alerts.cancelled)
+        assertTrue(alerts.statuses.isEmpty()) // nothing new is announced for good news
+    }
+
+    @Test
+    fun `an erased phone takes its battery notice with it`() {
+        engine().onEvent("device_deleted", """{"deviceId":"d1"}""")
+
+        assertTrue(BatteryPlanner.keyFor("d1") in alerts.cancelled)
+    }
+
+    @Test
+    fun `damaged battery news is ignored`() {
+        engine().onEvent("device_battery_low", "not json")
+        engine().onEvent("device_battery_low", """{"percent":5}""")
+
+        assertTrue(alerts.statuses.isEmpty())
+    }
 }

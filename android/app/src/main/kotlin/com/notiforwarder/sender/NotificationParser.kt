@@ -38,9 +38,13 @@ class NotificationParser(
     private val ownPackage: String,
     private val newId: () -> String = { UUID.randomUUID().toString() },
 ) {
+    // The signed app and the dev build (".debug") are two apps that can sit on one phone: neither forwards the other's
+    // notifications, which are alerts carrying message text and 2FA codes.
+    private val ownFamily = ownPackage.removeSuffix(".debug")
+
     /** Returns null for notifications that should never be forwarded. */
     fun parse(raw: RawNotification): Message? {
-        if (raw.packageName == ownPackage) return null
+        if (raw.packageName == ownFamily || raw.packageName == "$ownFamily.debug") return null
         if (raw.isOngoing || raw.isForegroundService || raw.isGroupSummary) return null
 
         val title = raw.title?.trim().orEmpty()

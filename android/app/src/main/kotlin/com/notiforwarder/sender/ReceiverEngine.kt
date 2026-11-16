@@ -10,6 +10,10 @@ import kotlinx.serialization.json.jsonPrimitive
 @kotlinx.serialization.Serializable
 private data class QuietEvent(val deviceId: String, val deviceName: String? = null, val minutes: Int = 0)
 
+/** News from the server about a sender phone's battery running low (or recovering). */
+@kotlinx.serialization.Serializable
+private data class BatteryEvent(val deviceId: String, val deviceName: String? = null, val percent: Int = 0)
+
 sealed interface RecentOutcome {
     data class Messages(val messages: List<ReceivedMessage>) : RecentOutcome
     data object Unauthorized : RecentOutcome
@@ -101,11 +105,20 @@ class ReceiverEngine(
                 val ids = store.idsForDevice(deviceId)
                 store.delete(ids)
                 // An erased phone can no longer be quiet, so its notice goes too.
-                alerts.cancel(if (type == "device_deleted") ids + QuietPlanner.keyFor(deviceId) else ids)
+                alerts.cancel(if (type == "device_deleted") ids + QuietPlanner.keyFor(deviceId) + BatteryPlanner.keyFor(deviceId) else ids)
             }
             "device_quiet" -> {
                 val e = parse<QuietEvent>(data) ?: return
                 QuietPlanner.quiet(e.deviceId, e.deviceName, e.minutes, settings())?.let(alerts::showStatus)
+            }
+            "device_battery_low" -> {
+                val e = parse<BatteryEvent>(data) ?: return
+                BatteryPlanner.low(e.deviceId, e.deviceName, e.percent, settings())?.let(alerts::showStatus)
+            }
+            // Good news needs no notice of its own: the low one just goes, whatever the switches say by now.
+            "device_battery_ok" -> {
+                val e = parse<BatteryEvent>(data) ?: return
+                alerts.cancel(listOf(BatteryPlanner.keyFor(e.deviceId)))
             }
             "device_back" -> {
                 val e = parse<QuietEvent>(data) ?: return

@@ -48,9 +48,10 @@ class NotiApp : Application() {
 
     // One thread for everything the receiver does with its messages, so events and syncs never overlap.
     private val receiverThread = Executors.newSingleThreadExecutor { r -> Thread(r, "receiver").apply { isDaemon = true } }
+    val receiverClient by lazy { ReceiverClient(store, appVersion = BuildConfig.VERSION_NAME, onRevoked = { controller.refresh() }) }
     private val receiverEngine by lazy {
         ReceiverEngine(
-            api = ReceiverClient(store, appVersion = BuildConfig.VERSION_NAME, onRevoked = { controller.refresh() }),
+            api = receiverClient,
             store = receivedStore,
             alerts = alertSink,
             settings = receiverSettingsStore::load,

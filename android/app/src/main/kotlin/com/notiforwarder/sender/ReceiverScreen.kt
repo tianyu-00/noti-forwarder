@@ -73,6 +73,15 @@ internal fun ReceiverScreen(
     }
     val connection by app.receiverStream.state.collectAsState()
 
+    // The sender phones and their battery, looked up while the Status page is open.
+    var phones by remember { mutableStateOf<List<SenderPhone>>(emptyList()) }
+    LaunchedEffect(tab) {
+        while (tab == Tab.Status) {
+            (withContext(Dispatchers.IO) { app.receiverClient.phones() } as? PhonesOutcome.Phones)?.let { phones = it.phones }
+            delay(30_000)
+        }
+    }
+
     // The alert rules are a page behind Settings; the back button and leaving the tab both close it.
     var showAlertSettings by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(tab) { if (tab != Tab.Settings) showAlertSettings = false }
@@ -92,7 +101,7 @@ internal fun ReceiverScreen(
                 val startOfToday = java.time.LocalDate.now().atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
                 receiverStats(messages, startOfToday)
             }
-            ReceiverStatusScreen(paired, connection, ready, stats, actions)
+            ReceiverStatusScreen(paired, connection, ready, stats, phones, actions)
         }
     }
 }
@@ -103,6 +112,7 @@ private fun ReceiverStatusScreen(
     connection: ConnectionState,
     ready: Readiness,
     stats: ReceiverStats,
+    phones: List<SenderPhone>,
     actions: ReceiverActions,
 ) {
     val colors = MaterialTheme.colorScheme
@@ -147,6 +157,39 @@ private fun ReceiverStatusScreen(
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             StatTile("Today", stats.today.toString(), Modifier.weight(1f))
             StatTile("Last message", describeAgoShort(stats.lastAt, now), Modifier.weight(1f))
+        }
+
+        if (phones.isNotEmpty()) {
+            NotiCard(padding = androidx.compose.foundation.layout.PaddingValues(horizontal = 18.dp, vertical = 8.dp)) {
+                CardLabel("Sender phones")
+                phones.forEachIndexed { index, phone ->
+                    if (index > 0) RowDivider()
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 13.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(phone.name, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                        phone.battery?.let { battery ->
+                            val low = BatteryPlanner.isLow(battery)
+                            val tone = if (low) colors.error else colors.onSurfaceVariant
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.padding(start = 12.dp),
+                            ) {
+                                BatteryIcon(battery.percent, battery.charging, tone)
+                                Text(
+                                    BatteryPlanner.describe(battery),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = tone,
+                                    fontWeight = if (low) FontWeight.SemiBold else FontWeight.Normal,
+                                )
+                            }
+                        } ?: Text("No battery yet", style = MaterialTheme.typography.bodyMedium, color = colors.outline)
+                    }
+                }
+            }
         }
 
         NotiCard(padding = androidx.compose.foundation.layout.PaddingValues(horizontal = 18.dp, vertical = 8.dp)) {
@@ -339,6 +382,10 @@ private fun ReceiverAlertSettingsScreen(app: NotiApp, messages: List<ReceivedMes
             RowDivider()
             SwitchRow("Quiet phones", "Tell me when a sender phone stops checking in, and when it is back", settings.quietAlerts) {
                 change(settings.copy(quietAlerts = it))
+            }
+            RowDivider()
+            SwitchRow("Low battery", "Tell me when a sender phone is at 15% or less and not charging", settings.batteryAlerts) {
+                change(settings.copy(batteryAlerts = it))
             }
         }
 

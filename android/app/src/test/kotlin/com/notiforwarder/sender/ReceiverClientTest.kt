@@ -93,4 +93,41 @@ class ReceiverClientTest {
         assertTrue(client().recent(10) is RecentOutcome.Failed)
         assertEquals(0, server.requestCount)
     }
+
+    // --- the sender phones, with their battery ---
+
+    private val phonesBody = """{"phones":[
+        {"deviceId":"d1","name":"Kitchen phone","battery":{"percent":63,"charging":true},"lastSeen":"2026-11-11T10:00:00.000Z"},
+        {"deviceId":"d2","name":"Spare","battery":null,"lastSeen":null}]}"""
+
+    @Test
+    fun `asks for the sender phones with the receiver token and reads their battery`() {
+        reply(200, phonesBody)
+
+        val outcome = client().phones() as PhonesOutcome.Phones
+
+        assertEquals(listOf("Kitchen phone", "Spare"), outcome.phones.map { it.name })
+        assertEquals(BatteryReading(63, true), outcome.phones[0].battery)
+        assertNull(outcome.phones[1].battery)
+        val request = server.takeRequest()
+        assertEquals("/api/v1/receiver/phones", request.url.encodedPath)
+        assertEquals("Bearer receiver-token", request.headers["Authorization"])
+    }
+
+    @Test
+    fun `an unauthorized answer to the phone list clears the pairing`() {
+        reply(401)
+
+        assertEquals(PhonesOutcome.Unauthorized, client().phones())
+        assertNull(store.load())
+        assertEquals(1, revoked)
+    }
+
+    @Test
+    fun `a damaged or failed phone list is a failure, not a crash`() {
+        reply(200, "not json")
+        assertTrue(client().phones() is PhonesOutcome.Failed)
+        reply(500)
+        assertTrue(client().phones() is PhonesOutcome.Failed)
+    }
 }

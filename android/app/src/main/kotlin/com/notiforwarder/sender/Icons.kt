@@ -57,3 +57,43 @@ fun IconMark(icon: AppIcon, color: Color, modifier: Modifier = Modifier, size: D
         }
     }
 }
+
+/** A battery drawn in code: an outline filled to [percent], with a bolt while it charges. */
+@Composable
+fun BatteryIcon(percent: Int, charging: Boolean, color: Color, modifier: Modifier = Modifier, width: Dp = 24.dp) {
+    androidx.compose.foundation.Canvas(modifier.size(width, width / 2)) {
+        val unit = size.width / 24f
+        val stroke = Stroke(width = 1.6f * unit, cap = StrokeCap.Round, join = StrokeJoin.Round)
+        // Body, and the little cap on the right.
+        drawRoundRect(
+            color, topLeft = Offset(0.8f * unit, 0.8f * unit), size = androidx.compose.ui.geometry.Size(19.4f * unit, 10.4f * unit),
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(2.6f * unit), style = stroke,
+        )
+        drawRoundRect(
+            color, topLeft = Offset(21.2f * unit, 3.8f * unit), size = androidx.compose.ui.geometry.Size(2.2f * unit, 4.4f * unit),
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(1f * unit),
+        )
+        // The charge, from the left.
+        val fill = percent.coerceIn(0, 100) / 100f
+        if (fill > 0f) {
+            drawRoundRect(
+                color, topLeft = Offset(2.6f * unit, 2.6f * unit), size = androidx.compose.ui.geometry.Size(16f * unit * fill, 6.8f * unit),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(1.2f * unit),
+            )
+        }
+        if (charging) {
+            drawPath(
+                Path().apply {
+                    moveTo(11.8f * unit, 1.2f * unit)
+                    lineTo(7f * unit, 6.6f * unit)
+                    lineTo(10.4f * unit, 6.6f * unit)
+                    lineTo(9.2f * unit, 10.8f * unit)
+                    lineTo(14.4f * unit, 5.2f * unit)
+                    lineTo(11f * unit, 5.2f * unit)
+                    close()
+                },
+                androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.85f),
+            )
+        }
+    }
+}

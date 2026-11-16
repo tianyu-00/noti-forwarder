@@ -12,6 +12,8 @@ data class ReceiverSettings(
     val blockedApps: Set<String> = emptySet(),
     /** Tell me when a sender phone stops checking in, and when it is back. */
     val quietAlerts: Boolean = true,
+    /** Tell me when a sender phone's battery is running low. */
+    val batteryAlerts: Boolean = true,
 )
 
 interface ReceiverSettingsStore {
@@ -28,6 +30,7 @@ class PrefsReceiverSettingsStore(context: android.content.Context, name: String 
         types = prefs.getStringSet(TYPES, null)?.toSet() ?: setOf("sms", "notification"),
         blockedApps = prefs.getStringSet(BLOCKED, emptySet())?.toSet().orEmpty(),
         quietAlerts = prefs.getBoolean(QUIET, true),
+        batteryAlerts = prefs.getBoolean(BATTERY, true),
     )
 
     override fun save(settings: ReceiverSettings) = prefs.edit()
@@ -36,6 +39,7 @@ class PrefsReceiverSettingsStore(context: android.content.Context, name: String 
         .putStringSet(TYPES, settings.types)
         .putStringSet(BLOCKED, settings.blockedApps)
         .putBoolean(QUIET, settings.quietAlerts)
+        .putBoolean(BATTERY, settings.batteryAlerts)
         .apply()
 
     private companion object {
@@ -44,6 +48,7 @@ class PrefsReceiverSettingsStore(context: android.content.Context, name: String 
         const val TYPES = "types"
         const val BLOCKED = "blockedApps"
         const val QUIET = "quietAlerts"
+        const val BATTERY = "batteryAlerts"
     }
 }
 
